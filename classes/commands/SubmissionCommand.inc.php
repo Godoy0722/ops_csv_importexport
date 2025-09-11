@@ -25,7 +25,6 @@ use PKP\Plugins\ImportExport\CSV\Classes\Handlers\CSVFileHandler;
 use PKP\Plugins\ImportExport\CSV\Classes\Processors\AuthorsProcessor;
 use PKP\Plugins\ImportExport\CSV\Classes\Processors\CategoriesProcessor;
 use PKP\Plugins\ImportExport\CSV\Classes\Processors\GalleyProcessor;
-use PKP\Plugins\ImportExport\CSV\Classes\Processors\IssueProcessor;
 use PKP\Plugins\ImportExport\CSV\Classes\Processors\KeywordsProcessor;
 use PKP\Plugins\ImportExport\CSV\Classes\Processors\PublicationProcessor;
 use PKP\Plugins\ImportExport\CSV\Classes\Processors\SectionsProcessor;
@@ -35,7 +34,7 @@ use PKP\Plugins\ImportExport\CSV\Classes\Processors\SubmissionProcessor;
 use PKP\Plugins\ImportExport\CSV\Classes\Validations\InvalidRowValidations;
 use PKP\Plugins\ImportExport\CSV\Classes\Validations\RequiredIssueHeaders;
 
-class IssueCommand
+class SubmissionCommand
 {
     /**
      * Expected row size for a CSV based on the command passed as argument
@@ -79,9 +78,6 @@ class IssueCommand
     /** @var string */
     private $_format;
 
-    /** @var array */
-    private $_processedIssues;
-
     /**
 	 * @param string $sourceDir
 	 * @param \User $user
@@ -92,7 +88,6 @@ class IssueCommand
         $this->_expectedRowSize = count(RequiredIssueHeaders::$issueHeaders);
         $this->_sourceDir = $sourceDir;
         $this->_user = $user;
-        $this->_processedIssues = [];
     }
 
     public function run()
@@ -190,9 +185,8 @@ class IssueCommand
                 }
 
                 // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
-			    $genreName = mb_strtoupper($data->genreName ?? 'SUBMISSION');
-                $genreId = CachedEntities::getCachedGenreId($genreName, $journal->getId());
-                $reason = InvalidRowValidations::validateGenreIdValid($genreId, $genreName);
+                $genreId = CachedEntities::getCachedGenreId('SUBMISSION', $journal->getId());
+                $reason = InvalidRowValidations::validateGenreIdValid($genreId, 'SUBMISSION');
 
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->_expectedRowSize, $reason, $this->_failedRows);
@@ -356,22 +350,10 @@ class IssueCommand
                     CategoriesProcessor::process($data->categories, $data->locale, $journal->getId(), $publication->getId());
                 }
 
-				import('plugins.importexport.csv.classes.processors.IssueProcessor');
-                $issue = IssueProcessor::process($journal->getId(), $data);
-                PublicationProcessor::updateIssueId($publication, $issue->getId());
-
-                $issueKey = $journal->getId() . '_' . $issue->getId();
-                if (!isset($this->_processedIssues[$issueKey])) {
-                    $this->_processedIssues[$issueKey] = [
-                        'issue' => $issue,
-                        'journalId' => $journal->getId(),
-                        'data' => $data
-                    ];
-                }
-
 				import('plugins.importexport.csv.classes.processors.SectionsProcessor');
                 $section = SectionsProcessor::process($data, $journal->getId());
-                PublicationProcessor::updateSectionId($publication, $section->getId());
+
+				PublicationProcessor::updateSectionId($publication, $section->getId());
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [
@@ -384,9 +366,6 @@ class IssueCommand
                 unlink($this->_sourceDir . '/' . "invalid_{$basename}");
             }
         }
-
-		import('plugins.importexport.csv.classes.processors.IssueProcessor');
-        IssueProcessor::reorderImportedIssues($this->_processedIssues);
     }
 
     /**

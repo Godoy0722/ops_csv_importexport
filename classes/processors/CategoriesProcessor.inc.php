@@ -33,7 +33,7 @@ class CategoriesProcessor
 	 */
 	public static function process($categories, $locale, $journalId, $publicationId)
     {
-        $categoriesArray = explode(';', $categories);
+        $categoriesArray = array_map('trim', explode(';', $categories));
 
         foreach ($categoriesArray as $categoryPath) {
             $lowerCategoryPath = mb_strtolower(trim($categoryPath));

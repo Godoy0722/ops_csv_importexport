@@ -19,7 +19,7 @@ namespace PKP\Plugins\ImportExport\CSV;
 import('lib.pkp.classes.plugins.ImportExportPlugin');
 
 use PKP\Plugins\ImportExport\CSV\Classes\CachedAttributes\CachedDaos;
-use PKP\Plugins\ImportExport\CSV\Classes\Commands\IssueCommand;
+use PKP\Plugins\ImportExport\CSV\Classes\Commands\SubmissionCommand;
 use PKP\Plugins\ImportExport\CSV\Classes\Commands\UserCommand;
 
 class CSVImportExportPlugin extends \ImportExportPlugin
@@ -132,7 +132,7 @@ class CSVImportExportPlugin extends \ImportExportPlugin
         $this->_sourceDir = array_shift($args);
         $this->_sendWelcomeEmail = array_shift($args) ?? false;
 
-        if (! in_array($this->_command, ['issues', 'users']) || !$this->_sourceDir || !$this->_username) {
+        if (! in_array($this->_command, ['submissions', 'users']) || !$this->_sourceDir || !$this->_username) {
 			$this->usage($scriptName);
 			exit(1);
 		}
@@ -151,16 +151,16 @@ class CSVImportExportPlugin extends \ImportExportPlugin
 		import('plugins.importexport.csv.classes.cachedAttributes.CachedEntities');
 
         switch ($this->_command) {
-            case 'issues':
-				import('plugins.importexport.csv.classes.commands.IssueCommand');
-				(new IssueCommand($this->_sourceDir, $this->_user))->run();
+            case 'submissions':
+				import('plugins.importexport.csv.classes.commands.SubmissionCommand');
+				(new SubmissionCommand($this->_sourceDir, $this->_user))->run();
                 break;
             case 'users':
 				import('plugins.importexport.csv.classes.commands.UserCommand');
                 (new UserCommand($this->_sourceDir, $this->_user, $this->_sendWelcomeEmail))->run();
                 break;
             default:
-                throw new \InvalidArgumentException("Comando inválido: {$this->_command}");
+                throw new \InvalidArgumentException("Invalid Command: {$this->_command}");
         }
 
 		$endTime = microtime(true);

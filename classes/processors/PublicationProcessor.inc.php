@@ -61,7 +61,6 @@ class PublicationProcessor
         $publicationDao->insertObject($publication);
 
 		self::setCopyrightFromSystem($submission, $publication, $data);
-		$publicationDao->updateObject($publication);
 
         SubmissionProcessor::updateCurrentPublicationId($submission, $publication->getId());
 
@@ -115,19 +114,6 @@ class PublicationProcessor
     }
 
     /**
-     * Updates the issue ID for the publication
-	 *
-	 * @param \Publication $publication
-	 * @param int $issueId
-	 *
-	 * @return void
-     */
-    public static function updateIssueId($publication, $issueId)
-    {
-        self::updatePublicationAttribute($publication, 'issueId', $issueId);
-    }
-
-    /**
      * Updates the section ID for the publication
 	 *
 	 * @param \Publication $publication
@@ -175,20 +161,20 @@ class PublicationProcessor
             PERMISSIONS_FIELD_COPYRIGHT_HOLDER,
             $publication
         );
-        $publication->setData('copyrightHolder', $copyrightHolder);
+		self::updatePublicationAttribute($publication, 'copyrightHolder', $copyrightHolder);
 
         $copyrightYear = $data->copyrightYear ?? $submission->_getContextLicenseFieldValue(
             null,
             PERMISSIONS_FIELD_COPYRIGHT_YEAR,
             $publication
         );
-        $publication->setData('copyrightYear', $copyrightYear);
+		self::updatePublicationAttribute($publication, 'copyrightYear', $copyrightYear);
 
         $licenseUrl =  $data->licenseUrl ?? $submission->_getContextLicenseFieldValue(
             null,
             PERMISSIONS_FIELD_LICENSE_URL,
             $publication
         );
-        $publication->setData('licenseUrl', $licenseUrl);
+		self::updatePublicationAttribute($publication, 'licenseUrl', $licenseUrl);
     }
 }

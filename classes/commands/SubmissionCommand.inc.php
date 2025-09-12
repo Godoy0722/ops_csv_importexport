@@ -345,15 +345,14 @@ class SubmissionCommand
                     PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
                 }
 
+				import('plugins.importexport.csv.classes.processors.SectionsProcessor');
+                $section = SectionsProcessor::process($data, $journal->getId());
+				PublicationProcessor::updateSectionId($publication, $section->getId());
+
                 if ($data->categories) {
 					import('plugins.importexport.csv.classes.processors.CategoriesProcessor');
                     CategoriesProcessor::process($data->categories, $data->locale, $journal->getId(), $publication->getId());
                 }
-
-				import('plugins.importexport.csv.classes.processors.SectionsProcessor');
-                $section = SectionsProcessor::process($data, $journal->getId());
-
-				PublicationProcessor::updateSectionId($publication, $section->getId());
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [

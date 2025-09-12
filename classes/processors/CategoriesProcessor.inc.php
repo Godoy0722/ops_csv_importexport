@@ -48,8 +48,9 @@ class CategoriesProcessor
                 $category->setParentId(null);
                 $category->setSequence(REALLY_BIG_NUMBER);
                 $category->setPath($lowerCategoryPath);
-
                 $categoryDao->insertObject($category);
+
+				CachedEntities::$categories[$lowerCategoryPath] = $category;
             }
 
             $categoryDao->insertPublicationAssignment($category->getId(), $publicationId);

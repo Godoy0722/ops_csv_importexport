@@ -16,10 +16,10 @@
 
 namespace APP\plugins\importexport\csv\classes\validations;
 
-class RequiredIssueHeaders
+class RequiredSubmissionHeaders
 {
-    static $issueHeaders = [
-        'journalPath',
+    static $submissionHeaders = [
+        'serverPath',
         'locale',
         'articleTitle',
         'articlePrefix',
@@ -39,11 +39,6 @@ class RequiredIssueHeaders
         'suppLabels',
         'sectionTitle',
         'sectionAbbrev',
-        'issueTitle',
-        'issueVolume',
-        'issueNumber',
-        'issueYear',
-        'issueDescription',
         'datePublished',
         'startPage',
         'endPage',
@@ -52,8 +47,8 @@ class RequiredIssueHeaders
 		'licenseUrl',
     ];
 
-    static $issueRequiredHeaders = [
-        'journalPath',
+    static $submissionRequiredHeaders = [
+        'serverPath',
         'locale',
         'articleTitle',
         'authors',
@@ -62,12 +57,12 @@ class RequiredIssueHeaders
 
     public static function validateRowHasAllFields(array $row): bool
     {
-        return count($row) === count(self::$issueHeaders);
+        return count($row) === count(self::$submissionHeaders);
     }
 
     public static function validateRowHasAllRequiredFields(object $row): bool
     {
-        foreach (self::$issueRequiredHeaders as $requiredHeader) {
+        foreach (self::$submissionRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;
             }

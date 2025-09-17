@@ -17,9 +17,7 @@
 namespace APP\plugins\importexport\csv\classes\cachedAttributes;
 
 use APP\facades\Repo;
-use APP\journal\JournalDAO;
-use APP\subscription\IndividualSubscriptionDAO as SubscriptionIndividualSubscriptionDAO;
-use APP\subscription\SubscriptionTypeDAO as SubscriptionSubscriptionTypeDAO;
+use APP\server\ServerDAO;
 use PKP\db\DAO;
 use PKP\db\DAORegistry;
 use PKP\submission\GenreDAO;
@@ -29,10 +27,10 @@ class CachedDaos
     /** @var array<string,DAO> */
     static array $cachedDaos = [];
 
-    /** Retrieves the cached JournalDAO instance. */
-    public static function getJournalDao(): JournalDAO
+    /** Retrieves the cached ServerDAO instance. */
+    public static function getServerDao(): ServerDAO
     {
-        return self::$cachedDaos['JournalDAO'] ??= DAORegistry::getDAO('JournalDAO');
+        return self::$cachedDaos['ServerDAO'] ??= DAORegistry::getDAO('ServerDAO');
     }
 
     /** Retrieves the cached GenreDAO instance. */
@@ -45,17 +43,5 @@ class CachedDaos
     public static function getCategoryDao()
 	{
 		return Repo::category()->dao;
-	}
-
-    /** Retrieves the cached IndividualSubscriptionDAO instance. */
-    public static function getIndividualSubscriptionDao(): SubscriptionIndividualSubscriptionDAO
-	{
-		return self::$cachedDaos['IndividualSubscriptionDAO'] ??= DAORegistry::getDAO('IndividualSubscriptionDAO');
-	}
-
-    /** Retrieves the cached SubscriptionTypeDAO instance. */
-    public static function getSubscriptionTypeDao(): SubscriptionSubscriptionTypeDAO
-	{
-		return self::$cachedDaos['SubscriptionTypeDAO'] ??= DAORegistry::getDAO('SubscriptionTypeDAO');
 	}
 }

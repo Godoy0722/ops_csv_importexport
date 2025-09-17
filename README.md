@@ -109,7 +109,7 @@ interest one; interest two; another interest
 
 | Column | Required | Description | Example |
 |--------|----------|-------------|---------|
-| journalPath | Yes | Path of the journal | leo |
+| serverPath | Yes | Path of the server | leo |
 | firstname | Yes | User's first name | Homer |
 | lastname | Yes | User's last name | Simpson |
 | email | Yes | User's email address | homer@example.com |
@@ -127,8 +127,8 @@ interest one; interest two; another interest
 
 | Column | Required | Description | Example | Notes |
 |--------|----------|-------------|---------|-------|
-| journalPath | Yes | Path of the target journal | leo | Must exist in the system |
-| locale | Yes | Article locale | en_US | Must be enabled in the journal |
+| serverPath | Yes | Path of the target server | leo | Must exist in the system |
+| locale | Yes | Article locale | en_US | Must be enabled in the server |
 | articleTitle | Yes | Article title | My Research Paper | |
 | articlePrefix | No | Article prefix | PREF | Optional |
 | articleSubtitle | No | Article subtitle | A Study of... | Optional |
@@ -162,17 +162,17 @@ interest one; interest two; another interest
 ### Complete Example: Users CSV
 
 ```csv
-journalPath,firstname,lastname,email,affiliation,country,username,tempPassword,roles,reviewInterests,subscriptionType,start_date,end_date
-myjournal,John,Doe,john@example.com,University of Example,US,jdoe,temp123,"Reader;Author","science;research",1,2024-01-01,2024-12-31
-myjournal,Jane,Smith,jane@example.com,Research Institute,CA,jsmith,temp456,Reader,"biology;ecology",2,2024-01-01,2024-12-31
+serverPath,firstname,lastname,email,affiliation,country,username,tempPassword,roles,reviewInterests
+myserver,John,Doe,john@example.com,University of Example,US,jdoe,temp123,"Reader;Author","science;research"
+myserver,Jane,Smith,jane@example.com,Research Institute,CA,jsmith,temp456,Reader,"biology;ecology"
 ```
 
 ### Complete Example: Issues CSV
 
 ```csv
-journalPath,locale,articleTitle,authors,articleAbstract,keywords,subjects,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,issueTitle,issueVolume,issueNumber,issueYear,datePublished,startPage,endPage,copyrightYear,copyrightHolder,licenseUrl
-myjournal,en_US,"Climate Change Impacts","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","This study examines...","climate change;environment","Environmental Science;Ecology",cover.jpg,"Journal Cover 2024","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,"Volume 5, Issue 1",5,1,2024,2024-03-15,1,15,2025,"Public Knowledge Project","https://creativecommons.org/licenses/by/4.0"
-myjournal,en_US,"Biodiversity Loss","Alice,Johnson,alice@example.com,Conservation Org","This paper discusses...","biodiversity;conservation","Biology;Environmental Science",,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,"Volume 5, Issue 1",5,1,2024,2024-03-20,16,30,2024,"Conservation Organization","https://creativecommons.org/licenses/by-sa/4.0"
+serverPath,locale,articleTitle,authors,articleAbstract,keywords,subjects,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,datePublished,startPage,endPage,copyrightYear,copyrightHolder,licenseUrl
+myjournal,en,"Climate Change Impacts","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","This study examines...","climate change;environment","Environmental Science;Ecology",cover.jpg,"Journal Cover 2024","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,2024,2024-03-15,1,15,2025,"Public Knowledge Project","https://creativecommons.org/licenses/by/4.0"
+myjournal,en,"Biodiversity Loss","Alice,Johnson,alice@example.com,Conservation Org","This paper discusses...","biodiversity;conservation","Biology;Environmental Science",,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,2024,2024-03-20,16,30,2024,"Conservation Organization","https://creativecommons.org/licenses/by-sa/4.0"
 ```
 
 ## File Structure for Import
@@ -182,7 +182,7 @@ When importing issues, the following file structure is recommended:
 ```
 import_directory/
 ├── users.csv
-├── issues.csv
+├── submissions.csv
 ├── article.pdf
 ├── article2.pdf
 ├── presentation.pptx
@@ -245,12 +245,12 @@ import_directory/
      - Ensure required subscription fields (start_date, end_date) are provided
 
 #### Issue Import Issues
-7. **Journal or Locale Issues**
-   - Error: `Unknown journal with path [path]` or `Unknown locale [locale]`
+7. **Server or Locale Issues**
+   - Error: `Unknown server with path [path]` or `Unknown locale [locale]`
    - Solution:
-     - Verify the journal path in the CSV matches exactly
-     - Check that the specified locale is enabled in the journal
-     - Ensure the journal exists and is accessible to the importing user
+     - Verify the server path in the CSV matches exactly
+     - Check that the specified locale is enabled in the server
+     - Ensure the server exists and is accessible to the importing user
 
 8. **File Validation Errors**
    - Error: `Invalid [article/cover/galley] file for this submission`
@@ -261,9 +261,9 @@ import_directory/
      - Verify galley files match the specified labels
 
 9. **Author and Metadata Issues**
-   - Error: `There is no default author group in the journal`
+   - Error: `There is no default author group in the server`
    - Solution:
-     - Ensure the journal has at least one author group configured
+     - Ensure the server has at least one author group configured
      - Verify author information follows the required format
      - Check that required author fields (first name) are provided
 

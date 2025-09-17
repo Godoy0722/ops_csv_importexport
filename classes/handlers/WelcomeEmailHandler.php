@@ -16,19 +16,19 @@
 
 namespace APP\plugins\importexport\csv\classes\handlers;
 
-use APP\journal\Journal;
-use APP\notification\Notification;
 use APP\notification\NotificationManager;
+use APP\server\Server;
 use Illuminate\Support\Facades\Mail;
 use PKP\facades\Repo;
 use PKP\mail\mailables\UserCreated;
+use PKP\notification\Notification;
 use PKP\user\User;
 use Symfony\Component\Mailer\Exception\TransportException;
 
 class WelcomeEmailHandler
 {
 
-    public static function sendWelcomeEmail(Journal $context, User $recipient, User $sender, string $password)
+    public static function sendWelcomeEmail(Server $context, User $recipient, User $sender, string $password)
     {
         $mailable = new UserCreated($context, $password);
         $mailable->recipients($recipient);

@@ -23,26 +23,18 @@ use PKP\context\Context;
 
 class SubmissionProcessor
 {
-    public static function process(object $data, Publication $publication, Context $journal): Submission
+    public static function process(object $data, Publication $publication, Context $server): Submission
     {
         $submission = Repo::submission()->newDataObject();
 
-        $submission->setData('contextId', $journal->getId());
+        $submission->setData('contextId', $server->getId());
         $submission->setData('status', Submission::STATUS_PUBLISHED);
         $submission->setData('locale', $data->locale);
         $submission->setData('stageId', WORKFLOW_STAGE_ID_PRODUCTION);
         $submission->setData('submissionProgress', '0');
         $submission->setData('abstract', $data->articleAbstract, $data->locale);
 
-        $submission->stampLastActivity();
-        $submission->stampModified();
-
-        $submissionId = Repo::submission()->add($submission, $publication, $journal);
+        $submissionId = Repo::submission()->add($submission, $publication, $server);
         return Repo::submission()->get($submissionId);
-    }
-
-    public static function updateCurrentPublicationId(Submission $submission, int $publicationId)
-    {
-        Repo::submission()->edit($submission, ['currentPublicationId' => $publicationId]);
     }
 }

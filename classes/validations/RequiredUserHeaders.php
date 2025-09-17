@@ -19,7 +19,7 @@ namespace APP\plugins\importexport\csv\classes\validations;
 class RequiredUserHeaders
 {
     static $userHeaders = [
-        'journalPath',
+        'serverPath',
         'firstname',
         'lastname',
         'email',
@@ -29,23 +29,14 @@ class RequiredUserHeaders
         'tempPassword',
         'roles',
         'reviewInterests',
-        'subscriptionType',
-        'startDate',
-        'endDate'
     ];
 
     static $userRequiredHeaders = [
-        'journalPath',
+        'serverPath',
         'firstname',
         'lastname',
         'email',
         'roles',
-    ];
-
-    static $subscriptionHeaders = [
-        'subscriptionType',
-        'startDate',
-        'endDate'
     ];
 
     public static function validateRowHasAllFields(array $row): bool
@@ -62,15 +53,5 @@ class RequiredUserHeaders
         }
 
         return true;
-    }
-
-    public static function validateSubscriptionFields(object $row): bool
-    {
-        $hasSubscriptionType = !empty($row->subscriptionType);
-        $hasStartDate = !empty($row->startDate);
-        $hasEndDate = !empty($row->endDate);
-
-		return (!$hasSubscriptionType && !$hasStartDate && !$hasEndDate)
-			|| ($hasSubscriptionType && $hasStartDate && $hasEndDate);
     }
 }

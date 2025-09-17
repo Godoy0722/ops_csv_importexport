@@ -16,9 +16,8 @@
 
 namespace APP\plugins\importexport\csv\classes\validations;
 
-use APP\journal\Journal;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
-use APP\subscription\SubscriptionType;
+use APP\server\Server;
 
 class InvalidRowValidations
 {
@@ -130,23 +129,23 @@ class InvalidRowValidations
     }
 
     /**
-     * Validates whether the journal is valid for the CSV row. Returns the reason if an error occurred,
+     * Validates whether the server is valid for the CSV row. Returns the reason if an error occurred,
      * or null if everything is correct.
      */
-    public static function validateJournalIsValid(Journal $journal, string $journalPath): ?string
+    public static function validateServerIsValid(?Server $server, string $serverPath): ?string
     {
-        return !$journal ? __('plugins.importexport.csv.unknownJournal', ['journalPath' => $journalPath]) : null;
+        return !$server ? __('plugins.importexport.csv.unknownServer', ['serverPath' => $serverPath]) : null;
     }
 
     /**
-     * Validates if the journal supports the locale provided in the CSV row. Returns the reason if an error occurred
+     * Validates if the server supports the locale provided in the CSV row. Returns the reason if an error occurred
      * or null if everything is correct.
      */
-    public static function validateJournalLocale(Journal $journal, string $locale): ?string
+    public static function validateServerLocale(Server $server, string $locale): ?string
     {
-        $supportedLocales = $journal->getSupportedSubmissionLocales();
+        $supportedLocales = $server->getSupportedSubmissionLocales();
         if (!is_array($supportedLocales) || count($supportedLocales) < 1) {
-            $supportedLocales = [$journal->getPrimaryLocale()];
+            $supportedLocales = [$server->getPrimaryLocale()];
         }
 
         return !in_array($locale, $supportedLocales)
@@ -167,10 +166,10 @@ class InvalidRowValidations
      * Validates if the user group ID is valid. Returns the reason if an error occurred
      * or null if everything is correct.
      */
-    public static function validateUserGroupId(?int $userGroupId, string $journalPath): ?string
+    public static function validateUserGroupId(?int $userGroupId, string $serverPath): ?string
     {
         return !$userGroupId
-            ? __('plugins.importexport.csv.noAuthorGroup', ['journal' => $journalPath])
+            ? __('plugins.importexport.csv.noAuthorGroup', ['journal' => $serverPath])
             : null;
     }
 
@@ -178,54 +177,20 @@ class InvalidRowValidations
      * Validates if all user groups are valid. Returns the reason if an error occurred
      * or null if everything is correct.
      */
-    public static function validateAllUserGroupsAreValid(array $roles, int $journalId, string $locale): ?string
+    public static function validateAllUserGroupsAreValid(array $roles, int $serverId, string $locale): ?string
     {
-        $userGroups = CachedEntities::getCachedUserGroupsByJournalId($journalId);
+        $userGroups = CachedEntities::getCachedUserGroupsByServerId($serverId);
 
         $allDbRoles = 0;
         foreach ($roles as $role) {
             $matchingGroups = array_filter($userGroups, function($userGroup) use ($role, $locale) {
-                return mb_strtolower($userGroup->getName($locale)) === mb_strtolower($role);
+                return mb_strtolower($userGroup->name[$locale]) === mb_strtolower($role);
             });
             $allDbRoles += count($matchingGroups);
         }
 
         return $allDbRoles !== count($roles)
             ? __('plugins.importexport.csv.roleDoesntExist', ['role' => $role])
-            : null;
-    }
-
-    /**
-     * Validates if the subscription dates are valid. Returns the reason if an error occurred
-     * or null if everything is correct.
-     */
-    public static function validateSubscriptionDates(string $startDate, string $endDate, ?string $dateFormat = 'Y-m-d'): ?string
-    {
-        $startDateObj = \DateTime::createFromFormat($dateFormat, $startDate);
-        if (!$startDateObj) {
-            return __('plugins.importexport.csv.invalidStartDate', ['date' => $startDate]);
-        }
-
-        $endDateObj = \DateTime::createFromFormat($dateFormat, $endDate);
-        if (!$endDateObj) {
-            return __('plugins.importexport.csv.invalidEndDate', ['date' => $endDate]);
-        }
-
-        if ($endDateObj <= $startDateObj) {
-            return __('plugins.importexport.csv.endDateBeforeStartDate');
-        }
-
-        return null;
-    }
-
-    /**
-     * Validates if the subscription type is valid. Returns the reason if an error occurred
-     * or null if everything is correct.
-     */
-    public static function validateSubscriptionType(?SubscriptionType $subscriptionType, int $subscriptionTypeId): ?string
-    {
-        return !$subscriptionType
-            ? __('plugins.importexport.csv.subscriptionTypeDoesntExist', ['subscriptionTypeId' => $subscriptionTypeId])
             : null;
     }
 }

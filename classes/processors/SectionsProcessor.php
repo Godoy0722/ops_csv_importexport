@@ -22,9 +22,9 @@ use APP\section\Section;
 
 class SectionsProcessor
 {
-	public static function process(object $data, int $journalId): Section
+	public static function process(object $data, int $serverId): Section
     {
-        $section = CachedEntities::getCachedSection($data->sectionTitle, $data->sectionAbbrev, $data->locale, $journalId);
+        $section = CachedEntities::getCachedSection($data->sectionTitle, $data->sectionAbbrev, $data->locale, $serverId);
 
 		if (!is_null($section)) {
 			return $section;
@@ -32,22 +32,27 @@ class SectionsProcessor
 
         $section = Repo::section()->newDataObject();
 
-        $section->setContextId($journalId);
+        $section->setContextId($serverId);
         $section->setSequence(REALLY_BIG_NUMBER);
         $section->setEditorRestricted(false);
         $section->setMetaIndexed(true);
         $section->setMetaReviewed(true);
         $section->setAbstractsNotRequired(false);
+        $section->setAbstractWordCount(REALLY_BIG_NUMBER);
         $section->setHideTitle(false);
         $section->setHideAuthor(false);
         $section->setIsInactive(false);
         $section->setTitle($data->sectionTitle, $data->locale);
-        $section->setAbbrev($data->sectionAbbrev, $data->locale);
+        $section->setAbbrev(mb_strtoupper(trim($data->sectionAbbrev)), $data->locale);
         $section->setIdentifyType('', $data->locale);
         $section->setPolicy('', $data->locale);
 
         $sectionId = Repo::section()->add($section);
 
-        return Repo::section()->get($sectionId, $journalId);
+        $createdSection = Repo::section()->get($sectionId, $serverId);
+        $customSectionKey = $data->sectionTitle . '_' . mb_strtoupper(trim($data->sectionAbbrev));
+        CachedEntities::$sections[$customSectionKey] = $createdSection;
+
+        return $createdSection;
 	}
 }

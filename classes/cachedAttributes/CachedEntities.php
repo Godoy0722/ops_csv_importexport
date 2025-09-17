@@ -12,15 +12,14 @@
  * @ingroup plugins_importexport_csv
  *
  * @brief This class is responsible for retrieving cached entities such as
- * journals, user groups, genres, categories, sections, and issues.
+ * servers, user groups, genres, categories and sections.
  */
 
 namespace APP\plugins\importexport\csv\classes\cachedAttributes;
 
 use APP\facades\Repo;
-use APP\issue\Issue;
-use APP\journal\Journal;
 use APP\section\Section;
+use APP\server\Server;
 use APP\subscription\SubscriptionType;
 use PKP\category\Category;
 use PKP\security\Role;
@@ -29,8 +28,8 @@ use PKP\userGroup\UserGroup;
 
 class CachedEntities
 {
-    /** @var array<string,Journal> */
-    static array $journals = [];
+    /** @var array<string,Server> */
+    static array $servers = [];
 
     /** @var array<string,int|null> */
     static array $userGroupIds = [];
@@ -47,38 +46,39 @@ class CachedEntities
     /** @var array<string,Section|null> */
     static array $sections = [];
 
-    /** @var array<string,Issue|null> */
-    static array $issues = [];
-
     /** @var array<string,User|null> */
     static array $users = [];
 
     /** @var array<string,SubscriptionType|null> */
     static array $subscriptionTypes = [];
 
-    /** Retrieves a cached Journal by its path. Returns null if an error occurs. */
-    static function getCachedJournal(string $journalPath): ?Journal
+    /** Retrieves a cached Server by its path. Returns null if an error occurs. */
+    static function getCachedServer(string $serverPath): ?Server
     {
-        $journalDao = CachedDaos::getJournalDao();
+        $serverDao = CachedDaos::getServerDao();
 
-        return self::$journals[$journalPath] ?? self::$journals[$journalPath] = $journalDao->getByPath($journalPath);
+        return self::$servers[$serverPath] ?? self::$servers[$serverPath] = $serverDao->getByPath($serverPath);
     }
 
-    /** Retrieves a cached userGroup ID by journalId. Returns null if an error occurs. */
-    static function getCachedUserGroupId(string $journalPath, int $journalId): ?int
+    /** Retrieves a cached userGroup ID by serverId. Returns null if an error occurs. */
+    static function getCachedUserGroupId(string $serverPath, int $serverId): ?int
     {
-        if (isset(self::$userGroupIds[$journalPath])) {
-            return self::$userGroupIds[$journalPath];
+        if (isset(self::$userGroupIds[$serverPath])) {
+            return self::$userGroupIds[$serverPath];
         }
 
-        $userGroups = Repo::userGroup()->getByRoleIds([Role::ROLE_ID_AUTHOR], $journalId);
+        $userGroups = Repo::userGroup()->getByRoleIds([Role::ROLE_ID_AUTHOR], $serverId);
 
         if (empty($userGroups)) {
             return null;
         }
 
         $userGroup = $userGroups->first();
-        return self::$userGroupIds[$journalPath] = $userGroup->getId();
+        if (is_null($userGroup)) {
+            return null;
+        }
+
+        return self::$userGroupIds[$serverPath] = $userGroup->id;
     }
 
 	/** Retrieves a cached User by email. Returns null if an error occurs. */
@@ -94,33 +94,33 @@ class CachedEntities
     }
 
 	/**
-	 * Retrieves a cached UserGroup by journalId. Returns null if an error occurs.
+	 * Retrieves a cached UserGroup by serverId. Returns null if an error occurs.
 	 *
 	 * @return UserGroup[]
 	 */
-    static function getCachedUserGroupsByJournalId(int $journalId): array
+    static function getCachedUserGroupsByServerId(int $serverId): array
     {
-        if (isset(self::$userGroups[$journalId])) {
-            return self::$userGroups[$journalId];
+        if (isset(self::$userGroups[$serverId])) {
+            return self::$userGroups[$serverId];
         }
 
         $userGroups = [];
-        $userGroupsCollection = UserGroup::withContextIds([$journalId])->get();
+        $userGroupsCollection = UserGroup::withContextIds([$serverId])->get();
 
         foreach ($userGroupsCollection as $userGroup) {
-            $userGroups[$userGroup->getId()] = $userGroup;
+            $userGroups[$userGroup->id] = $userGroup;
         }
 
-        return self::$userGroups[$journalId] = $userGroups;
+        return self::$userGroups[$serverId] = $userGroups;
     }
 
-	/** Retrieves a cached UserGroup by name and journalId. Returns null if an error occurs. */
-    static function getCachedUserGroupByName(string $name, int $journalId, string $locale): ?UserGroup
+	/** Retrieves a cached UserGroup by name and serverId. Returns null if an error occurs. */
+    static function getCachedUserGroupByName(string $name, int $serverId, string $locale): ?UserGroup
     {
-        $userGroups = self::getCachedUserGroupsByJournalId($journalId);
+        $userGroups = self::getCachedUserGroupsByServerId($serverId);
 
         foreach ($userGroups as $userGroup) {
-            if (mb_strtolower($userGroup->getName($locale)) === mb_strtolower($name)) {
+            if (mb_strtolower($userGroup->name[$locale]) === mb_strtolower($name)) {
                 return $userGroup;
             }
         }
@@ -128,21 +128,21 @@ class CachedEntities
         return null;
     }
 
-    /** Retrieves a cached genre ID by genreName and journalId. Returns null if an error occurs. */
-    static function getCachedGenreId(string $genreName, int $journalId): ?int
+    /** Retrieves a cached genre ID by genreName and serverId. Returns null if an error occurs. */
+    static function getCachedGenreId(string $genreName, int $serverId): ?int
     {
-		return self::$genreIds[$genreName] ??= CachedDaos::getGenreDao()->getByKey($genreName, $journalId)->getId();
+		return self::$genreIds[$genreName] ??= CachedDaos::getGenreDao()->getByKey($genreName, $serverId)->getId();
     }
 
-    /** Retrieves a cached Category by categoryName and journalId. Returns null if an error occurs. */
-    static function getCachedCategory(string $categoryName, int $journalId): ?Category
+    /** Retrieves a cached Category by categoryName and serverId. Returns null if an error occurs. */
+    static function getCachedCategory(string $categoryName, int $serverId): ?Category
     {
         if (isset(self::$categories[$categoryName])) {
             return self::$categories[$categoryName];
         }
 
         $categories = Repo::category()->getCollector()
-            ->filterByContextIds([$journalId])
+            ->filterByContextIds([$serverId])
             ->getMany();
 
         foreach ($categories as $category) {
@@ -154,55 +154,17 @@ class CachedEntities
         return null;
     }
 
-    /** Retrieves a cached Issue by issue data and journalId. Returns null if an error occurs. */
-    static function getCachedIssue(object $data, int $journalId): ?Issue
+    /** Retrieves a cached Section by sectionTitle, sectionAbbrev, and serverId. Returns null if an error occurs. */
+    static function getCachedSection(string $sectionTitle, string $sectionAbbrev, string $locale, int $serverId): ?Section
     {
-        $cacheKeyParts = [];
-        if (!empty($data->issueTitle)) $cacheKeyParts[] = "title:" . $data->issueTitle;
-        if (!empty($data->issueVolume)) $cacheKeyParts[] = "vol:" . $data->issueVolume;
-        if (!empty($data->issueNumber)) $cacheKeyParts[] = "num:" . $data->issueNumber;
-        if (!empty($data->issueYear)) $cacheKeyParts[] = "year:" . $data->issueYear;
-
-        $customIssueDescription = implode('_', $cacheKeyParts);
-
-        if (isset(self::$issues[$customIssueDescription])) {
-            return self::$issues[$customIssueDescription];
-        }
-
-        $collector = Repo::issue()->getCollector()->filterByContextIds([$journalId]);
-
-        if (!empty($data->issueVolume)) {
-            $collector = $collector->filterByVolumes([(int)$data->issueVolume]);
-        }
-        if (!empty($data->issueNumber)) {
-            $collector = $collector->filterByNumbers([$data->issueNumber]);
-        }
-        if (!empty($data->issueYear)) {
-            $collector = $collector->filterByYears([(int)$data->issueYear]);
-        }
-        if (!empty($data->issueTitle)) {
-            $collector = $collector->filterByTitles([$data->issueTitle]);
-        }
-
-        $issues = $collector->limit(1)->getMany();
-        $issue = $issues->first();
-
-        self::$issues[$customIssueDescription] = $issue;
-
-        return self::$issues[$customIssueDescription];
-    }
-
-    /** Retrieves a cached Section by sectionTitle, sectionAbbrev, and journalId. Returns null if an error occurs. */
-    static function getCachedSection(string $sectionTitle, string $sectionAbbrev, string $locale, int $journalId): ?Section
-    {
-        $customSectionKey = "{$sectionTitle}_{$sectionAbbrev}";
+        $customSectionKey = $sectionTitle . '_' . mb_strtoupper(trim($sectionAbbrev));
 
         if (isset(self::$sections[$customSectionKey])) {
             return self::$sections[$customSectionKey];
         }
 
         $sections = Repo::section()->getCollector()
-            ->filterByContextIds([$journalId])
+            ->filterByContextIds([$serverId])
             ->getMany();
 
         foreach ($sections as $section) {
@@ -212,15 +174,5 @@ class CachedEntities
         }
 
         return null;
-    }
-
-	/** Retrieves a cached SubscriptionType by subscriptionType and journalId. Returns null if an error occurs. */
-	static function getCachedSubscriptionType(string $subscriptionType, int $journalId): ?SubscriptionType
-    {
-        if (isset(self::$subscriptionTypes[$subscriptionType])) {
-            return self::$subscriptionTypes[$subscriptionType];
-        }
-
-        return self::$subscriptionTypes[$subscriptionType] ??= CachedDaos::getSubscriptionTypeDao()->getById((int) $subscriptionType, $journalId);
     }
 }

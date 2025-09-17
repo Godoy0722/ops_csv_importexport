@@ -42,11 +42,11 @@ class SubmissionFileProcessor
         $submissionFile->setData('fileStage', SubmissionFile::SUBMISSION_FILE_PROOF);
         $submissionFile->setData('createdAt', Core::getCurrentDate());
         $submissionFile->setData('updatedAt', Core::getCurrentDate());
-        $submissionFile->setData('mimetype', PKPString::mime_content_type($filePath));
+        $submissionFile->setData('mimeType', PKPString::mime_content_type($filePath));
         $submissionFile->setData('locale', $locale);
         $submissionFile->setData('name', pathinfo($filePath, PATHINFO_FILENAME), $locale);
-        $submissionFile->setData('directSalesPrice', 0);
-        $submissionFile->setData('salesType', 'openAccess');
+        $submissionFile->setDirectSalesPrice(0);
+        $submissionFile->setSalesType('openAccess');
 
         $submissionFileId = Repo::submissionFile()->add($submissionFile);
 

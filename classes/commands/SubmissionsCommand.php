@@ -1,17 +1,17 @@
 <?php
 
 /**
- * @file plugins/importexport/csv/classes/commands/IssueCommand.php
+ * @file plugins/importexport/csv/classes/commands/SubmissionCommand.php
  *
  * Copyright (c) 2014-2025 Simon Fraser University
  * Copyright (c) 2003-2025 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class IssueCommand
+ * @class SubmissionCommand
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Handles the issue import when the user uses the issue command
+ * @brief Handles the submission import when the user uses the submissions command
  */
 
 namespace APP\plugins\importexport\csv\classes\commands;
@@ -26,7 +26,6 @@ use APP\plugins\importexport\csv\classes\handlers\CSVFileHandler;
 use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
 use APP\plugins\importexport\csv\classes\processors\GalleyProcessor;
-use APP\plugins\importexport\csv\classes\processors\IssueProcessor;
 use APP\plugins\importexport\csv\classes\processors\KeywordsProcessor;
 use APP\plugins\importexport\csv\classes\processors\PublicationProcessor;
 use APP\plugins\importexport\csv\classes\processors\SectionsProcessor;
@@ -34,14 +33,14 @@ use APP\plugins\importexport\csv\classes\processors\SubjectsProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
-use APP\plugins\importexport\csv\classes\validations\RequiredIssueHeaders;
+use APP\plugins\importexport\csv\classes\validations\RequiredSubmissionHeaders;
 use APP\submission\Submission;
 use PKP\core\PKPString;
 use PKP\file\FileManager;
 use PKP\services\PKPFileService;
 use PKP\user\User;
 
-class IssueCommand
+class SubmissionsCommand
 {
     /** Expected row size for a CSV based on the command passed as argument */
     private int $expectedRowSize;
@@ -70,14 +69,11 @@ class IssueCommand
 
     private string $format;
 
-    private array $processedIssues;
-
     public function __construct(string $sourceDir, User $user)
     {
-        $this->expectedRowSize = count(RequiredIssueHeaders::$issueHeaders);
+        $this->expectedRowSize = count(RequiredSubmissionHeaders::$submissionHeaders);
         $this->sourceDir = $sourceDir;
         $this->user = $user;
-        $this->processedIssues = [];
     }
 
     public function run()
@@ -95,7 +91,11 @@ class IssueCommand
             }
 
             $basename = $fileInfo->getBasename();
-            $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredIssueHeaders::$issueHeaders);
+            $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows(
+                $this->sourceDir,
+                "invalid_{$basename}",
+                RequiredSubmissionHeaders::$submissionHeaders
+            );
 
             if (is_null($invalidCsvFile)) {
                 continue;
@@ -118,28 +118,17 @@ class IssueCommand
                 }
 
                 $data = (object) array_combine(
-                    RequiredIssueHeaders::$issueHeaders,
+                    RequiredSubmissionHeaders::$submissionHeaders,
                     array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                 );
 
-                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, [RequiredIssueHeaders::class, 'validateRowHasAllRequiredFields']);
+                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, [RequiredSubmissionHeaders::class, 'validateRowHasAllRequiredFields']);
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
                 $fieldsList = array_pad($fields, $this->expectedRowSize, null);
-
-                $hasIssueData = !empty(trim($data->issueTitle))
-                                || !empty(trim($data->issueVolume))
-                                || !empty(trim($data->issueNumber))
-                                || !empty(trim($data->issueYear));
-
-                if (!$hasIssueData) {
-                    $reason = __('plugins.importexport.csv.atLeastOneIssueFieldRequired');
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
 
                 if ($data->galleyFilenames) {
                     $reason = InvalidRowValidations::validateArticleGalleys(
@@ -167,23 +156,23 @@ class IssueCommand
                     }
                 }
 
-                $journal = CachedEntities::getCachedJournal($data->journalPath);
+                $server = CachedEntities::getCachedServer($data->serverPath);
 
-                $reason = InvalidRowValidations::validateJournalIsValid($journal, $data->journalPath);
+                $reason = InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
-                $reason = InvalidRowValidations::validateJournalLocale($journal, $data->locale);
+                $reason = InvalidRowValidations::validateServerLocation($server, $data->locale);
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
                 // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
-                $genreName = mb_strtoupper($data->genreName ?? 'SUBMISSION');
-                $genreId = CachedEntities::getCachedGenreId($genreName, $journal->getId());
+                $genreName = 'SUBMISSION';
+                $genreId = CachedEntities::getCachedGenreId($genreName, $server->getId());
 
                 $reason = InvalidRowValidations::validateGenreIdValid($genreId, $genreName);
                 if (!is_null($reason)) {
@@ -191,9 +180,9 @@ class IssueCommand
                     continue;
                 }
 
-                $userGroupId = CachedEntities::getCachedUserGroupId($data->journalPath, $journal->getId());
+                $userGroupId = CachedEntities::getCachedUserGroupId($data->serverPath, $server->getId());
 
-                $reason = InvalidRowValidations::validateUserGroupId($userGroupId, $data->journalPath);
+                $reason = InvalidRowValidations::validateUserGroupId($userGroupId, $data->serverPath);
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
@@ -212,7 +201,7 @@ class IssueCommand
                     $sanitizedCoverImageName = PKPString::regexp_replace('/[^a-z0-9\.\-]+/', '', $sanitizedCoverImageName);
                     $coverImageUploadName = uniqid() . '-' . basename($sanitizedCoverImageName);
 
-                    $destFilePath = $this->publicFileManager->getContextFilesPath($journal->getId()) . '/' . $coverImageUploadName;
+                    $destFilePath = $this->publicFileManager->getContextFilesPath($server->getId()) . '/' . $coverImageUploadName;
                     $srcFilePath = "{$this->sourceDir}/{$data->coverImageFilename}";
                     $bookCoverImageSaved = $this->fileManager->copyFile($srcFilePath, $destFilePath);
 
@@ -224,10 +213,10 @@ class IssueCommand
                     }
                 }
 
-                $initialPublication = PublicationProcessor::createInitialPublication($data, $journal);
-                $submission = SubmissionProcessor::process($data, $initialPublication, $journal);
+                $initialPublication = PublicationProcessor::createInitialPublication($data, $server);
+                $submission = SubmissionProcessor::process($data, $initialPublication, $server);
 
-                $publication = PublicationProcessor::process($submission, $data, $journal);
+                $publication = PublicationProcessor::process($submission, $data, $server);
                 if (!$publication) {
                     $reason = __('plugins.importexport.csv.errorWhileCreatingPublication');
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
@@ -240,7 +229,7 @@ class IssueCommand
                     foreach (array_map('trim', explode(';', $data->galleyFilenames)) as $galleyFile) {
                         $galleyFileId = $this->saveSubmissionFile(
                             $galleyFile,
-                            $journal->getId(),
+                            $server->getId(),
                             $submission,
                             $invalidCsvFile,
                             __('plugins.importexport.csv.errorWhileSavingSubmissionGalley', ['galley' => $galleyFile]),
@@ -278,14 +267,14 @@ class IssueCommand
                 if ($data->suppFilenames) {
                     // Get supplementary genre for supplementary files
                     $genreDao = CachedDaos::getGenreDao();
-                    $supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $journal->getId())->toArray();
+                    $supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $server->getId())->toArray();
                     $suppGenreId = !empty($supplementaryGenres) ? $supplementaryGenres[0]->getId() : $genreId;
                     $suppIds = [];
 
                     foreach (array_map('trim', explode(';', $data->suppFilenames)) as $suppFile) {
                         $suppFileId = $this->saveSubmissionFile(
                             $suppFile,
-                            $journal->getId(),
+                            $server->getId(),
                             $submission,
                             $invalidCsvFile,
                             __('plugins.importexport.csv.errorWhileSavingSupplementaryFile', ['file' => $suppFile]),
@@ -323,7 +312,7 @@ class IssueCommand
                     }
                 }
 
-                AuthorsProcessor::process($data, $journal->getContactEmail(), $submission->getId(), $publication, $userGroupId);
+                AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
                 KeywordsProcessor::process($data, $publication->getId());
                 SubjectsProcessor::process($data, $publication->getId());
 
@@ -335,24 +324,12 @@ class IssueCommand
                     PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
                 }
 
-                if ($data->categories) {
-                    CategoriesProcessor::process($data->categories, $data->locale, $journal->getId(), $publication->getId());
-                }
-
-                $issue = IssueProcessor::process($journal->getId(), $data);
-                PublicationProcessor::updateIssueId($publication, $issue->getId());
-
-                $issueKey = $journal->getId() . '_' . $issue->getId();
-                if (!isset($this->processedIssues[$issueKey])) {
-                    $this->processedIssues[$issueKey] = [
-                        'issue' => $issue,
-                        'journalId' => $journal->getId(),
-                        'data' => $data
-                    ];
-                }
-
-                $section = SectionsProcessor::process($data, $journal->getId());
+                $section = SectionsProcessor::process($data, $server->getId());
                 PublicationProcessor::updateSectionId($publication, $section->getId());
+
+                if ($data->categories) {
+                    CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
+                }
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [
@@ -365,8 +342,6 @@ class IssueCommand
                 unlink($this->sourceDir . '/' . "invalid_{$basename}");
             }
         }
-
-        IssueProcessor::reorderImportedIssues($this->processedIssues);
     }
 
     /** Insert static data that will be used for the submission processing */
@@ -385,7 +360,7 @@ class IssueCommand
      */
     private function saveSubmissionFile(
         string $filePath,
-        int $journalId,
+        int $serverId,
         Submission $submission,
         \SplFileObject $invalidCsvFile,
         string $reason,
@@ -394,7 +369,7 @@ class IssueCommand
     {
         try {
             $extension = $this->fileManager->parseFileExtension($filePath);
-            $submissionDir = sprintf($this->format, $journalId, $submission->getId());
+            $submissionDir = sprintf($this->format, $serverId, $submission->getId());
             $completePath = "{$this->sourceDir}/{$filePath}";
 
             return $this->fileService->add($completePath, $submissionDir . '/' . uniqid() . '.' . $extension);

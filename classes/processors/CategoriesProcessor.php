@@ -22,7 +22,7 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 
 class CategoriesProcessor
 {
-    public static function process(string $categories, string $locale, int $journalId, int $publicationId)
+    public static function process(string $categories, string $locale, int $serverId, int $publicationId)
     {
         if (empty(trim($categories))) {
             return;
@@ -38,19 +38,21 @@ class CategoriesProcessor
             }
 
             $lowerCategoryPath = mb_strtolower($categoryPath);
-            $category = CachedEntities::getCachedCategory($lowerCategoryPath, $journalId);
+            $category = CachedEntities::getCachedCategory($lowerCategoryPath, $serverId);
 
             if (is_null($category)) {
-                $category = Repo::category()->newDataObject([
-                    'contextId' => $journalId,
-                    'title' => $categoryPath,
-                    'locale' => $locale,
-                    'parentId' => null,
-                    'sequence' => REALLY_BIG_NUMBER,
-                    'path' => $lowerCategoryPath,
-                ]);
+                $category = Repo::category()->newDataObject();
 
-                Repo::category()->add($category);
+                $category->setContextId($serverId);
+                $category->setTitle($categoryPath, $locale);
+                $category->setData('locale', $locale);
+                $category->setParentId(null);
+                $category->setSequence(REALLY_BIG_NUMBER);
+                $category->setPath($lowerCategoryPath);
+
+                $categoryId = Repo::category()->add($category);
+                $category = Repo::category()->get($categoryId);
+                CachedEntities::$categories[$lowerCategoryPath] = $category;
             }
 
             CachedDaos::getCategoryDao()->insertPublicationAssignment($category->getId(), $publicationId);

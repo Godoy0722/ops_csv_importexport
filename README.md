@@ -5,11 +5,11 @@ This plugin allows administrators to import users and issues with their associat
 ## Table of Contents
 - [Usage](#usage)
   - [Importing Users](#importing-users)
-  - [Importing Issues](#importing-issues)
+  - [Importing Submissions](#importing-issues)
   - [Exporting Data](#exporting-data)
 - [CSV File Format](#csv-file-format)
   - [Users CSV Format](#users-csv-format)
-  - [Issues CSV Format](#issues-csv-format)
+  - [Submissions CSV Format](#issues-csv-format)
 - [Troubleshooting](#troubleshooting)
 - [Support](#support)
 
@@ -34,12 +34,12 @@ Example:
 php tools/importExport.php CSVImportExportPlugin users admin /path/to/users.csv true
 ```
 
-### Importing Issues
+### Importing Submissions
 
-To import issues from a CSV file, use the following command:
+To import submissions from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin issues [username] [pathToCsvFile]
+php tools/importExport.php CSVImportExportPlugin submissions [username] [pathToCsvFile]
 ```
 
 Parameters:
@@ -48,7 +48,7 @@ Parameters:
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin issues admin /path/to/csv_file_for_issues
+php tools/importExport.php CSVImportExportPlugin submissions admin /path/to/csv_file_for_issues
 ```
 
 ### Important Notes:
@@ -109,7 +109,7 @@ interest one; interest two; another interest
 
 | Column | Required | Description | Example |
 |--------|----------|-------------|---------|
-| journalPath | Yes | Path of the journal | leo |
+| serverPath | Yes | Path of the journal | leo |
 | firstname | Yes | User's first name | Homer |
 | lastname | Yes | User's last name | Simpson |
 | email | Yes | User's email address | homer@example.com |
@@ -119,16 +119,13 @@ interest one; interest two; another interest
 | tempPassword | Yes | Temporary password | temppassword123 |
 | roles | No | Semicolon-separated list of roles | Reader;Author |
 | reviewInterests | No | Semicolon-separated interests | interest one;interest two |
-| subscriptionType | No | Subscription type ID | 1 |
-| start_date | If subscriptionType is set | Subscription start date (YYYY-MM-DD) | 2023-01-01 |
-| end_date | If subscriptionType is set | Subscription end date (YYYY-MM-DD) | 2023-12-31 |
 
-### Issues CSV Format
+### Submissions CSV Format
 
 | Column | Required | Description | Example | Notes |
 |--------|----------|-------------|---------|-------|
-| journalPath | Yes | Path of the target journal | leo | Must exist in the system |
-| locale | Yes | Article locale | en_US | Must be enabled in the journal |
+| serverPath | Yes | Path of the target server | leo | Must exist in the system |
+| locale | Yes | Article locale | en_US | Must be enabled in the server |
 | articleTitle | Yes | Article title | My Research Paper | |
 | articlePrefix | No | Article prefix | PREF | Optional |
 | articleSubtitle | No | Article subtitle | A Study of... | Optional |
@@ -147,11 +144,6 @@ interest one; interest two; another interest
 | suppLabels | No | Labels for supplementary files | Supplement;Dataset | Must match suppFilenames count |
 | sectionTitle | No | Section name | Articles | Will be created if needed |
 | sectionAbbrev | No | Section abbreviation | ART | Used if section is created |
-| issueTitle | No | Issue title | Vol 1, No 1 (2024) | |
-| issueVolume | No | Volume number | 1 | |
-| issueNumber | No | Issue number | 1 | |
-| issueYear | No | Publication year | 2024 | |
-| issueDescription | No | Issue description | Special Edition | Optional |
 | datePublished | No | Publication date | 2024-01-15 | Format: YYYY-MM-DD |
 | startPage | No | First page | 1 | |
 | endPage | No | Last page | 15 | |
@@ -162,17 +154,17 @@ interest one; interest two; another interest
 ### Complete Example: Users CSV
 
 ```csv
-journalPath,firstname,lastname,email,affiliation,country,username,tempPassword,roles,reviewInterests,subscriptionType,start_date,end_date
-myjournal,John,Doe,john@example.com,University of Example,US,jdoe,temp123,"Reader;Author","science;research",1,2024-01-01,2024-12-31
-myjournal,Jane,Smith,jane@example.com,Research Institute,CA,jsmith,temp456,Reader,"biology;ecology",2,2024-01-01,2024-12-31
+serverPath,firstname,lastname,email,affiliation,country,username,tempPassword,roles,reviewInterests
+myjournal,John,Doe,john@example.com,University of Example,US,jdoe,temp123,"Reader;Author","science;research"
+myjournal,Jane,Smith,jane@example.com,Research Institute,CA,jsmith,temp456,Reader,"biology;ecology"
 ```
 
 ### Complete Example: Issues CSV
 
 ```csv
-journalPath,locale,articleTitle,authors,articleAbstract,keywords,subjects,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,issueTitle,issueVolume,issueNumber,issueYear,datePublished,startPage,endPage,copyrightYear,copyrightHolder,licenseUrl
-myjournal,en_US,"Climate Change Impacts","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","This study examines...","climate change;environment","Environmental Science;Ecology",cover.jpg,"Journal Cover 2024","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,"Volume 5, Issue 1",5,1,2024,2024-03-15,1,15,2025,"Public Knowledge Project","https://creativecommons.org/licenses/by/4.0"
-myjournal,en_US,"Biodiversity Loss","Alice,Johnson,alice@example.com,Conservation Org","This paper discusses...","biodiversity;conservation","Biology;Environmental Science",,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,"Volume 5, Issue 1",5,1,2024,2024-03-20,16,30,2024,"Conservation Organization","https://creativecommons.org/licenses/by-sa/4.0"
+serverPath,locale,articleTitle,authors,articleAbstract,keywords,subjects,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,datePublished,startPage,endPage,copyrightYear,copyrightHolder,licenseUrl
+myjournal,en_US,"Climate Change Impacts","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","This study examines...","climate change;environment","Environmental Science;Ecology",cover.jpg,"Journal Cover 2024","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,2024-03-15,1,15,2025,"Public Knowledge Project","https://creativecommons.org/licenses/by/4.0"
+myjournal,en_US,"Biodiversity Loss","Alice,Johnson,alice@example.com,Conservation Org","This paper discusses...","biodiversity;conservation","Biology;Environmental Science",,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,2024-03-20,16,30,2024,"Conservation Organization","https://creativecommons.org/licenses/by-sa/4.0"
 ```
 
 ## File Structure for Import
@@ -182,7 +174,7 @@ When importing issues, the following file structure is recommended:
 ```
 import_directory/
 ├── users.csv
-├── issues.csv
+├── submissions.csv
 ├── article.pdf
 ├── article2.pdf
 ├── presentation.pptx

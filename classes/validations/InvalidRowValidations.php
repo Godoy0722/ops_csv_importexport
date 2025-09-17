@@ -16,9 +16,8 @@
 
 namespace APP\plugins\importexport\csv\classes\validations;
 
-use APP\journal\Journal;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
-use APP\subscription\SubscriptionType;
+use APP\server\Server;
 
 class InvalidRowValidations
 {
@@ -131,23 +130,23 @@ class InvalidRowValidations
 
 
     /**
-     * Validates whether the journal is valid for the CSV row. Returns the reason if an error occurred,
+     * Validates whether the server is valid for the CSV row. Returns the reason if an error occurred,
      * or null if everything is correct.
      */
-    public static function validateJournalIsValid(Journal $journal, string $journalPath): ?string
+    public static function validateServerIsValid(?Server $server, string $serverPath): ?string
     {
-        return !$journal ? __('plugins.importexport.csv.unknownJournal', ['journalPath' => $journalPath]) : null;
+        return !$server ? __('plugins.importexport.csv.unknownServer', ['serverPath' => $serverPath]) : null;
     }
 
     /**
-     * Validates if the journal supports the locale provided in the CSV row. Returns the reason if an error occurred
+     * Validates if the server supports the locale provided in the CSV row. Returns the reason if an error occurred
      * or null if everything is correct.
      */
-    public static function validateJournalLocale(Journal $journal, string $locale): ?string
+    public static function validateServerLocation(Server $server, string $locale): ?string
     {
-        $supportedLocales = $journal->getSupportedSubmissionLocales();
+        $supportedLocales = $server->getSupportedSubmissionLocales();
         if (!is_array($supportedLocales) || count($supportedLocales) < 1) {
-            $supportedLocales = [$journal->getPrimaryLocale()];
+            $supportedLocales = [$server->getPrimaryLocale()];
         }
 
         return !in_array($locale, $supportedLocales)
@@ -168,20 +167,18 @@ class InvalidRowValidations
      * Validates if the user group ID is valid. Returns the reason if an error occurred
      * or null if everything is correct.
      */
-    public static function validateUserGroupId(?int $userGroupId, string $journalPath): ?string
+    public static function validateUserGroupId(?int $userGroupId, string $serverPath): ?string
     {
-        return !$userGroupId
-            ? __('plugins.importexport.csv.noAuthorGroup', ['journal' => $journalPath])
-            : null;
+        return !$userGroupId ? __('plugins.importexport.csv.noAuthorGroup', ['server' => $serverPath]) : null;
     }
 
     /**
      * Validates if all user groups are valid. Returns the reason if an error occurred
      * or null if everything is correct.
      */
-    public static function validateAllUserGroupsAreValid(array $roles, int $journalId, string $locale): ?string
+    public static function validateAllUserGroupsAreValid(array $roles, int $serverId, string $locale): ?string
     {
-        $userGroups = CachedEntities::getCachedUserGroupsByJournalId($journalId);
+        $userGroups = CachedEntities::getCachedUserGroupsByServerId($serverId);
 
         $allDbRoles = 0;
         foreach ($roles as $role) {
@@ -217,16 +214,5 @@ class InvalidRowValidations
         }
 
         return null;
-    }
-
-    /**
-     * Validates if the subscription type is valid. Returns the reason if an error occurred
-     * or null if everything is correct.
-     */
-    public static function validateSubscriptionType(?SubscriptionType $subscriptionType, int $subscriptionTypeId): ?string
-    {
-        return !$subscriptionType
-            ? __('plugins.importexport.csv.subscriptionTypeDoesntExist', ['subscriptionTypeId' => $subscriptionTypeId])
-            : null;
     }
 }

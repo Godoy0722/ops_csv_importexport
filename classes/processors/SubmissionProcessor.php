@@ -23,29 +23,18 @@ use PKP\context\Context;
 
 class SubmissionProcessor
 {
-    public static function process(object $data, Publication $publication, Context $journal): Submission
+    public static function process(object $data, Publication $publication, Context $server): Submission
     {
-        $submissionData = [
-            'contextId' => $journal->getId(),
-            'status' => Submission::STATUS_PUBLISHED,
-            'locale' => $data->locale,
-            'stageId' => WORKFLOW_STAGE_ID_PRODUCTION,
-            'submissionProgress' => '0',
-            $data->locale => [
-                'abstract' => $data->articleAbstract
-            ]
-        ];
+        $submission = Repo::submission()->newDataObject();
 
-        $submission = Repo::submission()->newDataObject($submissionData);
-        $submission->stampLastActivity();
-        $submission->stampModified();
+        $submission->setData('contextId', $server->getId());
+        $submission->setData('status', Submission::STATUS_PUBLISHED);
+        $submission->setData('locale', $data->locale);
+        $submission->setData('stageId', WORKFLOW_STAGE_ID_PRODUCTION);
+        $submission->setData('submissionProgress', '0');
+        $submission->setData('abstract', $data->articleAbstract, $data->locale);
 
-        $submissionId = Repo::submission()->add($submission, $publication, $journal);
+        $submissionId = Repo::submission()->add($submission, $publication, $server);
         return Repo::submission()->get($submissionId);
-    }
-
-    public static function updateCurrentPublicationId(Submission $submission, int $publicationId)
-    {
-        Repo::submission()->edit($submission, ['currentPublicationId' => $publicationId]);
     }
 }

@@ -11,7 +11,7 @@
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Handles the issue import when the user uses the issue command
+ * @brief Provides utility methods for reading, writing, and handling CSV files and invalid row processing for import/export commands.
  */
 
 namespace APP\plugins\importexport\csv\classes\handlers;

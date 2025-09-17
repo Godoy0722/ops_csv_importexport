@@ -55,11 +55,11 @@ msgstr "Row doesn't contain all fields."
 msgid "plugins.importexport.csv.verifyRequiredFieldsForThisRow"
 msgstr "Verify the required fields for this row."
 
-msgid "plugins.importexport.csv.unknownJournal"
-msgstr "Unknown journal with path \"{$journalPath}\"."
+msgid "plugins.importexport.csv.unknownServer"
+msgstr "Unknown server with path \"{$serverPath}\"."
 
 msgid "plugins.importexport.csv.unknownLocale"
-msgstr "Unknown locale or locale not supported by this journal: \"{$locale}\""
+msgstr "Unknown locale or locale not supported by this server: \"{$locale}\""
 
 msgid "plugins.importexport.csv.invalidArticleFile"
 msgstr "Invalid article file for this submission."
@@ -80,7 +80,7 @@ msgid "plugins.importexport.csv.invalidNumberOfLabelsAndSupplementaryFiles"
 msgstr "Supplementary files don't have the same amount as the labels. Please verify it for this row."
 
 msgid "plugins.importexport.csv.noAuthorGroup"
-msgstr "There is no default author group in the journal {$journal}."
+msgstr "There is no default author group in the server {$server}."
 
 msgid "plugins.importexpot.csv.fileProcessFinished"
 msgstr "Process for file \"{$filename}\" finished. {$processedRows} rows processed. {$failedRows} rows with error."
@@ -105,9 +105,6 @@ msgstr "An error occurred while saving the galley {$galley}."
 
 msgid "plugins.importexport.csv.abstractRequiredBySection"
 msgstr "Abstract is required for this section but not provided."
-
-msgid "plugins.importexport.csv.atLeastOneIssueFieldRequired"
-msgstr "At least one issue field (issueTitle, issueVolume, issueNumber, or issueYear) must be provided."
 
 msgid "plugins.importexport.csv.userAlreadyExistsWithEmail"
 msgstr "User already exists with email \"{$email}\"."

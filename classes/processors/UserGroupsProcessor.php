@@ -21,10 +21,10 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 
 class UserGroupsProcessor
 {
-	public static function process(array $roles, int $userId, int $journalId, string $locale)
+	public static function process(array $roles, int $userId, int $serverId, string $locale)
     {
         foreach ($roles as $role) {
-            $userGroup = CachedEntities::getCachedUserGroupByName($role, $journalId, $locale);
+            $userGroup = CachedEntities::getCachedUserGroupByName($role, $serverId, $locale);
             if ($userGroup) {
                 Repo::userGroup()->assignUserToGroup($userId, $userGroup->getId());
             }

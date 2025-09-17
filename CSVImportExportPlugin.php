@@ -17,7 +17,7 @@
 namespace APP\plugins\importexport\csv;
 
 use APP\facades\Repo;
-use APP\plugins\importexport\csv\classes\commands\IssueCommand;
+use APP\plugins\importexport\csv\classes\commands\SubmissionsCommand;
 use APP\plugins\importexport\csv\classes\commands\UserCommand;
 use PKP\config\Config;
 use PKP\plugins\ImportExportPlugin;
@@ -109,7 +109,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $this->sourceDir = array_shift($args);
         $this->sendWelcomeEmail = array_shift($args) ?? false;
 
-        if (! in_array($this->command, ['issues', 'users']) || !$this->sourceDir || !$this->username) {
+        if (! in_array($this->command, ['submissions', 'users']) || !$this->sourceDir || !$this->username) {
 			$this->usage($scriptName);
 			exit(1);
 		}
@@ -122,16 +122,14 @@ class CSVImportExportPlugin extends ImportExportPlugin
 		$this->validateUser();
 
         switch ($this->command) {
-            case 'issues':
-				import('plugins.importexport.csv.classes.commands.IssueCommand');
-				(new IssueCommand($this->sourceDir, $this->user))->run();
+            case 'submissions':
+				(new SubmissionsCommand($this->sourceDir, $this->user))->run();
                 break;
             case 'users':
-				import('plugins.importexport.csv.classes.commands.UserCommand');
                 (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail))->run();
                 break;
             default:
-                throw new \InvalidArgumentException("Comando inválido: {$this->command}");
+                throw new \InvalidArgumentException("Invalid command: {$this->command}");
         }
 
 		$endTime = microtime(true);

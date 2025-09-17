@@ -11,7 +11,7 @@
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Handles the issue import when the user uses the issue command
+ * @brief Handles the user import when the user uses the users command
  */
 
 namespace APP\plugins\importexport\csv\classes\commands;
@@ -22,7 +22,6 @@ use APP\plugins\importexport\csv\classes\handlers\WelcomeEmailHandler;
 use APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor;
 use APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor;
 use APP\plugins\importexport\csv\classes\processors\UsersProcessor;
-use APP\plugins\importexport\csv\classes\processors\UserSubscriptionProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredUserHeaders;
 use PKP\security\Validation;
@@ -96,9 +95,9 @@ class UserCommand
                     continue;
                 }
 
-                $journal = CachedEntities::getCachedJournal($data->journalPath);
+                $server = CachedEntities::getCachedServer($data->serverPath);
 
-                $reason = InvalidRowValidations::validateJournalIsValid($journal, $data->journalPath);
+                $reason = InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
@@ -121,52 +120,24 @@ class UserCommand
                 $data->username = UsersProcessor::getValidUsername($data->firstname, $data->lastname);
                 $roles = array_map('trim', explode(';', $data->roles));
 
-                $reason = InvalidRowValidations::validateAllUserGroupsAreValid($roles, $journal->getId(), $journal->getPrimaryLocale());
+                $reason = InvalidRowValidations::validateAllUserGroupsAreValid($roles, $server->getId(), $server->getPrimaryLocale());
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
-                }
-
-                if (!empty($data->subscriptionType) || !empty($data->startDate) || !empty($data->endDate)) {
-					if (!RequiredUserHeaders::validateSubscriptionFields($data)) {
-						$reason = __('plugins.importexport.csv.missingSubscriptionFields', ['email' => $data->email]);
-						CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-						continue;
-					}
-
-					$subscriptionType = CachedEntities::getCachedSubscriptionType($data->subscriptionType, $journal->getId());
-
-                    $reason = InvalidRowValidations::validateSubscriptionType($subscriptionType, $data->subscriptionType, $journal->getId());
-                    if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-
-					$reason = InvalidRowValidations::validateSubscriptionDates($data->start_date, $data->end_date);
-					if ($reason) {
-						CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-						continue;
-					}
                 }
 
                 if (is_null($data->tempPassword)) {
                     $data->tempPassword = Validation::generatePassword();
                 }
 
-                $user = UsersProcessor::process($data, $journal->getPrimaryLocale());
+                $user = UsersProcessor::process($data, $server->getPrimaryLocale());
                 $userId = $user->getId();
                 $userInterests = array_map('trim', explode(';', $data->reviewInterests));
                 UserInterestsProcessor::process($userInterests, $userId);
-                UserGroupsProcessor::process($roles, $userId, $journal->getId(), $journal->getPrimaryLocale());
-
-				$dateFormat = 'Y-m-d';
-				$startDate = \DateTime::createFromFormat($dateFormat, $data->startDate);
-				$endDate = \DateTime::createFromFormat($dateFormat, $data->endDate);
-
-				UserSubscriptionProcessor::process((int) $data->subscriptionType, $user->getId(), $journal->getId(), $startDate, $endDate);
+                UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
 
                 if ($this->sendWelcomeEmail) {
-                    WelcomeEmailHandler::sendWelcomeEmail($journal, $user, $this->senderEmailUser, $data->tempPassword);
+                    WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                 }
             }
 

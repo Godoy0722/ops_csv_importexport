@@ -20,7 +20,6 @@ use APP\facades\Repo;
 use APP\publication\Publication;
 use APP\server\Server;
 use APP\submission\Submission;
-use PKP\core\PKPString;
 
 class PublicationProcessor
 {
@@ -34,8 +33,8 @@ class PublicationProcessor
 
         $publication->setData('version', 1);
         $publication->setData('status', Submission::STATUS_PUBLISHED);
-        $publication->setData('datePublished', $data->datePublished);
-        $publication->setData('title', $data->articleTitle, $data->locale);
+        $publication->setData('datePublished', $data->datePosted);
+        $publication->setData('title', $data->preprintTitle, $data->locale);
 
         return $publication;
     }
@@ -48,20 +47,16 @@ class PublicationProcessor
 
         $submissionPublication->setData('copyrightNotice', $server->getLocalizedData('copyrightNotice', $data->locale));
 
-        if (!empty($data->articleSubtitle)) {
-            $submissionPublication->setData('subtitle', $data->articleSubtitle, $data->locale);
+        if (!empty($data->preprintSubtitle)) {
+            $submissionPublication->setData('subtitle', $data->preprintSubtitle, $data->locale);
         }
 
-        if (!empty($data->articleAbstract)) {
-            $submissionPublication->setData('abstract', $data->articleAbstract, $data->locale);
+        if (!empty($data->preprintAbstract)) {
+            $submissionPublication->setData('abstract', $data->preprintAbstract, $data->locale);
         }
 
-        if (!empty($data->articlePrefix)) {
-            $submissionPublication->setData('prefix', $data->articlePrefix, $data->locale);
-        }
-
-        if (!empty($data->startPage) && !empty($data->endPage)) {
-            $submissionPublication->setData('pages', "{$data->startPage}-{$data->endPage}");
+        if (!empty($data->preprintPrefix)) {
+            $submissionPublication->setData('prefix', $data->preprintPrefix, $data->locale);
         }
 
         Repo::publication()->dao->update($submissionPublication);
@@ -133,7 +128,7 @@ class PublicationProcessor
         );
         self::updatePublicationAttribute($publication, 'copyrightYear', $copyrightYear);
 
-        $licenseUrl =  $data->licenseUrl ?? $submission->_getContextLicenseFieldValue(
+        $licenseUrl = $data->licenseUrl ?? $submission->_getContextLicenseFieldValue(
             null,
             Submission::PERMISSIONS_FIELD_LICENSE_URL,
             $publication

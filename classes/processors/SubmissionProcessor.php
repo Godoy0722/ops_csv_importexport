@@ -32,7 +32,8 @@ class SubmissionProcessor
         $submission->setData('locale', $data->locale);
         $submission->setData('stageId', WORKFLOW_STAGE_ID_PRODUCTION);
         $submission->setData('submissionProgress', '0');
-        $submission->setData('abstract', $data->articleAbstract, $data->locale);
+        $submission->setData('abstract', $data->preprintAbstract, $data->locale);
+        $submission->setData('dateSubmitted', $data->dateSubmitted ?? $data->datePosted);
 
         $submissionId = Repo::submission()->add($submission, $publication, $server);
         return Repo::submission()->get($submissionId);

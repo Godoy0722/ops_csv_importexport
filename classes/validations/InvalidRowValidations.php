@@ -49,27 +49,27 @@ class InvalidRowValidations
 
 
     /**
-     * Validates whether the article file exists and is readable. Returns the reason if an error occurred,
+     * Validates whether the preprint file exists and is readable. Returns the reason if an error occurred,
      * or null if everything is correct.
      */
-    public static function validateArticleFileIsValid(string $coverImageFilename, string $sourceDir): ?string
+    public static function validatePreprintFileIsValid(string $coverImageFilename, string $sourceDir): ?string
     {
-        $articleCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
+        $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
 
-        return !is_readable($articleCoverImagePath)
-            ? __('plugins.importexport.csv.invalidArticleFile')
+        return !is_readable($preprintCoverImagePath)
+            ? __('plugins.importexport.csv.invalidPreprintFile')
             : null;
     }
 
     /**
-     * Validates the article cover image. Returns the reason if an error occurred,
+     * Validates the preprint cover image. Returns the reason if an error occurred,
      * or null if everything is correct.
      */
     public static function validateCoverImageIsValid(string $coverImageFilename, string $sourceDir): ?string
     {
-        $articleCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
+        $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
 
-        if (!is_readable($articleCoverImagePath)) {
+        if (!is_readable($preprintCoverImagePath)) {
             return __('plugins.importexport.csv.invalidBookCoverImage');
         }
 
@@ -83,10 +83,10 @@ class InvalidRowValidations
     }
 
     /**
-     * Perform all necessary validations for article galleys. Returns the reason if an error occurred,
+     * Perform all necessary validations for preprint galleys. Returns the reason if an error occurred,
      * or null if everything is correct.
      */
-    public static function validateArticleGalleys(string $galleyFilenames, string $galleyLabels, string $sourceDir): ?string
+    public static function validatePreprintGalleys(string $galleyFilenames, string $galleyLabels, string $sourceDir): ?string
     {
         $galleyFilenamesArray = explode(';', $galleyFilenames);
         $galleyLabelsArray = explode(';', $galleyLabels);

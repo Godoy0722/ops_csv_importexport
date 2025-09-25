@@ -61,8 +61,8 @@ msgstr "Unknown server with path \"{$serverPath}\"."
 msgid "plugins.importexport.csv.unknownLocale"
 msgstr "Unknown locale or locale not supported by this server: \"{$locale}\""
 
-msgid "plugins.importexport.csv.invalidArticleFile"
-msgstr "Invalid article file for this submission."
+msgid "plugins.importexport.csv.invalidPreprintFile"
+msgstr "Invalid file for this preprint."
 
 msgid "plugins.importexport.csv.invalidCoverImage"
 msgstr "Invalid cover image for this submission."

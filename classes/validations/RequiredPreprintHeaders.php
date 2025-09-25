@@ -1,30 +1,30 @@
 <?php
 
 /**
- * @file plugins/importexport/csv/classes/validations/RequiredIssueHeaders.php
+ * @file plugins/importexport/csv/classes/validations/RequiredPreprintHeaders.php
  *
  * Copyright (c) 2025 Simon Fraser University
  * Copyright (c) 2025 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class RequiredIssueHeaders
+ * @class RequiredPreprintHeaders
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Class to validate headers in the issue CSV files
+ * @brief Class to validate headers in the preprint CSV files
  */
 
 namespace APP\plugins\importexport\csv\classes\validations;
 
-class RequiredSubmissionHeaders
+class RequiredPreprintHeaders
 {
-    static $submissionHeaders = [
+    static $preprintHeaders = [
         'serverPath',
         'locale',
-        'articleTitle',
-        'articlePrefix',
-        'articleSubtitle',
-        'articleAbstract',
+        'preprintTitle',
+        'preprintPrefix',
+        'preprintSubtitle',
+        'preprintAbstract',
         'authors',
         'keywords',
         'subjects',
@@ -39,30 +39,29 @@ class RequiredSubmissionHeaders
         'suppLabels',
         'sectionTitle',
         'sectionAbbrev',
-        'datePublished',
-        'startPage',
-        'endPage',
+        'datePosted',
+        'dateSubmitted',
         'copyrightYear',
 		'copyrightHolder',
 		'licenseUrl',
     ];
 
-    static $submissionRequiredHeaders = [
+    static $preprintRequiredHeaders = [
         'serverPath',
         'locale',
-        'articleTitle',
+        'preprintTitle',
         'authors',
-        'datePublished',
+        'datePosted',
     ];
 
     public static function validateRowHasAllFields(array $row): bool
     {
-        return count($row) === count(self::$submissionHeaders);
+        return count($row) === count(self::$preprintHeaders);
     }
 
     public static function validateRowHasAllRequiredFields(object $row): bool
     {
-        foreach (self::$submissionRequiredHeaders as $requiredHeader) {
+        foreach (self::$preprintRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;
             }

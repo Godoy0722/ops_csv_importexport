@@ -29,7 +29,7 @@ class AuthorsProcessor
             /**
              * Examine the author string. The pattern is: "GivenName,FamilyName,email@email.com,affiliation".
              *
-             * If the article has more than one author, it must separate the authors by a semicolon (;). Example:
+             * If the preprint has more than one author, it must separate the authors by a semicolon (;). Example:
              * "<AUTHOR_1_INFORMATION>;<AUTHOR_2_INFORMATION>".
              *
              * Fields familyName, email, and affiliation are optional and can be left as empty fields. E.g.:

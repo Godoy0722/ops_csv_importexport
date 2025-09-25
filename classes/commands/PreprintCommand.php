@@ -1,17 +1,17 @@
 <?php
 
 /**
- * @file plugins/importexport/csv/classes/commands/SubmissionCommand.php
+ * @file plugins/importexport/csv/classes/commands/PreprintCommand.php
  *
  * Copyright (c) 2025 Simon Fraser University
  * Copyright (c) 2025 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class SubmissionCommand
+ * @class PreprintCommand
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Handles the submission import when the user uses the submissions command
+ * @brief Handles the preprint import when the user uses the preprints command
  */
 
 namespace APP\plugins\importexport\csv\classes\commands;
@@ -32,13 +32,13 @@ use APP\plugins\importexport\csv\classes\processors\SubjectsProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
-use APP\plugins\importexport\csv\classes\validations\RequiredSubmissionHeaders;
+use APP\plugins\importexport\csv\classes\validations\RequiredPreprintHeaders;
 use APP\submission\Submission;
 use PKP\file\FileManager;
 use PKP\services\PKPFileService;
 use PKP\user\User;
 
-class SubmissionCommand
+class PreprintCommand
 {
     /** Expected row size for a CSV based on the command passed as argument */
     private int $expectedRowSize;
@@ -69,7 +69,7 @@ class SubmissionCommand
 
     public function __construct(string $sourceDir, User $user)
     {
-        $this->expectedRowSize = count(RequiredSubmissionHeaders::$submissionHeaders);
+        $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
         $this->sourceDir = $sourceDir;
         $this->user = $user;
     }
@@ -89,7 +89,7 @@ class SubmissionCommand
             }
 
             $basename = $fileInfo->getBasename();
-            $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredSubmissionHeaders::$submissionHeaders);
+            $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
 
             if (is_null($invalidCsvFile)) {
                 continue;
@@ -112,11 +112,11 @@ class SubmissionCommand
                 }
 
                 $data = (object) array_combine(
-                    RequiredSubmissionHeaders::$submissionHeaders,
+                    RequiredPreprintHeaders::$preprintHeaders,
                     array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                 );
 
-                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, [RequiredSubmissionHeaders::class, 'validateRowHasAllRequiredFields']);
+                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, [RequiredPreprintHeaders::class, 'validateRowHasAllRequiredFields']);
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
@@ -125,7 +125,7 @@ class SubmissionCommand
                 $fieldsList = array_pad($fields, $this->expectedRowSize, null);
 
                 if ($data->galleyFilenames) {
-                    $reason = InvalidRowValidations::validateArticleGalleys(
+                    $reason = InvalidRowValidations::validatePreprintGalleys(
                         $data->galleyFilenames,
                         $data->galleyLabels,
                         $this->sourceDir
@@ -164,10 +164,8 @@ class SubmissionCommand
                     continue;
                 }
 
-                $section = CachedEntities::getCachedSection($data->sectionTitle, $data->sectionAbbrev, $data->locale, $server->getId());
-
                 // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
-                $genreName = mb_strtoupper($data->genreName ?? 'SUBMISSION');
+                $genreName = 'SUBMISSION';
                 $genreId = CachedEntities::getCachedGenreId($genreName, $server->getId());
 
                 $reason = InvalidRowValidations::validateGenreIdValid($genreId, $genreName);

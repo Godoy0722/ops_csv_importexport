@@ -1,17 +1,16 @@
-# OJS CSV Import Plugin (CLI)
+# OPS CSV Import Plugin (CLI)
 
-This plugin allows administrators to import users and issues with their associated metadata in CSV format into OJS 3.3.X. This plugin operates exclusively via command-line interface (CLI).
+This plugin allows administrators to import users and preprints with their associated metadata in CSV format into OPS 3.5.X. This plugin operates exclusively via command-line interface (CLI).
 
 ## Table of Contents
 - [Usage](#usage)
   - [Importing Users](#importing-users)
-  - [Importing Issues](#importing-issues)
-  - [Exporting Data](#exporting-data)
+  - [Importing Preprints](#importing-preprints)
+  - [Multi-Version Preprints](#multi-version-preprints)
 - [CSV File Format](#csv-file-format)
   - [Users CSV Format](#users-csv-format)
-  - [Issues CSV Format](#issues-csv-format)
+  - [Preprints CSV Format](#preprints-csv-format)
 - [Troubleshooting](#troubleshooting)
-- [Support](#support)
 
 
 ## Command Line Usage
@@ -34,27 +33,40 @@ Example:
 php tools/importExport.php CSVImportExportPlugin users admin /path/to/users.csv true
 ```
 
-### Importing Issues
+### Importing Preprints
 
-To import issues from a CSV file, use the following command:
+To import preprints from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin issues [username] [pathToCsvFile]
+php tools/importExport.php CSVImportExportPlugin preprints [username] [pathToCsvFile]
 ```
 
 Parameters:
 - `username`: The username of an administrator who will be associated with the import
-- `pathToCsvFile`: Path to the CSV file containing issue data. Can be absolute or relative to the OJS root directory.
+- `pathToCsvFile`: Path to the CSV file containing preprint data. Can be absolute or relative to the OPS root directory.
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin issues admin /path/to/csv_file_for_issues
+php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/csv_file_for_preprints
 ```
+
+### Multi-Version Preprints
+
+The plugin supports importing multiple versions of the same preprint. This allows you to track the evolution of a preprint over time with different versions.
+
+#### How Multi-Version Import Works:
+
+1. **Version Identification**: Use `preprintIdentifier` and `version` columns to link versions of the same preprint
+2. **First Version**: Must include all required fields (serverPath, locale, preprintTitle, authors, datePosted)
+3. **Subsequent Versions** (version > 1): Only require `preprintIdentifier` and `version` fields
+4. **Data Cloning**: When creating version 2+, the system automatically clones all data from the previous version
+5. **Selective Updates**: Only the fields you fill in the CSV will be updated; empty fields retain values from the previous version
 
 ### Important Notes:
 - The CSV file and any referenced files (PDFs, images) must be readable by the web server user
-- The script must be executed from the OJS installation directory
+- The script must be executed from the OPS installation directory
 - Ensure you have proper permissions to execute PHP scripts and access the files
+- On single-version preprints should leave `preprintIdentifier` and `version` columns are optional.
 
 ## CSV File Format
 
@@ -123,41 +135,41 @@ interest one; interest two; another interest
 | start_date | If subscriptionType is set | Subscription start date (YYYY-MM-DD) | 2023-01-01 |
 | end_date | If subscriptionType is set | Subscription end date (YYYY-MM-DD) | 2023-12-31 |
 
-### Issues CSV Format
+### Preprints CSV Format
 
 | Column | Required | Description | Example | Notes |
 |--------|----------|-------------|---------|-------|
-| serverPath | Yes | Path of the target server | leo | Must exist in the system |
-| locale | Yes | Article locale | en_US | Must be enabled in the server |
-| articleTitle | Yes | Article title | My Research Paper | |
-| articlePrefix | No | Article prefix | PREF | Optional |
-| articleSubtitle | No | Article subtitle | A Study of... | Optional |
-| articleAbstract | No | Article abstract | This paper examines... | Optional |
-| authors | Yes | Author information | See [Authors Format](#authors-format) | |
+| serverPath | Yes* | Path of the target server | liv | Must exist in the system |
+| locale | Yes* | Preprint locale | en | Must be enabled in the server |
+| preprintTitle | Yes* | Preprint title | My Research Preprint | |
+| preprintPrefix | No | Preprint prefix | ML | Optional abbreviation |
+| preprintSubtitle | No | Preprint subtitle | A Study of... | Optional |
+| preprintAbstract | Yes* | Preprint abstract | This paper examines... | |
+| authors | Yes* | Author information | See [Authors Format](#authors-format) | |
 | keywords | No | Semicolon-separated keywords | science;research | Optional |
 | subjects | No | Semicolon-separated subjects | Biology;Ecology | Optional |
 | coverage | No | Coverage information | Global study | Optional |
 | categories | No | Semicolon-separated categories | Research Article | Will be created if needed |
-| doi | No | Digital Object Identifier | 10.1234/abc123 | Must be valid format |
-| coverImageFilename | No | Cover image filename | cover.jpg | Must be in same directory |
-| coverImageAltText | No | Alt text for cover | Journal Cover | Required if cover image used |
-| galleyFilenames | No | Semicolon-separated primary galley files | doc.docx;data.xlsx | Optional |
-| galleyLabels | No | Labels for primary galleys | DOC;XLS | Must match galleyFilenames count |
+| doi | No | Digital Object Identifier | 10.1234/abc123 | Optional |
+| coverImageFilename | No | Cover image filename | cover.png | Must be in same directory |
+| coverImageAltText | No | Alt text for cover | Preprint Cover | Optional |
+| galleyFilenames | No | Semicolon-separated galley files | paper.pdf;slides.pptx | Optional |
+| galleyLabels | No | Labels for galleys | PDF;SLIDES | Must match galleyFilenames count |
 | suppFilenames | No | Semicolon-separated supplementary files | supplement.pdf;data.csv | Optional |
 | suppLabels | No | Labels for supplementary files | Supplement;Dataset | Must match suppFilenames count |
-| sectionTitle | No | Section name | Articles | Will be created if needed |
-| sectionAbbrev | No | Section abbreviation | ART | Used if section is created |
-| issueTitle | No | Issue title | Vol 1, No 1 (2024) | |
-| issueVolume | No | Volume number | 1 | |
-| issueNumber | No | Issue number | 1 | |
-| issueYear | No | Publication year | 2024 | |
-| issueDescription | No | Issue description | Special Edition | Optional |
-| datePublished | No | Publication date | 2024-01-15 | Format: YYYY-MM-DD |
-| startPage | No | First page | 1 | |
-| endPage | No | Last page | 15 | |
-| copyrightYear | No | Copyright year | 2025 | Defaults to system setting if not provided |
+| sectionTitle | No | Section name | Preprints | Will be created if needed |
+| sectionAbbrev | No | Section abbreviation | PRE | Used if section is created |
+| datePosted | Yes* | Posting date | 2024-01-15 | Format: YYYY-MM-DD |
+| dateSubmitted | No | Submission date | 2024-01-10 | Format: YYYY-MM-DD, optional |
+| copyrightYear | No | Copyright year | 2024 | Defaults to system setting if not provided |
 | copyrightHolder | No | Copyright holder | Public Knowledge Project | Defaults to system setting if not provided |
 | licenseUrl | No | License URL | https://creativecommons.org/licenses/by/4.0 | Defaults to system setting if not provided |
+| preprintIdentifier | No** | Unique identifier for versioning | ML-CLIMATE-2024 | Required for multi-version preprints |
+| version | No** | Version number | 1 | Required for multi-version preprints |
+
+**Notes:**
+- *Required for first version or single-version preprints
+- **For version > 1: Only `preprintIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
 
 ### Complete Example: Users CSV
 
@@ -167,30 +179,48 @@ myserver,John,Doe,john@example.com,University of Example,US,jdoe,temp123,"Reader
 myserver,Jane,Smith,jane@example.com,Research Institute,CA,jsmith,temp456,Reader,"biology;ecology"
 ```
 
-### Complete Example: Issues CSV
+### Complete Example: Preprints CSV (Single Version)
 
 ```csv
-serverPath,locale,articleTitle,authors,articleAbstract,keywords,subjects,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,datePublished,startPage,endPage,copyrightYear,copyrightHolder,licenseUrl
-myjournal,en,"Climate Change Impacts","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","This study examines...","climate change;environment","Environmental Science;Ecology",cover.jpg,"Journal Cover 2024","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,2024,2024-03-15,1,15,2025,"Public Knowledge Project","https://creativecommons.org/licenses/by/4.0"
-myjournal,en,"Biodiversity Loss","Alice,Johnson,alice@example.com,Conservation Org","This paper discusses...","biodiversity;conservation","Biology;Environmental Science",,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,2024,2024-03-20,16,30,2024,"Conservation Organization","https://creativecommons.org/licenses/by-sa/4.0"
+serverPath,locale,preprintTitle,preprintPrefix,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl,preprintIdentifier,version
+liv,en,"Climate Change Impacts",CC,"A Comprehensive Study","This study examines...","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","climate change;environment","Environmental Science;Ecology",global,"environmental science",10.5678/climate-2024,cover.jpg,"Climate Study Cover","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,RA,2024-03-15,2024-03-10,2024,Public Knowledge Project,https://creativecommons.org/licenses/by/4.0,,
+liv,en,"Biodiversity Loss",,,"This paper discusses...","Alice,Johnson,alice@example.com,Conservation Org","biodiversity;conservation","Biology;Environmental Science",,,,,,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,RA,2024-03-20,2024-03-15,2024,Conservation Organization,https://creativecommons.org/licenses/by-sa/4.0,,
+```
+
+### Complete Example: Preprints CSV (Multi-Version)
+
+```csv
+serverPath,locale,preprintTitle,preprintPrefix,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl,preprintIdentifier,version
+liv,en,"Machine Learning in Climate Science",ML,"Version 1.0","Initial findings...","John,Doe,john@example.com,University","machine learning;climate","AI;Environment",global,"computer science",10.5678/ml-v1,cover_v1.png,"ML Climate V1","paper_v1.pdf","PDF","supplement_v1.pdf","Supplement",Preprints,PRE,2024-01-15,2024-01-10,2024,Research Institute,https://creativecommons.org/licenses/by/4.0,ML-CLIMATE-2024,1
+,,,,,,,,,,,,,,paper_v2.pdf,PDF,,,,,,,,,,ML-CLIMATE-2024,2
+liv,en,"Machine Learning in Climate Science - Enhanced",ML,"Version 3.0","Updated with new models...","John,Doe,john@example.com,University;Jane,Smith,jane@example.com,AI Lab","machine learning;climate;deep learning","AI;Environment;Neural Networks",global,"computer science",10.5678/ml-v3,cover_v3.png,"ML Climate V3","paper_v3.pdf;code.zip","PDF;Code","supplement_v3.pdf","Supplement V3",Preprints,PRE,2024-05-20,2024-05-15,2024,Research Institute,https://creativecommons.org/licenses/by/4.0,ML-CLIMATE-2024,3
 ```
 
 ## File Structure for Import
 
-When importing issues, the following file structure is recommended:
+When importing preprints, the following file structure is recommended:
 
 ```
 import_directory/
 ├── users.csv
-├── submissions.csv
-├── article.pdf
-├── article2.pdf
+├── preprints.csv
+├── paper.pdf
+├── paper_v2.pdf
+├── paper_v3.pdf
 ├── presentation.pptx
 ├── supplement.pdf
 ├── data.xlsx
 ├── supplementary_data.csv
-├── cover.jpg
+├── cover_v1.png
+├── cover_v2.png
 ```
+
+### Multi-Version File Naming Convention
+
+For multi-version preprints, it's recommended to include version indicators in filenames:
+- `paper_v1.pdf`, `paper_v2.pdf`, `paper_v3.pdf`
+- `cover_v1.png`, `cover_v2.png`
+- `supplement_v1.pdf`, `supplement_v2.pdf`
 
 ## Troubleshooting
 
@@ -244,7 +274,7 @@ import_directory/
      - Check that subscription type IDs exist in the database
      - Ensure required subscription fields (start_date, end_date) are provided
 
-#### Issue Import Issues
+#### Preprint Import Issues
 7. **Server or Locale Issues**
    - Error: `Unknown server with path [path]` or `Unknown locale [locale]`
    - Solution:
@@ -253,11 +283,11 @@ import_directory/
      - Ensure the server exists and is accessible to the importing user
 
 8. **File Validation Errors**
-   - Error: `Invalid [article/cover/galley] file for this submission`
+   - Error: `Invalid [preprint/cover/galley] file for this submission`
    - Solution:
      - Verify all referenced files exist in the specified location
      - Check file permissions and formats
-     - Ensure cover images are in a supported format (JPG, PNG)
+     - Ensure cover images are in a supported format (JPG, PNG, GIF, WEBP)
      - Verify galley files match the specified labels
 
 9. **Author and Metadata Issues**
@@ -265,12 +295,31 @@ import_directory/
    - Solution:
      - Ensure the server has at least one author group configured
      - Verify author information follows the required format
-     - Check that required author fields (first name) are provided
+     - Check that required author fields (given name) are provided
+
+10. **Multi-Version Import Issues**
+    - Error: `Version is required when preprintIdentifier is provided`
+    - Solution:
+      - Ensure both `preprintIdentifier` and `version` are filled when using versioning
+      - Verify version numbers are positive integers (1, 2, 3, etc.)
+
+    - Error: `Duplicate preprint version found`
+    - Solution:
+      - Check that you don't have duplicate version numbers for the same `preprintIdentifier`
+      - Ensure each version number is unique within the same preprint identifier
+
+    - **Best Practices for Multi-Version Imports:**
+      - Always import versions in sequential order (1, 2, 3...)
+      - Keep all versions of the same preprint in the same CSV file
+      - For version 2+, you can leave most fields empty to clone from previous version
+      - Only fill in the fields you want to update in newer versions
 
 #### General Troubleshooting Tips
 - Always back up your database before running imports
-- Test with a small CSV file first
-- Check the OJS error log for detailed error messages
+- Test with a small CSV file first (2-3 preprints)
+- Check the OPS error log for detailed error messages
 - Ensure your CSV file is saved with UTF-8 encoding
 - On Linux systems, check file permissions with `ls -l` and adjust with `chmod` if needed
 - For large imports, monitor server resources as the process may be memory-intensive
+- When importing multi-version preprints, start with a simple 2-version example to verify the workflow
+- Check the `invalid_[filename].csv` file generated after import for any failed rows

@@ -151,7 +151,7 @@ class PreprintCommand
                     continue;
                 }
 
-                if (!empty($data->preprintIdentifier)) {
+                if (!empty($data->versionIdentifier)) {
                     $reason = InvalidRowValidations::validateNoDuplicateVersion($data, $this->processedPreprints);
                     if (!is_null($reason)) {
                         CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
@@ -249,8 +249,8 @@ class PreprintCommand
                 $existingSubmission = null;
                 /** @var null|Publication */
                 $basePublication = null;
-                if (!empty($data->preprintIdentifier) && isset($this->processedPreprints[$data->preprintIdentifier])) {
-                    $firstVersionData = reset($this->processedPreprints[$data->preprintIdentifier]);
+                if (!empty($data->versionIdentifier) && isset($this->processedPreprints[$data->versionIdentifier])) {
+                    $firstVersionData = reset($this->processedPreprints[$data->versionIdentifier]);
                     $existingSubmission = $firstVersionData['submission'];
                     $basePublication = $firstVersionData['publication'];
                 }
@@ -388,7 +388,7 @@ class PreprintCommand
                         : CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
                 }
 
-                if (!empty($data->preprintIdentifier)) {
+                if (!empty($data->versionIdentifier)) {
                     $this->trackProcessedPreprint($data, $submission, $publication);
                 }
             }
@@ -477,7 +477,7 @@ class PreprintCommand
      */
     private function trackProcessedPreprint(object $data, Submission $submission, Publication $publication): void
     {
-        $identifier = $data->preprintIdentifier;
+        $identifier = $data->versionIdentifier;
         $version = (int)$data->version;
 
         if (!isset($this->processedPreprints[$identifier])) {

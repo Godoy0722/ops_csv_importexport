@@ -196,7 +196,7 @@ class InvalidRowValidations
 
     public static function validatePreprintVersioningFields(object $data): ?string
     {
-        if (!empty($data->preprintIdentifier) && empty($data->version)) {
+        if (!empty($data->versionIdentifier) && empty($data->version)) {
             return __('plugins.importexport.csv.versionRequiredWhenIdentifierProvided');
         }
 
@@ -215,7 +215,7 @@ class InvalidRowValidations
      */
     public static function validateNoDuplicateVersion(object $data, array $processedPreprints): ?string
     {
-        $identifier = $data->preprintIdentifier;
+        $identifier = $data->versionIdentifier;
         $version = (int)$data->version;
 
         if (isset($processedPreprints[$identifier][$version])) {

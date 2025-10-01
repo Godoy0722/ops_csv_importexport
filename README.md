@@ -56,9 +56,9 @@ The plugin supports importing multiple versions of the same preprint. This allow
 
 #### How Multi-Version Import Works:
 
-1. **Version Identification**: Use `preprintIdentifier` and `version` columns to link versions of the same preprint
+1. **Version Identification**: Use `versionIdentifier` and `version` columns to link versions of the same preprint
 2. **First Version**: Must include all required fields (serverPath, locale, preprintTitle, authors, datePosted)
-3. **Subsequent Versions** (version > 1): Only require `preprintIdentifier` and `version` fields
+3. **Subsequent Versions** (version > 1): Only require `versionIdentifier` and `version` fields
 4. **Data Cloning**: When creating version 2+, the system automatically clones all data from the previous version
 5. **Selective Updates**: Only the fields you fill in the CSV will be updated; empty fields retain values from the previous version
 
@@ -66,7 +66,7 @@ The plugin supports importing multiple versions of the same preprint. This allow
 - The CSV file and any referenced files (PDFs, images) must be readable by the web server user
 - The script must be executed from the OPS installation directory
 - Ensure you have proper permissions to execute PHP scripts and access the files
-- On single-version preprints should leave `preprintIdentifier` and `version` columns are optional.
+- On single-version preprints should leave `versionIdentifier` and `version` columns are optional.
 
 ## CSV File Format
 
@@ -141,8 +141,10 @@ interest one; interest two; another interest
 |--------|----------|-------------|---------|-------|
 | serverPath | Yes* | Path of the target server | liv | Must exist in the system |
 | locale | Yes* | Preprint locale | en | Must be enabled in the server |
-| preprintTitle | Yes* | Preprint title | My Research Preprint | |
+| versionIdentifier | No** | Unique identifier for versioning | ML-CLIMATE-2024 | Required for multi-version preprints |
+| version | No** | Version number | 1 | Required for multi-version preprints |
 | preprintPrefix | No | Preprint prefix | ML | Optional abbreviation |
+| preprintTitle | Yes* | Preprint title | My Research Preprint | |
 | preprintSubtitle | No | Preprint subtitle | A Study of... | Optional |
 | preprintAbstract | Yes* | Preprint abstract | This paper examines... | |
 | authors | Yes* | Author information | See [Authors Format](#authors-format) | |
@@ -164,12 +166,10 @@ interest one; interest two; another interest
 | copyrightYear | No | Copyright year | 2024 | Defaults to system setting if not provided |
 | copyrightHolder | No | Copyright holder | Public Knowledge Project | Defaults to system setting if not provided |
 | licenseUrl | No | License URL | https://creativecommons.org/licenses/by/4.0 | Defaults to system setting if not provided |
-| preprintIdentifier | No** | Unique identifier for versioning | ML-CLIMATE-2024 | Required for multi-version preprints |
-| version | No** | Version number | 1 | Required for multi-version preprints |
 
 **Notes:**
 - *Required for first version or single-version preprints
-- **For version > 1: Only `preprintIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
+- **For version > 1: Only `versionIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
 
 ### Complete Example: Users CSV
 
@@ -182,18 +182,18 @@ myserver,Jane,Smith,jane@example.com,Research Institute,CA,jsmith,temp456,Reader
 ### Complete Example: Preprints CSV (Single Version)
 
 ```csv
-serverPath,locale,preprintTitle,preprintPrefix,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl,preprintIdentifier,version
-liv,en,"Climate Change Impacts",CC,"A Comprehensive Study","This study examines...","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","climate change;environment","Environmental Science;Ecology",global,"environmental science",10.5678/climate-2024,cover.jpg,"Climate Study Cover","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,RA,2024-03-15,2024-03-10,2024,Public Knowledge Project,https://creativecommons.org/licenses/by/4.0,,
-liv,en,"Biodiversity Loss",,,"This paper discusses...","Alice,Johnson,alice@example.com,Conservation Org","biodiversity;conservation","Biology;Environmental Science",,,,,,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,RA,2024-03-20,2024-03-15,2024,Conservation Organization,https://creativecommons.org/licenses/by-sa/4.0,,
+serverPath,locale,versionIdentifier,version,preprintPrefix,preprintTitle,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl
+liv,en,,,CC,"Climate Change Impacts","A Comprehensive Study","This study examines...","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","climate change;environment","Environmental Science;Ecology",global,"environmental science",10.5678/climate-2024,cover.jpg,"Climate Study Cover","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,RA,2024-03-15,2024-03-10,2024,Public Knowledge Project,https://creativecommons.org/licenses/by/4.0
+liv,en,,,"","Biodiversity Loss",,"This paper discusses...","Alice,Johnson,alice@example.com,Conservation Org","biodiversity;conservation","Biology;Environmental Science",,,,,,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,RA,2024-03-20,2024-03-15,2024,Conservation Organization,https://creativecommons.org/licenses/by-sa/4.0
 ```
 
 ### Complete Example: Preprints CSV (Multi-Version)
 
 ```csv
-serverPath,locale,preprintTitle,preprintPrefix,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl,preprintIdentifier,version
-liv,en,"Machine Learning in Climate Science",ML,"Version 1.0","Initial findings...","John,Doe,john@example.com,University","machine learning;climate","AI;Environment",global,"computer science",10.5678/ml-v1,cover_v1.png,"ML Climate V1","paper_v1.pdf","PDF","supplement_v1.pdf","Supplement",Preprints,PRE,2024-01-15,2024-01-10,2024,Research Institute,https://creativecommons.org/licenses/by/4.0,ML-CLIMATE-2024,1
-,,,,,,,,,,,,,,paper_v2.pdf,PDF,,,,,,,,,,ML-CLIMATE-2024,2
-liv,en,"Machine Learning in Climate Science - Enhanced",ML,"Version 3.0","Updated with new models...","John,Doe,john@example.com,University;Jane,Smith,jane@example.com,AI Lab","machine learning;climate;deep learning","AI;Environment;Neural Networks",global,"computer science",10.5678/ml-v3,cover_v3.png,"ML Climate V3","paper_v3.pdf;code.zip","PDF;Code","supplement_v3.pdf","Supplement V3",Preprints,PRE,2024-05-20,2024-05-15,2024,Research Institute,https://creativecommons.org/licenses/by/4.0,ML-CLIMATE-2024,3
+serverPath,locale,versionIdentifier,version,preprintPrefix,preprintTitle,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl
+liv,en,ML-CLIMATE-2024,1,ML,"Machine Learning in Climate Science","Version 1.0","Initial findings...","John,Doe,john@example.com,University","machine learning;climate","AI;Environment",global,"computer science",10.5678/ml-v1,cover_v1.png,"ML Climate V1","paper_v1.pdf","PDF","supplement_v1.pdf","Supplement",Preprints,PRE,2024-01-15,2024-01-10,2024,Research Institute,https://creativecommons.org/licenses/by/4.0
+liv,en,ML-CLIMATE-2024,2,,,,,,,,,,,,paper_v2.pdf,PDF,,,,,,,,,
+liv,en,ML-CLIMATE-2024,3,ML,"Machine Learning in Climate Science - Enhanced","Version 3.0","Updated with new models...","John,Doe,john@example.com,University;Jane,Smith,jane@example.com,AI Lab","machine learning;climate;deep learning","AI;Environment;Neural Networks",global,"computer science",10.5678/ml-v3,cover_v3.png,"ML Climate V3","paper_v3.pdf;code.zip","PDF;Code","supplement_v3.pdf","Supplement V3",Preprints,PRE,2024-05-20,2024-05-15,2024,Research Institute,https://creativecommons.org/licenses/by/4.0
 ```
 
 ## File Structure for Import
@@ -298,14 +298,14 @@ For multi-version preprints, it's recommended to include version indicators in f
      - Check that required author fields (given name) are provided
 
 10. **Multi-Version Import Issues**
-    - Error: `Version is required when preprintIdentifier is provided`
+    - Error: `Version is required when versionIdentifier is provided`
     - Solution:
-      - Ensure both `preprintIdentifier` and `version` are filled when using versioning
+      - Ensure both `versionIdentifier` and `version` are filled when using versioning
       - Verify version numbers are positive integers (1, 2, 3, etc.)
 
     - Error: `Duplicate preprint version found`
     - Solution:
-      - Check that you don't have duplicate version numbers for the same `preprintIdentifier`
+      - Check that you don't have duplicate version numbers for the same `versionIdentifier`
       - Ensure each version number is unique within the same preprint identifier
 
     - **Best Practices for Multi-Version Imports:**

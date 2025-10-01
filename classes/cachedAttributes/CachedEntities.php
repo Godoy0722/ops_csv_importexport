@@ -18,6 +18,7 @@
 namespace APP\plugins\importexport\csv\classes\cachedAttributes;
 
 use APP\facades\Repo;
+use APP\publication\Publication;
 use APP\section\Section;
 use APP\server\Server;
 use APP\subscription\SubscriptionType;
@@ -174,5 +175,24 @@ class CachedEntities
         }
 
         return null;
+    }
+
+    static function getCachedSectionById(int $baseSectionId, int $serverId, string $locale): ?Section
+    {
+        $existingSection = array_find(self::$sections, function (Section $section) use ($baseSectionId) {
+            return $section->getId() === $baseSectionId;
+        });
+
+        if ($existingSection) {
+            return $existingSection;
+        }
+
+        $section = Repo::section()->get($baseSectionId, $serverId);
+        $sectionTitle = $section->getTitle($locale);
+        $sectionAbbrev = $section->getAbbrev($locale);
+
+        $customSectionKey = $sectionTitle . '_' . mb_strtoupper(trim($sectionAbbrev));
+        self::$sections[$customSectionKey] = $section;
+        return $section;
     }
 }

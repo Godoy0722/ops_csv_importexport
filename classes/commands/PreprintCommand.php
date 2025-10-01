@@ -19,6 +19,7 @@ namespace APP\plugins\importexport\csv\classes\commands;
 use APP\core\Application;
 use APP\facades\Repo;
 use APP\file\PublicFileManager;
+use APP\publication\Publication;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\handlers\CSVFileHandler;
@@ -67,11 +68,33 @@ class PreprintCommand
 
     private string $format;
 
+    /**
+     * Array to track processed preprints by identifier
+     * Structure: [
+     *     'identifier' => [
+     *         'version1' => [
+     *             'data' => csv_row,
+     *             'publication' => Publication,
+     *             'submission' => Submission
+     *         ],
+     *         'version2' => [
+     *             'data' => csv_row,
+     *             'publication' => Publication,
+     *             'submission' => Submission
+     *         ]
+     *     ]
+     * ]
+     *
+     * @var array
+     */
+    private array $processedPreprints;
+
     public function __construct(string $sourceDir, User $user)
     {
         $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
         $this->sourceDir = $sourceDir;
         $this->user = $user;
+        $this->processedPreprints = [];
     }
 
     public function run()
@@ -120,6 +143,20 @@ class PreprintCommand
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
+                }
+
+                $reason = InvalidRowValidations::validatePreprintVersioningFields($data);
+                if (!is_null($reason)) {
+                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    continue;
+                }
+
+                if (!empty($data->preprintIdentifier)) {
+                    $reason = InvalidRowValidations::validateNoDuplicateVersion($data, $this->processedPreprints);
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        continue;
+                    }
                 }
 
                 $fieldsList = array_pad($fields, $this->expectedRowSize, null);
@@ -208,10 +245,27 @@ class PreprintCommand
                     }
                 }
 
-                $initialPublication = PublicationProcessor::createInitialPublication($data, $server);
-                $submission = SubmissionProcessor::process($data, $initialPublication, $server);
+                /** @var null|Submission */
+                $existingSubmission = null;
+                /** @var null|Publication */
+                $basePublication = null;
+                if (!empty($data->preprintIdentifier) && isset($this->processedPreprints[$data->preprintIdentifier])) {
+                    $firstVersionData = reset($this->processedPreprints[$data->preprintIdentifier]);
+                    $existingSubmission = $firstVersionData['submission'];
+                    $basePublication = $firstVersionData['publication'];
+                }
 
-                $publication = PublicationProcessor::process($submission, $data, $server);
+                if ($existingSubmission && $basePublication) {
+                    $submission = $existingSubmission;
+                    $publication = PublicationProcessor::createPublicationVersion($basePublication, $data);
+
+                    $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication);
+                } else {
+                    $initialPublication = PublicationProcessor::createInitialPublication($data);
+                    $submission = SubmissionProcessor::process($data, $initialPublication, $server);
+                    $publication = PublicationProcessor::process($submission, $data, $server);
+                }
+
                 if (!$publication) {
                     $reason = __('plugins.importexport.csv.errorWhileCreatingPublication');
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
@@ -307,23 +361,35 @@ class PreprintCommand
                     }
                 }
 
-                AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
-                KeywordsProcessor::process($data, $publication->getId());
-                SubjectsProcessor::process($data, $publication->getId());
+                AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
+                KeywordsProcessor::process($data, $publication->getId(), $basePublication);
+                SubjectsProcessor::process($data, $publication->getId(), $basePublication);
 
-                if ($data->coverage) {
-                    PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
+                if ($data->coverage || ($basePublication && !$data->coverage)) {
+                    if (!empty($data->coverage)) {
+                        PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
+                    } elseif ($basePublication && $basePublication->getLocalizedData('coverage', $data->locale)) {
+                        PublicationProcessor::updateCoverage($publication, $basePublication->getLocalizedData('coverage', $data->locale), $data->locale);
+                    }
                 }
 
-                $section = SectionsProcessor::process($data, $server->getId());
+                $section = SectionsProcessor::process($data, $server->getId(), $basePublication);
                 PublicationProcessor::updateSectionId($publication, $section->getId());
 
                 if ($data->coverImageFilename) {
                     PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
+                } elseif ($basePublication && $basePublication->getLocalizedData('coverImage', $data->locale)) {
+                    PublicationProcessor::updatePublicationAttribute($publication, 'coverImage', $basePublication->getData('coverImage'));
                 }
 
-                if ($data->categories) {
-                    CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
+                if ($data->categories || $basePublication) {
+                    ($existingSubmission && $basePublication)
+                        ? CategoriesProcessor::processForVersion($data->categories, $data->locale, $server->getId(), $publication->getId(), $basePublication)
+                        : CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
+                }
+
+                if (!empty($data->preprintIdentifier)) {
+                    $this->trackProcessedPreprint($data, $submission, $publication);
                 }
             }
 
@@ -337,6 +403,8 @@ class PreprintCommand
                 unlink($this->sourceDir . '/' . "invalid_{$basename}");
             }
         }
+
+        $this->setCurrentVersionsForProcessedPreprints();
     }
 
     /** Insert static data that will be used for the submission processing */
@@ -402,5 +470,56 @@ class PreprintCommand
         // Now that we have the submission file ID, it's time to process the galley itself.
         $galleyId = GalleyProcessor::process($submissionFile->getId(), $data, $label, $publicationId, $galleyExtension);
         SubmissionFileProcessor::updateAssocInfo($submissionFile, $galleyId);
+    }
+
+    /**
+     * Tracks a processed preprint for version management
+     */
+    private function trackProcessedPreprint(object $data, Submission $submission, Publication $publication): void
+    {
+        $identifier = $data->preprintIdentifier;
+        $version = (int)$data->version;
+
+        if (!isset($this->processedPreprints[$identifier])) {
+            $this->processedPreprints[$identifier] = [];
+        }
+
+        $this->processedPreprints[$identifier][$version] = [
+            'data' => $data,
+            'submission' => $submission,
+            'publication' => $publication
+        ];
+    }
+
+    /**
+     * Set the highest version as current for each processed preprint identifier
+     */
+    private function setCurrentVersionsForProcessedPreprints(): void
+    {
+        foreach ($this->processedPreprints as $identifier => $versions) {
+            if (count($versions) <= 1) {
+                continue; // Skip if only one version exists
+            }
+
+            $highestVersion = 0;
+            $currentVersionData = null;
+
+            foreach ($versions as $versionKey => $versionData) {
+                $versionNumber = (int)$versionData['data']->version;
+                if ($versionNumber > $highestVersion) {
+                    $highestVersion = $versionNumber;
+                    $currentVersionData = $versionData;
+                }
+            }
+
+            if ($currentVersionData) {
+                /** @var Submission */
+                $submission = $currentVersionData['submission'];
+                /** @var Publication */
+                $publication = $currentVersionData['publication'];
+
+                SubmissionProcessor::setCurrentPublicationId($submission, $publication->getId());
+            }
+        }
     }
 }

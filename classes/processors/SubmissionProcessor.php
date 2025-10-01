@@ -38,4 +38,9 @@ class SubmissionProcessor
         $submissionId = Repo::submission()->add($submission, $publication, $server);
         return Repo::submission()->get($submissionId);
     }
+
+    public static function setCurrentPublicationId(Submission $submission, int $publicationId): void
+    {
+        Repo::submission()->edit($submission, ['currentPublicationId' => $publicationId]);
+    }
 }

@@ -44,6 +44,8 @@ class RequiredPreprintHeaders
         'copyrightYear',
 		'copyrightHolder',
 		'licenseUrl',
+		'preprintIdentifier',
+		'version',
     ];
 
     static $preprintRequiredHeaders = [
@@ -61,6 +63,10 @@ class RequiredPreprintHeaders
 
     public static function validateRowHasAllRequiredFields(object $row): bool
     {
+        if (!empty($row->preprintIdentifier) && !empty($row->version) && (int)$row->version > 1) {
+            return true;
+        }
+
         foreach (self::$preprintRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;

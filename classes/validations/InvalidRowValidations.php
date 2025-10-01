@@ -193,4 +193,38 @@ class InvalidRowValidations
             ? __('plugins.importexport.csv.roleDoesntExist', ['role' => $role])
             : null;
     }
+
+    public static function validatePreprintVersioningFields(object $data): ?string
+    {
+        if (!empty($data->preprintIdentifier) && empty($data->version)) {
+            return __('plugins.importexport.csv.versionRequiredWhenIdentifierProvided');
+        }
+
+        if (!empty($data->version)) {
+            if (!is_numeric($data->version) || (int)$data->version < 1) {
+                return __('plugins.importexport.csv.versionMustBePositiveInteger');
+            }
+        }
+
+        return null;
+    }
+
+     /**
+     * Validates that no duplicate version exists for the same preprint identifier
+     * in the current import session
+     */
+    public static function validateNoDuplicateVersion(object $data, array $processedPreprints): ?string
+    {
+        $identifier = $data->preprintIdentifier;
+        $version = (int)$data->version;
+
+        if (isset($processedPreprints[$identifier][$version])) {
+            return __('plugins.importexport.csv.duplicatePreprintVersionFound', [
+                'identifier' => $identifier,
+                'version' => $version
+            ]);
+        }
+
+        return null;
+    }
 }

@@ -31,7 +31,8 @@ class PublicationProcessor
     {
         $publication = Repo::publication()->newDataObject();
 
-        $publication->setData('version', 1);
+        $version = !empty($data->version) ? (int)$data->version : 1;
+        $publication->setData('version', $version);
         $publication->setData('status', Submission::STATUS_PUBLISHED);
         $publication->setData('datePublished', $data->datePosted);
         $publication->setData('title', $data->preprintTitle, $data->locale);
@@ -134,5 +135,114 @@ class PublicationProcessor
             $publication
         );
         self::updatePublicationAttribute($publication, 'licenseUrl', $licenseUrl);
+    }
+
+    /**
+     * Set copyright information for versioned publications
+     * Clone from base version if CSV fields are empty
+     */
+    private static function setCopyrightFromSystemForVersion(
+        Publication &$publication,
+        object $data,
+        Publication $basePublication
+    ): void
+    {
+        if (!empty($data->copyrightHolder)) {
+            self::updatePublicationAttribute($publication, 'copyrightHolder', $data->copyrightHolder, $data->locale);
+        } elseif ($basePublication->getLocalizedData('copyrightHolder', $data->locale)) {
+            self::updatePublicationAttribute($publication, 'copyrightHolder', $basePublication->getLocalizedData('copyrightHolder', $data->locale), $data->locale);
+        }
+
+        if (!empty($data->copyrightYear)) {
+            self::updatePublicationAttribute($publication, 'copyrightYear', $data->copyrightYear);
+        } elseif ($basePublication->getData('copyrightYear')) {
+            self::updatePublicationAttribute($publication, 'copyrightYear', $basePublication->getData('copyrightYear'));
+        }
+
+        if (!empty($data->licenseUrl)) {
+            self::updatePublicationAttribute($publication, 'licenseUrl', $data->licenseUrl);
+        } elseif ($basePublication->getData('licenseUrl')) {
+            self::updatePublicationAttribute($publication, 'licenseUrl', $basePublication->getData('licenseUrl'));
+        }
+    }
+
+    /**
+     * Process a versioned publication with CSV data
+     * This method processes a publication that was created through OPS versioning mechanism
+     * OPS versioning already copied all data from base version, we only update what changed
+     */
+    public static function processVersionedPublication(Publication $publication, object $data, Publication $basePublication): Publication
+    {
+        // Update version and status
+        self::updatePublicationAttribute($publication, 'version', (int)$data->version);
+        self::updatePublicationAttribute($publication, 'status', Submission::STATUS_PUBLISHED);
+
+        $datePosted = !empty($data->datePosted) ? $data->datePosted : $basePublication->getData('datePublished');
+        self::updatePublicationAttribute($publication, 'datePublished', $datePosted);
+
+        $title = !empty($data->preprintTitle) ? $data->preprintTitle : $basePublication->getLocalizedData('title', $data->locale);
+        self::updatePublicationAttribute($publication, 'title', $title, $data->locale);
+
+        if (!empty($data->preprintSubtitle)) {
+            self::updatePublicationAttribute($publication, 'subtitle', $data->preprintSubtitle, $data->locale);
+        } elseif ($basePublication->getLocalizedData('subtitle', $data->locale)) {
+            self::updatePublicationAttribute($publication, 'subtitle', $basePublication->getLocalizedData('subtitle', $data->locale), $data->locale);
+        }
+
+        if (!empty($data->preprintAbstract)) {
+            self::updatePublicationAttribute($publication, 'abstract', $data->preprintAbstract, $data->locale);
+        } elseif ($basePublication->getLocalizedData('abstract', $data->locale)) {
+            self::updatePublicationAttribute($publication, 'abstract', $basePublication->getLocalizedData('abstract', $data->locale), $data->locale);
+        }
+
+        if (!empty($data->preprintPrefix)) {
+            self::updatePublicationAttribute($publication, 'prefix', $data->preprintPrefix, $data->locale);
+        } elseif ($basePublication->getLocalizedData('prefix', $data->locale)) {
+            self::updatePublicationAttribute($publication, 'prefix', $basePublication->getLocalizedData('prefix', $data->locale), $data->locale);
+        }
+
+        if (!empty($data->doi)) {
+            self::updatePublicationAttribute($publication, 'pub-id::doi', $data->doi);
+        }
+
+        if (!empty($data->coverage)) {
+            self::updatePublicationAttribute($publication, 'coverage', $data->coverage, $data->locale);
+        } elseif ($basePublication->getLocalizedData('coverage', $data->locale)) {
+            self::updatePublicationAttribute($publication, 'coverage', $basePublication->getLocalizedData('coverage', $data->locale), $data->locale);
+        }
+
+        $submission = Repo::submission()->get($publication->getData('submissionId'));
+        self::setCopyrightFromSystemForVersion($publication, $data, $basePublication);
+
+        return $publication;
+    }
+
+    /**
+     * Create a new publication version manually to avoid CLI context dependency
+     * This is a simplified version of Repo::publication()->version() without context dependencies
+     */
+    public static function createPublicationVersion(Publication $basePublication, object $data): Publication
+    {
+        $newPublication = clone $basePublication;
+        $newPublication->setData('id', null);
+        $newPublication->setData('datePublished', null);
+        $newPublication->setData('status', Submission::STATUS_PUBLISHED);
+        $newPublication->setData('version', (int)$data->version);
+        $newPublication->stampModified();
+
+        $publicationId = Repo::publication()->dao->insert($newPublication);
+        $newPublication = Repo::publication()->get($publicationId);
+
+        $authors = $basePublication->getData('authors');
+
+        if (empty($authors)) {
+            return $newPublication;
+        }
+
+        $newPublication->setData('authors', []);
+        $newPublication->setData('primaryContactId', null);
+        Repo::publication()->dao->update($newPublication);
+
+        return $newPublication;
     }
 }

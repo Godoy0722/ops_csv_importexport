@@ -16,15 +16,17 @@
 
 namespace APP\plugins\importexport\csv\classes\validations;
 
-class RequiredSubmissionHeaders
+class RequiredPreprintHeaders
 {
-    static $submissionHeaders = [
+    static $preprintHeaders = [
         'serverPath',
         'locale',
-        'articleTitle',
-        'articlePrefix',
-        'articleSubtitle',
-        'articleAbstract',
+        'versionIdentifier',
+		'version',
+        'preprintPrefix',
+        'preprintTitle',
+        'preprintSubtitle',
+        'preprintAbstract',
         'authors',
         'keywords',
         'subjects',
@@ -39,30 +41,29 @@ class RequiredSubmissionHeaders
         'suppLabels',
         'sectionTitle',
         'sectionAbbrev',
-        'datePublished',
-        'startPage',
-        'endPage',
+        'datePosted',
+        'dateSubmitted',
         'copyrightYear',
 		'copyrightHolder',
 		'licenseUrl',
     ];
 
-    static $submissionRequiredHeaders = [
+    static $preprintRequiredHeaders = [
         'serverPath',
         'locale',
-        'articleTitle',
+        'preprintTitle',
         'authors',
-        'datePublished',
+        'datePosted',
     ];
 
     public static function validateRowHasAllFields(array $row): bool
     {
-        return count($row) === count(self::$submissionHeaders);
+        return count($row) === count(self::$preprintHeaders);
     }
 
     public static function validateRowHasAllRequiredFields(object $row): bool
     {
-        foreach(self::$submissionRequiredHeaders as $requiredHeader) {
+        foreach(self::$preprintRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;
             }

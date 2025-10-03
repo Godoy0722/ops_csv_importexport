@@ -47,29 +47,15 @@ class InvalidRowValidations
             : null;
     }
 
-
     /**
-     * Validates whether the article file exists and is readable. Returns the reason if an error occurred,
-     * or null if everything is correct.
-     */
-    public static function validateArticleFileIsValid(string $coverImageFilename, string $sourceDir): ?string
-    {
-        $articleCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
-
-        return !is_readable($articleCoverImagePath)
-            ? __('plugins.importexport.csv.invalidArticleFile')
-            : null;
-    }
-
-    /**
-     * Validates the article cover image. Returns the reason if an error occurred,
+     * Validates the preprint cover image. Returns the reason if an error occurred,
      * or null if everything is correct.
      */
     public static function validateCoverImageIsValid(string $coverImageFilename, string $sourceDir): ?string
     {
-        $articleCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
+        $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
 
-        if (!is_readable($articleCoverImagePath)) {
+        if (!is_readable($preprintCoverImagePath)) {
             return __('plugins.importexport.csv.invalidBookCoverImage');
         }
 
@@ -83,10 +69,10 @@ class InvalidRowValidations
     }
 
     /**
-     * Perform all necessary validations for article galleys. Returns the reason if an error occurred,
+     * Perform all necessary validations for preprint galleys. Returns the reason if an error occurred,
      * or null if everything is correct.
      */
-    public static function validateArticleGalleys(string $galleyFilenames, string $galleyLabels, string $sourceDir): ?string
+    public static function validatePreprintGalleys(string $galleyFilenames, string $galleyLabels, string $sourceDir): ?string
     {
         $galleyFilenamesArray = explode(';', $galleyFilenames);
         $galleyLabelsArray = explode(';', $galleyLabels);
@@ -193,6 +179,21 @@ class InvalidRowValidations
             : null;
     }
 
+    public static function validatePreprintVersioningFields(object $data): ?string
+    {
+        if (!empty($data->versionIdentifier) && empty($data->version)) {
+            return __('plugins.importexport.csv.versionRequiredWhenIdentifierProvided');
+        }
+
+        if (!empty($data->version)) {
+            if (!is_numeric($data->version) || (int)$data->version < 1) {
+                return __('plugins.importexport.csv.versionMustBePositiveInteger');
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Validates if the subscription dates are valid. Returns the reason if an error occurred
      * or null if everything is correct.
@@ -211,6 +212,25 @@ class InvalidRowValidations
 
         if ($endDateObj <= $startDateObj) {
             return __('plugins.importexport.csv.endDateBeforeStartDate');
+        }
+
+        return null;
+    }
+
+    /**
+     * Validates that no duplicate version exists for the same preprint identifier
+     * in the current import session
+     */
+    public static function validateNoDuplicateVersion(object $data, array $processedPreprints): ?string
+    {
+        $identifier = $data->versionIdentifier;
+        $version = (int)$data->version;
+
+        if (isset($processedPreprints[$identifier][$version])) {
+            return __('plugins.importexport.csv.duplicatePreprintVersionFound', [
+                'identifier' => $identifier,
+                'version' => $version
+            ]);
         }
 
         return null;

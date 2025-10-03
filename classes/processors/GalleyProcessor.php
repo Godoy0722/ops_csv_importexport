@@ -11,7 +11,7 @@
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Processes the article galley data into the database.
+ * @brief Processes the preprint galley data into the database.
  */
 
 namespace APP\plugins\importexport\csv\classes\processors;

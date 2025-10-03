@@ -21,15 +21,26 @@ use APP\publication\Publication;
 
 class AuthorsProcessor
 {
-	public static function process(object $data, string $contactEmail, int $submissionId, Publication $publication, int $userGroupId)
-    {
+	public static function process(
+        object $data,
+        string $contactEmail,
+        int $submissionId,
+        Publication $publication,
+        int $userGroupId,
+        ?Publication $basePublication = null
+    ) {
+        if (empty($data->authors) && !is_null($basePublication)) {
+            self::cloneAuthorsFromBasePublication($basePublication, $publication, $submissionId);
+            return;
+        }
+
 		$authorsString = array_map('trim', explode(';', $data->authors));
 
         foreach ($authorsString as $index => $authorString) {
             /**
              * Examine the author string. The pattern is: "GivenName,FamilyName,email@email.com,affiliation".
              *
-             * If the article has more than one author, it must separate the authors by a semicolon (;). Example:
+             * If the preprint has more than one author, it must separate the authors by a semicolon (;). Example:
              * "<AUTHOR_1_INFORMATION>;<AUTHOR_2_INFORMATION>".
              *
              * Fields familyName, email, and affiliation are optional and can be left as empty fields. E.g.:
@@ -37,8 +48,12 @@ class AuthorsProcessor
              *
              * By default, if an author doesn't have an email, the primary contact email will be used in its place.
              */
-			$givenName = $familyName = $emailAddress = null;
-			[$givenName, $familyName, $emailAddress, $affiliation] = array_map('trim', explode(',', $authorString));
+			$givenName = $familyName = $emailAddress = $affiliation = null;
+			$authorParts = array_map('trim', explode(',', $authorString));
+			$givenName = $authorParts[0] ?? '';
+			$familyName = $authorParts[1] ?? '';
+			$emailAddress = $authorParts[2] ?? '';
+			$affiliation = $authorParts[3] ?? '';
 
 			if (empty($emailAddress)) {
 				$emailAddress = $contactEmail;
@@ -62,4 +77,31 @@ class AuthorsProcessor
 			}
 		}
 	}
+
+    /**
+     * Clone authors from base publication to new versioned publication
+     */
+    private static function cloneAuthorsFromBasePublication(
+        Publication $basePublication,
+        Publication $newPublication,
+        int $submissionId
+    ): void
+    {
+        $authors = $basePublication->getData('authors');
+        if (empty($authors)) {
+            return;
+        }
+
+        foreach ($authors as $author) {
+            $newAuthor = clone $author;
+            $newAuthor->setData('id', null);
+            $newAuthor->setData('publicationId', $newPublication->getId());
+            $newAuthor->setSubmissionId($submissionId);
+            $newAuthorId = Repo::author()->add($newAuthor);
+
+            if ($author->getId() === $basePublication->getData('primaryContactId')) {
+                PublicationProcessor::updatePrimaryContactId($newPublication, $newAuthorId);
+            }
+        }
+    }
 }

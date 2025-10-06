@@ -32,7 +32,7 @@ class PublicationProcessor
     public static function process($submission, $data, $journal)
     {
 		$publicationDao = CachedDaos::getPublicationDao();
-		$sanitizedAbstract = \PKPString::stripUnsafeHtml($data->articleAbstract);
+		$sanitizedAbstract = \PKPString::stripUnsafeHtml($data->preprintAbstract);
 		$locale = $data->locale;
 
 		/** @var \Publication $publication */
@@ -41,21 +41,17 @@ class PublicationProcessor
 		$publication->setData('submissionId', $submission->getId());
 		$publication->setData('version', 1);
 		$publication->setData('status', STATUS_PUBLISHED);
-		$publication->setData('datePublished', $data->datePublished);
+		$publication->setData('datePublished', $data->datePosted);
 		$publication->setData('abstract', $sanitizedAbstract, $locale);
-		$publication->setData('title', $data->articleTitle, $locale);
+		$publication->setData('title', $data->preprintTitle, $locale);
 		$publication->setData('copyrightNotice', $journal->getLocalizedData('copyrightNotice', $locale), $locale);
 
-        if ($data->articleSubtitle) {
-            $publication->setData('subtitle', $data->articleSubtitle, $locale);
+        if ($data->preprintSubtitle) {
+            $publication->setData('subtitle', $data->preprintSubtitle, $locale);
         }
 
-        if ($data->articlePrefix) {
-            $publication->setData('prefix', $data->articlePrefix, $locale);
-        }
-
-        if ($data->startPage && $data->endPage) {
-            $publication->setData('pages', "{$data->startPage}-{$data->endPage}");
+        if ($data->preprintPrefix) {
+            $publication->setData('prefix', $data->preprintPrefix, $locale);
         }
 
         $publicationDao->insertObject($publication);
@@ -161,7 +157,7 @@ class PublicationProcessor
             PERMISSIONS_FIELD_COPYRIGHT_HOLDER,
             $publication
         );
-		self::updatePublicationAttribute($publication, 'copyrightHolder', $copyrightHolder);
+		self::updatePublicationAttribute($publication, 'copyrightHolder', $copyrightHolder, $data->locale);
 
         $copyrightYear = $data->copyrightYear ?? $submission->_getContextLicenseFieldValue(
             null,
@@ -177,4 +173,123 @@ class PublicationProcessor
         );
 		self::updatePublicationAttribute($publication, 'licenseUrl', $licenseUrl);
     }
+
+	/**
+     * Create a new publication version manually to avoid CLI context dependency
+	 *
+	 * @param \Publication $basePublication
+	 * @param object $data
+	 *
+	 * @return \Publication
+     */
+    public static function createPublicationVersion($basePublication, $data)
+    {
+        $newPublication = clone $basePublication;
+        $newPublication->setData('id', null);
+        $newPublication->setData('datePublished', null);
+        $newPublication->setData('status', STATUS_PUBLISHED);
+        $newPublication->setData('version', (int)$data->version);
+        $newPublication->stampModified();
+
+		$publicationDao = CachedDaos::getPublicationDao();
+        $newPublicationId = $publicationDao->insertObject($newPublication);
+
+        $authors = $basePublication->getData('authors');
+
+        if (empty($authors)) {
+            return $newPublication;
+        }
+
+        $newPublication->setData('authors', []);
+        $newPublication->setData('primaryContactId', null);
+		$publicationDao->updateObject($newPublication);
+
+		$newPublication = $publicationDao->getById($newPublicationId);
+
+        return $newPublication;
+    }
+
+	/**
+     * Process a versioned publication with CSV data
+     * This method processes a publication that was created through OJS versioning mechanism
+     * OJS versioning already copied all data from base version, we only update what changed
+	 *
+	 * @param \Publication $publication
+	 * @param object $data
+	 * @param \Publication $basePublication
+	 *
+	 * @return \Publication
+     */
+    public static function processVersionedPublication($publication, $data, $basePublication)
+    {
+        self::updatePublicationAttribute($publication, 'version', (int)$data->version);
+        self::updatePublicationAttribute($publication, 'status', STATUS_PUBLISHED);
+
+		$localizedFields = [
+			'title' => 'preprintTitle',
+			'subtitle' => 'preprintSubtitle',
+			'abstract' => 'preprintAbstract',
+			'prefix' => 'preprintPrefix',
+			'coverage' => 'coverage',
+			'copyrightHolder' => 'copyrightHolder',
+		];
+
+		foreach($localizedFields as $field => $csvField) {
+			if (!empty($data->{$csvField})) {
+				self::updatePublicationAttribute($publication, $field, $data->{$csvField}, $data->locale);
+			} elseif ($basePublication->getLocalizedData($field, $data->locale)) {
+				self::updatePublicationAttribute($publication, $field, $basePublication->getLocalizedData($field, $data->locale), $data->locale);
+			}
+		}
+
+		$nonLocaleFields = ['copyrightYear', 'licenseUrl', 'datePublished'];
+
+		foreach($nonLocaleFields as $nonLocaleField) {
+			if (!empty($data->{$nonLocaleField})) {
+				self::updatePublicationAttribute($publication, $nonLocaleField, $data->{$nonLocaleField});
+			} elseif ($basePublication->getData($nonLocaleField)) {
+				self::updatePublicationAttribute($publication, $nonLocaleField, $basePublication->getData($nonLocaleField));
+			}
+		}
+
+		if (!empty($data->doi)) {
+            self::updatePublicationAttribute($publication, 'pub-id::doi', $data->doi);
+        }
+
+        return $publication;
+    }
+
+	/**
+     * Copy galleys from a base publication to a new publication version
+     * This mimics the behavior of OJS native versioning when creating new versions
+     *
+     * @param \Publication $newPublication The new publication version
+     * @param \Publication $basePublication The base publication to copy from
+     *
+     * @return void
+     */
+    public static function copyGalleysFromBasePublication($newPublication, $basePublication)
+    {
+        $galleyDao = CachedDaos::getArticleGalleyDao();
+
+        // Load galleys directly from the database to ensure we have the latest data
+        $galleysResultFactory = $galleyDao->getByPublicationId($basePublication->getId());
+        $galleys = $galleysResultFactory->toArray();
+
+        if (empty($galleys)) {
+            return;
+        }
+
+        foreach ($galleys as $galley) {
+            $newGalley = clone $galley;
+            $newGalley->setData('id', null);
+            $newGalley->setData('publicationId', $newPublication->getId());
+            $galleyDao->insertObject($newGalley);
+        }
+
+        // Refresh the publication with the new galleys
+        $publicationDao = CachedDaos::getPublicationDao();
+        $refreshedPublication = $publicationDao->getById($newPublication->getId());
+		$newPublication->setData('galleys', $refreshedPublication->getData('galleys'));
+	}
 }

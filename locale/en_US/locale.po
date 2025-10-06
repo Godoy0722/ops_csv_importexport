@@ -15,16 +15,16 @@ msgid "plugins.importexport.csv.displayName"
 msgstr "CSV Import Export Plugin"
 
 msgid "plugins.importexport.csv.description"
-msgstr "Import and export issues or users through a CSV file."
+msgstr "Import and export preprints or users through a CSV file."
 
 msgid "plugins.importexport.csv.cliUsage"
-msgstr "Command-line tool for importing issues or users through a CSV file.\n"
+msgstr "Command-line tool for importing preprints or users through a CSV file.\n"
 "Usage:\n"
-"{$scriptName} [users|issues] username [pathToCsvFile] <sendWelcomeEmail> [--subscription-type <typeId>]\n"
+"{$scriptName} [users|preprints] username [pathToCsvFile] <sendWelcomeEmail> [--subscription-type <typeId>]\n"
 "Choose one of the following options:\n"
 " - users - import users from CSV file\n"
-" - issues - import issues from CSV file\n\n"
-"username - the username of the user to whom imported issues should be assigned.\n"
+" - preprints - import preprints from CSV file\n\n"
+"username - the username of the user to whom imported preprints should be assigned.\n"
 "pathToCsvFile - the path to the CSV file to be imported.\n"
 "sendWelcomeEmail - optional parameter, if set to true, a welcome email will be sent to the imported users.\n"
 "--subscription-type <typeId> - optional parameter for user import, adds subscriptions with the specified type ID."
@@ -32,9 +32,9 @@ msgstr "Command-line tool for importing issues or users through a CSV file.\n"
 msgid "plugins.importexport.csv.cliUsage.examples"
 msgstr "Examples:\n"
 "{$scriptName} users admin /home/user/import_files/users.csv\n"
-"{$scriptName} issues admin /home/user/import_files/issues.csv\n"
+"{$scriptName} preprints admin /home/user/import_files/preprints.csv\n"
 "{$scriptName} users admin /home/user/import_files/users.csv true\n"
-"{$scriptName} issues admin /home/user/import_files/issues.csv true\n"
+"{$scriptName} preprints admin /home/user/import_files/preprints.csv true\n"
 "{$scriptName} users admin /home/user/import_files/users.csv true --subscription-type 1\n"
 
 msgid "plugins.importexport.csv.unknownUser"
@@ -60,9 +60,6 @@ msgstr "Unknown journal with path \"{$journalPath}\"."
 
 msgid "plugins.importexport.csv.unknownLocale"
 msgstr "Unknown locale or locale not supported by this journal: \"{$locale}\""
-
-msgid "plugins.importexport.csv.invalidArticleFile"
-msgstr "Invalid article file for this submission."
 
 msgid "plugins.importexport.csv.invalidCoverImage"
 msgstr "Invalid cover image for this submission."
@@ -106,9 +103,6 @@ msgstr "An error occurred while saving the supplementary file {$file}."
 msgid "plugins.importexport.csv.abstractRequiredBySection"
 msgstr "Abstract is required for this section but not provided."
 
-msgid "plugins.importexport.csv.atLeastOneIssueFieldRequired"
-msgstr "At least one issue field (issueTitle, issueVolume, issueNumber, or issueYear) must be provided."
-
 msgid "plugins.importexport.csv.userAlreadyExistsWithEmail"
 msgstr "User already exists with email \"{$email}\"."
 
@@ -132,3 +126,12 @@ msgstr "Missing required subscription fields (start_date and end_date) for user 
 
 msgid "plugins.importexport.csv.subscriptionTypeDoesntExist"
 msgstr "Invalid subscripion type with ID \"{$subscriptionTypeId}\""
+
+msgid "plugins.importexport.csv.versionRequiredWhenIdentifierProvided"
+msgstr "Version is required when versionIdentifier is provided."
+
+msgid "plugins.importexport.csv.invalidVersionFields"
+msgstr "Version field must be a positive integer and is required when versionIdentifier is provided."
+
+msgid "plugins.importexport.csv.duplicatePreprintVersionFound"
+msgstr "A preprint with identifier \"{$identifier}\" and version \"{$version}\" already exists in this import. Please check the article's version."

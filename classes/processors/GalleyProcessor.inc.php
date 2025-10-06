@@ -11,7 +11,7 @@
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Processes the article galley data into the database.
+ * @brief Processes the preprint galley data into the database.
  */
 
 namespace PKP\Plugins\ImportExport\CSV\Classes\Processors;
@@ -21,7 +21,7 @@ use PKP\Plugins\ImportExport\CSV\Classes\CachedAttributes\CachedDaos;
 class GalleyProcessor
 {
     /**
-     * Processes initial data for the article galley
+     * Processes initial data for the preprint galley
 	 *
 	 * @param int $submissionFileId
 	 * @param object $data

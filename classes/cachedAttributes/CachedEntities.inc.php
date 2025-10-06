@@ -51,11 +51,11 @@ class CachedEntities
      *
      * @return \Journal|null
      */
-    static function getCachedJournal(string $journalPath)
+    static function getCachedJournal(string $serverPath)
     {
         $journalDao = CachedDaos::getJournalDao();
 
-        return self::$journals[$journalPath] ?? self::$journals[$journalPath] = $journalDao->getByPath($journalPath);
+        return self::$journals[$serverPath] ?? self::$journals[$serverPath] = $journalDao->getByPath($serverPath);
     }
 
     /**
@@ -191,20 +191,53 @@ class CachedEntities
      */
     static function getCachedSection(string $sectionTitle, string $sectionAbbrev, string $locale, int $journalId)
     {
-			$customSectionKey = "{$sectionTitle}_{$sectionAbbrev}";
+		$customSectionKey = $sectionTitle . '_' . mb_strtoupper(trim($sectionAbbrev));
 
-			if (isset(self::$sections[$customSectionKey])) {
+		if (isset(self::$sections[$customSectionKey])) {
 				return self::$sections[$customSectionKey];
-			}
+		}
 
-			$sectionDao = CachedDaos::getSectionDao();
-			$sectionByAbbrev = $sectionDao->getByAbbrev($sectionAbbrev, $journalId);
+		$sectionDao = CachedDaos::getSectionDao();
+		$sectionByAbbrev = $sectionDao->getByAbbrev($sectionAbbrev, $journalId);
 
-			if ($sectionByAbbrev && $sectionByAbbrev->getTitle($locale) === $sectionTitle) {
-				return self::$sections[$customSectionKey] = $sectionByAbbrev;
-			}
+		if ($sectionByAbbrev && $sectionByAbbrev->getTitle($locale) === $sectionTitle) {
+			return self::$sections[$customSectionKey] = $sectionByAbbrev;
+		}
 
-			return null;
+		return null;
+    }
+
+	/**
+     * Retrieves a cached Section by journalId and sectionId, sectionAbbrev, and journalId. Returns null if an error occurs.
+	 *
+	 * @param int $baseSectionId
+	 * @param int $journalId
+	 * @param string $locale
+	 *
+	 * @return \Section|null
+     */
+	static function getCachedSectionById($baseSectionId, $journalId, $locale)
+    {
+        $existingSection = null;
+        foreach (self::$sections as $section) {
+            if ($section instanceof \Section && $section->getId() === $baseSectionId) {
+                $existingSection = $section;
+                break;
+            }
+        }
+
+        if ($existingSection) {
+            return $existingSection;
+        }
+
+        $section = CachedDaos::getSectionDao()->getById($baseSectionId, $journalId);
+        $sectionTitle = $section->getTitle($locale);
+        $sectionAbbrev = $section->getAbbrev($locale);
+
+        $customSectionKey = $sectionTitle . '_' . mb_strtoupper(trim($sectionAbbrev));
+        self::$sections[$customSectionKey] = $section;
+
+        return $section;
     }
 
 		/**

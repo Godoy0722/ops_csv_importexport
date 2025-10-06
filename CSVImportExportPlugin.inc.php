@@ -19,7 +19,7 @@ namespace PKP\Plugins\ImportExport\CSV;
 import('lib.pkp.classes.plugins.ImportExportPlugin');
 
 use PKP\Plugins\ImportExport\CSV\Classes\CachedAttributes\CachedDaos;
-use PKP\Plugins\ImportExport\CSV\Classes\Commands\SubmissionCommand;
+use PKP\Plugins\ImportExport\CSV\Classes\Commands\PreprintCommand;
 use PKP\Plugins\ImportExport\CSV\Classes\Commands\UserCommand;
 
 class CSVImportExportPlugin extends \ImportExportPlugin
@@ -132,7 +132,7 @@ class CSVImportExportPlugin extends \ImportExportPlugin
         $this->_sourceDir = array_shift($args);
         $this->_sendWelcomeEmail = array_shift($args) ?? false;
 
-        if (! in_array($this->_command, ['submissions', 'users']) || !$this->_sourceDir || !$this->_username) {
+        if (! in_array($this->_command, ['preprints', 'users']) || !$this->_sourceDir || !$this->_username) {
 			$this->usage($scriptName);
 			exit(1);
 		}
@@ -151,9 +151,9 @@ class CSVImportExportPlugin extends \ImportExportPlugin
 		import('plugins.importexport.csv.classes.cachedAttributes.CachedEntities');
 
         switch ($this->_command) {
-            case 'submissions':
-				import('plugins.importexport.csv.classes.commands.SubmissionCommand');
-				(new SubmissionCommand($this->_sourceDir, $this->_user))->run();
+            case 'preprints':
+				import('plugins.importexport.csv.classes.commands.PreprintCommand');
+				(new PreprintCommand($this->_sourceDir, $this->_user))->run();
                 break;
             case 'users':
 				import('plugins.importexport.csv.classes.commands.UserCommand');

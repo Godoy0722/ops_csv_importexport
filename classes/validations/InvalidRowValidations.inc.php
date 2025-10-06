@@ -56,27 +56,8 @@ class InvalidRowValidations
             : null;
     }
 
-
     /**
-     * Validates whether the article file exists and is readable. Returns the reason if an error occurred,
-     * or null if everything is correct.
-	 *
-	 * @param string $coverImageFilename
-	 * @param string $sourceDir
-	 *
-	 * @return string|null
-     */
-    public static function validateArticleFileIsValid($coverImageFilename, $sourceDir)
-    {
-        $articleCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
-
-        return !is_readable($articleCoverImagePath)
-            ? __('plugins.importexport.csv.invalidArticleFile')
-            : null;
-    }
-
-    /**
-     * Validates the article cover image. Returns the reason if an error occurred,
+     * Validates the preprint cover image. Returns the reason if an error occurred,
      * or null if everything is correct.
 	 *
 	 * @param string $coverImageFilename
@@ -86,9 +67,9 @@ class InvalidRowValidations
      */
     public static function validateCoverImageIsValid($coverImageFilename, $sourceDir)
     {
-        $articleCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
+        $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
 
-        if (!is_readable($articleCoverImagePath)) {
+        if (!is_readable($preprintCoverImagePath)) {
             return __('plugins.importexport.csv.invalidBookCoverImage');
         }
 
@@ -102,7 +83,7 @@ class InvalidRowValidations
     }
 
     /**
-     * Perform all necessary validations for article galleys. Returns the reason if an error occurred,
+     * Perform all necessary validations for preprint galleys. Returns the reason if an error occurred,
      * or null if everything is correct.
 	 *
 	 * @param string $galleyFilenames
@@ -111,7 +92,7 @@ class InvalidRowValidations
 	 *
 	 * @return string|null
      */
-    public static function validateArticleGalleys($galleyFilenames, $galleyLabels, $sourceDir)
+    public static function validatePreprintGalleys($galleyFilenames, $galleyLabels, $sourceDir)
     {
         $galleyFilenamesArray = explode(';', $galleyFilenames);
         $galleyLabelsArray = explode(';', $galleyLabels);
@@ -295,5 +276,51 @@ class InvalidRowValidations
 		return !$subscriptionType
 			? __('plugins.importexport.csv.subscriptionTypeDoesntExist', ['subscriptionTypeId' => $subscriptionTypeId])
 			: null;
+    }
+
+	/**
+	 * Validates whether version field is valid when versionIdentifier is provided
+	 *
+	 * @param object $row
+	 *
+	 * @return ?string
+	 */
+	public static function validateVersionFields($row)
+	{
+		if (!empty($row->versionIdentifier) && empty($row->version)) {
+			return __('plugins.importexport.csv.versionRequiredWhenIdentifierProvided');
+		}
+
+		if (!empty($data->version)) {
+			if (!empty($row->version) && ((int)$row->version < 1 || !is_numeric($row->version))) {
+				return __('plugins.importexport.csv.invalidVersionFields');
+			}
+		}
+
+		return null;
+	}
+
+	/**
+     * Validates that no duplicate version exists for the same preprint identifier
+     * in the current import session
+	 *
+	 * @param object $data
+	 * @param array $processedPreprints
+	 *
+	 * @return ?string
+     */
+    public static function validateNoDuplicateVersion($data, $processedPreprints)
+    {
+        $identifier = $data->versionIdentifier;
+        $version = (int)$data->version;
+
+        if (isset($processedPreprints[$identifier][$version])) {
+            return __('plugins.importexport.csv.duplicatePreprintVersionFound', [
+                'identifier' => $identifier,
+                'version' => $version
+            ]);
+        }
+
+        return null;
     }
 }

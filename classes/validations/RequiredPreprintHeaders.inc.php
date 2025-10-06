@@ -16,15 +16,17 @@
 
 namespace PKP\Plugins\ImportExport\CSV\Classes\Validations;
 
-class RequiredIssueHeaders
+class RequiredPreprintHeaders
 {
-    static $issueHeaders = [
-        'journalPath',
+    static $preprintHeaders = [
+        'serverPath',
         'locale',
-        'articleTitle',
-        'articlePrefix',
-        'articleSubtitle',
-        'articleAbstract',
+        'versionIdentifier',
+		'version',
+        'preprintPrefix',
+        'preprintTitle',
+        'preprintSubtitle',
+        'preprintAbstract',
         'authors',
         'keywords',
         'subjects',
@@ -39,20 +41,19 @@ class RequiredIssueHeaders
         'suppLabels',
         'sectionTitle',
         'sectionAbbrev',
-        'datePublished',
-        'startPage',
-        'endPage',
-		'copyrightYear',
+        'datePosted',
+        'dateSubmitted',
+        'copyrightYear',
 		'copyrightHolder',
 		'licenseUrl',
     ];
 
-    static $issueRequiredHeaders = [
-        'journalPath',
+    static $preprintRequiredHeaders = [
+        'serverPath',
         'locale',
-        'articleTitle',
+        'preprintTitle',
         'authors',
-        'datePublished',
+        'datePosted',
     ];
 
     /**
@@ -64,7 +65,7 @@ class RequiredIssueHeaders
      */
     public static function validateRowHasAllFields($row)
     {
-        return count($row) === count(self::$issueHeaders);
+        return count($row) === count(self::$preprintHeaders);
     }
 
     /**
@@ -76,7 +77,7 @@ class RequiredIssueHeaders
      */
     public static function validateRowHasAllRequiredFields($row)
     {
-        foreach(self::$issueRequiredHeaders as $requiredHeader) {
+        foreach(self::$preprintRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;
             }

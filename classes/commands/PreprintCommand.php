@@ -264,26 +264,20 @@ class PreprintCommand
                     $publication = PublicationProcessor::createPublicationVersion($basePublication, $data);
 
                     $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication);
-
-                    // Handle cover image for versioned publication if provided in CSV
-                    if ($data->coverImageFilename) {
-                        PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
-                    }
                 } else {
                     $initialPublication = PublicationProcessor::createInitialPublication($data);
                     $submission = SubmissionProcessor::process($data, $initialPublication, $server);
                     $publication = PublicationProcessor::process($submission, $data, $server);
-
-                    // Handle cover image for new publication
-                    if ($data->coverImageFilename) {
-                        PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
-                    }
                 }
 
                 if (!$publication) {
                     $reason = __('plugins.importexport.csv.errorWhileCreatingPublication');
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
+                }
+
+                if ($data->coverImageFilename) {
+                    PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
                 }
 
                 // Array to store each galley ID to its respective galley file
@@ -379,12 +373,11 @@ class PreprintCommand
                 KeywordsProcessor::process($data, $publication->getId(), $basePublication);
                 SubjectsProcessor::process($data, $publication->getId(), $basePublication);
 
-                if ($data->coverage || ($basePublication && !$data->coverage)) {
-                    if (!empty($data->coverage)) {
-                        PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
-                    } elseif ($basePublication && $basePublication->getLocalizedData('coverage', $data->locale)) {
-                        PublicationProcessor::updateCoverage($publication, $basePublication->getLocalizedData('coverage', $data->locale), $data->locale);
-                    }
+                if (
+                    ((!empty($data->version) && (int)$data->version === 1) || empty($data->version))
+                    && $data->coverage
+                ) {
+                    PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
                 }
 
                 $section = SectionsProcessor::process($data, $server->getId(), $basePublication);

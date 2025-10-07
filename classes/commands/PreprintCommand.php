@@ -250,9 +250,9 @@ class PreprintCommand
                 /** @var null|Publication */
                 $basePublication = null;
                 if (!empty($data->versionIdentifier) && isset($this->processedPreprints[$data->versionIdentifier])) {
-                    $firstVersionData = reset($this->processedPreprints[$data->versionIdentifier]);
-                    $existingSubmission = $firstVersionData['submission'];
-                    $basePublication = $firstVersionData['publication'];
+                    $lastVersionData = end($this->processedPreprints[$data->versionIdentifier]);
+                    $existingSubmission = $lastVersionData['submission'];
+                    $basePublication = $lastVersionData['publication'];
                 }
 
                 if ($existingSubmission && $basePublication) {
@@ -365,12 +365,11 @@ class PreprintCommand
                 KeywordsProcessor::process($data, $publication->getId(), $basePublication);
                 SubjectsProcessor::process($data, $publication->getId(), $basePublication);
 
-                if ($data->coverage || ($basePublication && !$data->coverage)) {
-                    if (!empty($data->coverage)) {
-                        PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
-                    } elseif ($basePublication && $basePublication->getLocalizedData('coverage', $data->locale)) {
-                        PublicationProcessor::updateCoverage($publication, $basePublication->getLocalizedData('coverage', $data->locale), $data->locale);
-                    }
+                if (
+                    ((!empty($data->version) && (int)$data->version === 1) || empty($data->version))
+                    && !empty($data->coverage)
+                ) {
+                    PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
                 }
 
                 $section = SectionsProcessor::process($data, $server->getId(), $basePublication);

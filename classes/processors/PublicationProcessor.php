@@ -138,35 +138,6 @@ class PublicationProcessor
     }
 
     /**
-     * Set copyright information for versioned publications
-     * Clone from base version if CSV fields are empty
-     */
-    private static function setCopyrightFromSystemForVersion(
-        Publication &$publication,
-        object $data,
-        Publication $basePublication
-    ): void
-    {
-        if (!empty($data->copyrightHolder)) {
-            self::updatePublicationAttribute($publication, 'copyrightHolder', $data->copyrightHolder, $data->locale);
-        } elseif ($basePublication->getLocalizedData('copyrightHolder', $data->locale)) {
-            self::updatePublicationAttribute($publication, 'copyrightHolder', $basePublication->getLocalizedData('copyrightHolder', $data->locale), $data->locale);
-        }
-
-        if (!empty($data->copyrightYear)) {
-            self::updatePublicationAttribute($publication, 'copyrightYear', $data->copyrightYear);
-        } elseif ($basePublication->getData('copyrightYear')) {
-            self::updatePublicationAttribute($publication, 'copyrightYear', $basePublication->getData('copyrightYear'));
-        }
-
-        if (!empty($data->licenseUrl)) {
-            self::updatePublicationAttribute($publication, 'licenseUrl', $data->licenseUrl);
-        } elseif ($basePublication->getData('licenseUrl')) {
-            self::updatePublicationAttribute($publication, 'licenseUrl', $basePublication->getData('licenseUrl'));
-        }
-    }
-
-    /**
      * Process a versioned publication with CSV data
      * This method processes a publication that was created through OPS versioning mechanism
      * OPS versioning already copied all data from base version, we only update what changed
@@ -180,39 +151,36 @@ class PublicationProcessor
         $datePosted = !empty($data->datePosted) ? $data->datePosted : $basePublication->getData('datePublished');
         self::updatePublicationAttribute($publication, 'datePublished', $datePosted);
 
-        $title = !empty($data->preprintTitle) ? $data->preprintTitle : $basePublication->getLocalizedData('title', $data->locale);
-        self::updatePublicationAttribute($publication, 'title', $title, $data->locale);
+        $localizedFields = [
+            'title' => 'preprintTitle',
+            'subtitle' => 'preprintSubtitle',
+            'abstract' => 'preprintAbstract',
+            'prefix' => 'preprintPrefix',
+            'coverage' => 'coverage',
+            'copyrightHolder' => 'copyrightHolder',
+        ];
 
-        if (!empty($data->preprintSubtitle)) {
-            self::updatePublicationAttribute($publication, 'subtitle', $data->preprintSubtitle, $data->locale);
-        } elseif ($basePublication->getLocalizedData('subtitle', $data->locale)) {
-            self::updatePublicationAttribute($publication, 'subtitle', $basePublication->getLocalizedData('subtitle', $data->locale), $data->locale);
+        foreach ($localizedFields as $field => $csvField) {
+            if (!empty($data->{$csvField})) {
+                self::updatePublicationAttribute($publication, $field, $data->{$csvField}, $data->locale);
+            } elseif ($basePublication->getLocalizedData($field, $data->locale)) {
+                self::updatePublicationAttribute($publication, $field, $basePublication->getLocalizedData($field, $data->locale), $data->locale);
+            }
         }
 
-        if (!empty($data->preprintAbstract)) {
-            self::updatePublicationAttribute($publication, 'abstract', $data->preprintAbstract, $data->locale);
-        } elseif ($basePublication->getLocalizedData('abstract', $data->locale)) {
-            self::updatePublicationAttribute($publication, 'abstract', $basePublication->getLocalizedData('abstract', $data->locale), $data->locale);
-        }
+        $nonLocalizedFields = ['copyrightYear', 'licenseUrl'];
 
-        if (!empty($data->preprintPrefix)) {
-            self::updatePublicationAttribute($publication, 'prefix', $data->preprintPrefix, $data->locale);
-        } elseif ($basePublication->getLocalizedData('prefix', $data->locale)) {
-            self::updatePublicationAttribute($publication, 'prefix', $basePublication->getLocalizedData('prefix', $data->locale), $data->locale);
+        foreach($nonLocalizedFields as $field) {
+            if (!empty($data->{$field})) {
+                self::updatePublicationAttribute($publication, $field, $data->{$field});
+            } elseif ($basePublication->getData($field)) {
+                self::updatePublicationAttribute($publication, $field, $basePublication->getData($field));
+            }
         }
 
         if (!empty($data->doi)) {
             self::updatePublicationAttribute($publication, 'pub-id::doi', $data->doi);
         }
-
-        if (!empty($data->coverage)) {
-            self::updatePublicationAttribute($publication, 'coverage', $data->coverage, $data->locale);
-        } elseif ($basePublication->getLocalizedData('coverage', $data->locale)) {
-            self::updatePublicationAttribute($publication, 'coverage', $basePublication->getLocalizedData('coverage', $data->locale), $data->locale);
-        }
-
-        $submission = Repo::submission()->get($publication->getData('submissionId'));
-        self::setCopyrightFromSystemForVersion($publication, $data, $basePublication);
 
         return $publication;
     }

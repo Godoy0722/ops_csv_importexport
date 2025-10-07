@@ -267,7 +267,7 @@ class PreprintCommand
                 $basePublication = null; /** @var null|\Publication */
 
                 if (!empty($data->versionIdentifier) && isset($this->_processedPublications[$data->versionIdentifier])) {
-                    $firstVersionData = reset($this->_processedPublications[$data->versionIdentifier]);
+                    $firstVersionData = end($this->_processedPublications[$data->versionIdentifier]);
                     $existingSubmission = $firstVersionData['submission'];
                     $basePublication = $firstVersionData['publication'];
                 }

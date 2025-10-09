@@ -1,32 +1,42 @@
 # OPS CSV Import Plugin (CLI)
 
-This plugin allows administrators to import users and preprints with their associated metadata in CSV format into OPS 3.3.X. This plugin operates exclusively via command-line interface (CLI).
+This plugin allows administrators to import users and preprints with their associated metadata in CSV format into OPS 3.5.X. This plugin operates exclusively via command-line interface (CLI).
 
 ## Table of Contents
-- [Usage](#usage)
+- [CLI Usage](#cli-usage)
   - [Importing Users](#importing-users)
   - [Importing Preprints](#importing-preprints)
-  - [Multi-Version Preprints](#multi-version-preprints)
-- [CSV File Format](#csv-file-format)
+- [CSV General Rules](#csv-general-rules)
   - [Users CSV Format](#users-csv-format)
+    - [CSV Example](#users-csv-example)
   - [Preprints CSV Format](#preprints-csv-format)
+    - [CSV Example](#preprints-csv-example)
+    - [Import File Structure](#import-file-structure)
+- [Preprint Versions](#preprint-versions)
+  - [How it Works](#how-it-works)
+  - [Version Management Rules](#version-management-rules)
+  - [Practical Examples](#practical-examples)
+    - [Single Version Preprints](#example-1-single-preprint-without-versions)
+    - [Multi Version Preprints](#example-2-multi-version-preprints)
+    - [Mixed Preprints](#example-3-mixed-preprints)
+  - [Important Notes](#important-notes)
 - [Troubleshooting](#troubleshooting)
 
 
-## Command Line Usage
+## CLI Usage
 
 ### Importing Users
 
 To import users from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin users [username] [pathToCsvFile] [sendWelcomeEmail]
+php tools/importExport.php CSVImportExportPlugin users [username] [pathToFolderWithCsvFiles] [sendWelcomeEmail]
 ```
 
 Parameters:
-- `username`: The username of an administrator who will be associated with the import
-- `pathToCsvFile`: Path to the CSV file containing user data. Can be absolute or relative to the OPS root directory.
-- `sendWelcomeEmail`: (Optional) Set to `true` to send welcome emails to imported users
+- `username`: The username of a valid Preprint Manager. This username is used to validate that the command is running by a valid user as a security step.
+- `pathToFolderWithCsvFiles`: Path to the CSV file containing user data. Can be absolute or relative to the OPS root directory.
+- `sendWelcomeEmail`: (Optional) Set to `true` to send welcome emails to imported users. If set to true, the sender email will be the user retrieved by the username on the CLI command.
 
 Example:
 ```bash
@@ -38,84 +48,27 @@ php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_wit
 To import preprints from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin preprints [username] [pathToCsvFile]
+php tools/importExport.php CSVImportExportPlugin preprints [username] [pathToFolderWithCsvFiles]
 ```
 
 Parameters:
-- `username`: The username of an administrator who will be associated with the import
-- `pathToCsvFile`: Path to the CSV file containing preprint data. Can be absolute or relative to the OPS root directory.
+- `username`: The username of an administrator who will be associated with the import. This username is used to validate that the command is running by a valid user as a security step.
+- `pathToFolderWithCsvFiles`: Path to the CSV file containing preprint data. Can be absolute or relative to the OPS root directory.
 
 Example:
 ```bash
 php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/folder_with_csv_preprint_files
 ```
 
-### Multi-Version Preprints
+> **Notes**:
+>
+>  - The user obtained through the username will be the same one assigned to the submission files. It's also recommended that a dedicated importUser is created for this purpose with the Author role so that it's separate from existing Preprint Manager and editor user accounts.
+>  - The last CLI attribute must be the path to the CSV file, and not directly the CSV file itself.
+>  - The CSV file and any referenced files (PDFs, images) must be readable by the user running the CLI script.
+>  - The script must be executed from the OPS installation directory
+>  - Ensure you have proper permissions to execute PHP scripts and access the files
 
-The plugin supports importing multiple versions of the same preprint. This allows you to track the evolution of a preprint over time with different versions.
-
-#### How Multi-Version Import Works:
-
-1. **Version Identification**: Use `versionIdentifier` and `version` columns to link versions of the same preprint
-2. **First Version**: Must include all required fields (serverPath, locale, preprintTitle, authors, datePosted)
-3. **Subsequent Versions** (version > 1): Only require `versionIdentifier` and `version` fields
-4. **Data Cloning**: When creating version 2+, the system automatically clones all data from the previous version
-5. **Selective Updates**: Only the fields you fill in the CSV will be updated; empty fields retain values from the previous version
-
-### Important Notes:
-- The CSV file and any referenced files (PDFs, images) must be readable by the user running the CLI script.
-- The script must be executed from the OPS installation directory
-- Ensure you have proper permissions to execute PHP scripts and access the files
-- On single-version preprints should leave `versionIdentifier` and `version` columns are optional.
-
-## CSV File Format
-
-## Data Structure Reference
-
-### Authors Format
-
-The `authors` field in the issues CSV must contain author information in the following format:
-
-```
-GivenName,FamilyName,Email,Affiliation;GivenName2,FamilyName2,Email2,Affiliation2
-```
-
-- Fields are separated by commas within each author
-- Multiple authors are separated by semicolons
-- All fields except GivenName are optional and can be left empty
-- If email is empty, the primary contact email will be used
-
-Examples:
-```
-"John,Doe,john@example.com,University of Example; Jane,Smith,,Another University"
-"Maria,Silva,maria@example.com,"
-"Carlos,,carlos@example.com,Example Corp"
-```
-
-### Keywords, Subjects, and Categories
-
-These fields use a simple semicolon-separated format:
-
-- **Keywords**: `keyword1; keyword two; another keyword`
-- **Subjects**: `subject1; subject two; another subject`
-- **Categories**: `Category1; Category Two; Another Category`
-
-Notes:
-- Leading/trailing spaces are automatically trimmed
-- Empty values are ignored
-- Categories will be created if they don't exist
-
-### User Interests
-
-User interests in the users CSV use a semicolon-separated format:
-
-```
-interest one; interest two; another interest
-```
-
-- Leading/trailing spaces are automatically trimmed
-- Empty values are ignored
-- Each interest will be associated with the user's profile
+## CSV General Rules
 
 ### Users CSV Format
 
@@ -134,6 +87,21 @@ interest one; interest two; another interest
 | subscriptionType | No | Subscription type ID | 1 |
 | start_date | If subscriptionType is set | Subscription start date (YYYY-MM-DD) | 2023-01-01 |
 | end_date | If subscriptionType is set | Subscription end date (YYYY-MM-DD) | 2023-12-31 |
+
+> **User Interests:** User interests in the users CSV use a semicolon-separated format:
+>
+> ```
+> interest one; interest two; another interest
+> ```
+>
+>  - Leading/trailing spaces are automatically trimmed
+>  - Empty values are ignored
+>  - Each interest will be associated with the created user's profile
+>
+
+#### Users CSV Example
+
+You can take a look at the example we provide on the [User CSV file](./examples/users/users_example.csv).
 
 ### Preprints CSV Format
 
@@ -167,51 +135,123 @@ interest one; interest two; another interest
 | copyrightHolder | No | Copyright holder | Public Knowledge Project | Defaults to system setting if not provided |
 | licenseUrl | No | License URL | https://creativecommons.org/licenses/by/4.0 | Defaults to system setting if not provided |
 
-**Notes:**
-- *Required for first version or single-version preprints
-- **For version > 1: Only `versionIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
+> **Notes:**
+>  - *Required for first version or single-version preprints
+>  - **For version > 1: Only `versionIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
 
-### Example: Users CSV
+> **Authors Format**
+> The `authors` field in the issues CSV must contain author information in the following format:
+>
+> ```
+> GivenName,FamilyName,Email,Affiliation;GivenName2,FamilyName2,Email2,Affiliation2
+> ```
+>
+>  - Fields are separated by commas within each author
+>  - Multiple authors are separated by semicolons
+>  - All fields except GivenName are optional and can be left empty
+>  - If email is empty, the primary contact email will be used
+>
+> Examples:
+>
+> ```
+> "John,Doe,john@example.com,University of Example; Jane,Smith,,Another University"
+> "Maria,Silva,maria@example.com,"
+> "Carlos,,carlos@example.com,Example Corp"
+> ```
 
-You can take a look at the example we provide on the [User CSV file](./examples/users/users_example.csv).
+> **Keywords, Subjects, and Categories**
+> These fields use a simple semicolon-separated format:
+>  - **Keywords**: `keyword1; keyword two; another keyword`
+>  - **Subjects**: `subject1; subject two; another subject`
+>  - **Categories**: `Category1; Category Two; Another Category`
+>
+> Notes:
+>  - Leading/trailing spaces are automatically trimmed
+>  - Empty values are ignored
+>  - Categories will be created if they don't exist
 
-### Example: Preprints CSV (Single Version)
+#### Preprints CSV Example
 
-You can take a look at the example we provide on the [Single Version Preprints CSV file](./examples/preprints/single_version_preprints.csv).
+You can take a look at the example we provide on the [Preprint CSV file](./examples/preprints/preprints_example.csv).
 
-### Example: Preprints CSV (Multi-Version)
+#### Import File Structure
 
-You can take a look at the example we provide on the [Multi Version Preprints CSV file](./examples/preprints/multiversion_preprints.csv).
-
-### Example: Preprints CSV (Multi-Version)
-
-You can take a look at the example we provide on the [Mixed Preprints CSV file](./examples/preprints/mixed_preprints.csv).
-
-## File Structure for Import
-
-When importing preprints, the following file structure is recommended:
+When importing preprints, it's important to keep all preprint assets in the same directory as the CSV file, so you just need to pass the asset names instead of a path for the asset. Here's an example of the recommended structure:
 
 ```
 import_directory/
-├── users.csv
 ├── preprints.csv
-├── paper.pdf
-├── paper_v2.pdf
-├── paper_v3.pdf
+├── preprint.pdf
+├── preprint2.pdf
 ├── presentation.pptx
 ├── supplement.pdf
 ├── data.xlsx
 ├── supplementary_data.csv
-├── cover_v1.png
-├── cover_v2.png
+├── cover.jpg
 ```
 
-### Multi-Version File Naming Convention
+## Preprint Versions
 
-For multi-version preprints, it's recommended to include version indicators in filenames:
-- `paper_v1.pdf`, `paper_v2.pdf`, `paper_v3.pdf`
-- `cover_v1.png`, `cover_v2.png`
-- `supplement_v1.pdf`, `supplement_v2.pdf`
+The plugin supports importing multiple versions of the same preprint. This allows you to track the evolution of a preprint over time with different versions.
+
+### How It Works
+
+The multiversion system uses two key fields to manage preprint versions:
+
+- **versionIdentifier**: A unique string that links multiple versions of the same preprint together
+- **version**: A positive integer indicating the version number (1, 2, 3, etc.)
+
+When you provide these fields in your CSV:
+1. Preprints with the same `versionIdentifier` are treated as different versions of the same submission
+2. Each version can have updated content, metadata, or files
+3. The system automatically sets the highest version number as the current published version
+4. All versions remain accessible in the system's version history
+
+### Version Management Rules
+
+1. **Version Identifiers**:
+   - Can be any unique string (e.g., "preprint-001", "ml-paper-2024", "climate-study")
+   - Leave empty for single-version preprints
+   - Must be unique across different preprints (don't reuse identifiers)
+
+2. **Version Numbers**:
+   - Must be positive integers (1, 2, 3, ...)
+   - Required when `versionIdentifier` is provided
+   - Must be unique for each version of the same preprint
+   - Version 1 is always the initial/base version
+
+3. **Required Fields**:
+   - **Version 1** must include ALL required fields: `preprintTitle`, `authors`, `datePublished`, etc.
+   - **Versions > 1** can include only the fields you want to update (partial updates)
+   - Fields not provided in higher versions inherit values from the previous version
+
+4. **Automatic Current Version**:
+   - After import, the system automatically sets the highest version as "current"
+   - All other versions remain in the system as historical versions
+   - Readers will see the highest version by default
+
+### Practical Examples
+
+#### Example 1: Single Preprint Without Versions
+
+For preprints that don't need version tracking, simply leave `versionIdentifier` and `version` empty. You can take a look at the [single version CSV file](./examples/preprints/single_version_preprints.csv).
+
+
+#### Example 2: Multi Version Preprints
+
+For preprint with multiple versions, you'll need to set the `versionIdentifier` and `version` fields. The `versionIdentifier` tracks the same preprint and the `version` handles with the preprint different verisons. See [multi version CSV file](./examples/preprints/multiversion_preprints.csv) example.
+
+#### Example 3: Mixed Preprints
+
+You can mix single-version and multi-version preprints in the same CSV file. Take a look at [the default CSV file](./examples/preprints/preprints_example.csv).
+
+### Important Notes
+
+- All versions of a preprint share the same submission ID but have different publication IDs
+- Each version can have its own DOI if needed
+- Readers can access previous versions through the preprint's version history
+- The import process validates that no duplicate versions exist (same identifier + version number)
+- Versions must be imported in sequence within a single CSV file (version 1 before version 2, etc.)
 
 ## Troubleshooting
 

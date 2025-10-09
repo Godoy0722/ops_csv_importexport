@@ -25,12 +25,12 @@ php tools/importExport.php CSVImportExportPlugin users [username] [pathToCsvFile
 
 Parameters:
 - `username`: The username of an administrator who will be associated with the import
-- `pathToCsvFile`: Path to the CSV file containing user data. Can be absolute or relative to the OJS root directory.
+- `pathToCsvFile`: Path to the CSV file containing user data. Can be absolute or relative to the OPS root directory.
 - `sendWelcomeEmail`: (Optional) Set to `true` to send welcome emails to imported users
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin users admin /path/to/users.csv true
+php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_with_csv_user_files true
 ```
 
 ### Importing Preprints
@@ -47,7 +47,7 @@ Parameters:
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/csv_file_for_preprints
+php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/folder_with_csv_preprint_files
 ```
 
 ### Multi-Version Preprints
@@ -63,7 +63,7 @@ The plugin supports importing multiple versions of the same preprint. This allow
 5. **Selective Updates**: Only the fields you fill in the CSV will be updated; empty fields retain values from the previous version
 
 ### Important Notes:
-- The CSV file and any referenced files (PDFs, images) must be readable by the web server user
+- The CSV file and any referenced files (PDFs, images) must be readable by the user running the CLI script.
 - The script must be executed from the OPS installation directory
 - Ensure you have proper permissions to execute PHP scripts and access the files
 - On single-version preprints should leave `versionIdentifier` and `version` columns are optional.
@@ -171,30 +171,21 @@ interest one; interest two; another interest
 - *Required for first version or single-version preprints
 - **For version > 1: Only `versionIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
 
-### Complete Example: Users CSV
+### Example: Users CSV
 
-```csv
-serverPath,firstname,lastname,email,affiliation,country,username,tempPassword,roles,reviewInterests
-myserver,John,Doe,john@example.com,University of Example,US,jdoe,temp123,"Reader;Author","science;research"
-myserver,Jane,Smith,jane@example.com,Research Institute,CA,jsmith,temp456,Reader,"biology;ecology"
-```
+You can take a look at the example we provide on the [User CSV file](./examples/users/users_example.csv).
 
-### Complete Example: Preprints CSV (Single Version)
+### Example: Preprints CSV (Single Version)
 
-```csv
-serverPath,locale,versionIdentifier,version,preprintPrefix,preprintTitle,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl
-liv,en,,,CC,"Climate Change Impacts","A Comprehensive Study","This study examines...","John,Doe,john@example.com,University of Example;Jane,Smith,jane@example.com,Research Institute","climate change;environment","Environmental Science;Ecology",global,"environmental science",10.5678/climate-2024,cover.jpg,"Climate Study Cover","article.pdf","PDF","supplement.pdf;data.xlsx","Supplement;Dataset",Research Articles,RA,2024-03-15,2024-03-10,2024,Public Knowledge Project,https://creativecommons.org/licenses/by/4.0
-liv,en,,,"","Biodiversity Loss",,"This paper discusses...","Alice,Johnson,alice@example.com,Conservation Org","biodiversity;conservation","Biology;Environmental Science",,,,,,"article2.pdf;presentation.pptx","PDF;SLIDES","supplementary_data.csv","Data",Research Articles,RA,2024-03-20,2024-03-15,2024,Conservation Organization,https://creativecommons.org/licenses/by-sa/4.0
-```
+You can take a look at the example we provide on the [Single Version Preprints CSV file](./examples/preprints/single_version_preprints.csv).
 
-### Complete Example: Preprints CSV (Multi-Version)
+### Example: Preprints CSV (Multi-Version)
 
-```csv
-serverPath,locale,versionIdentifier,version,preprintPrefix,preprintTitle,preprintSubtitle,preprintAbstract,authors,keywords,subjects,coverage,categories,doi,coverImageFilename,coverImageAltText,galleyFilenames,galleyLabels,suppFilenames,suppLabels,sectionTitle,sectionAbbrev,datePosted,dateSubmitted,copyrightYear,copyrightHolder,licenseUrl
-liv,en,ML-CLIMATE-2024,1,ML,"Machine Learning in Climate Science","Version 1.0","Initial findings...","John,Doe,john@example.com,University","machine learning;climate","AI;Environment",global,"computer science",10.5678/ml-v1,cover_v1.png,"ML Climate V1","paper_v1.pdf","PDF","supplement_v1.pdf","Supplement",Preprints,PRE,2024-01-15,2024-01-10,2024,Research Institute,https://creativecommons.org/licenses/by/4.0
-liv,en,ML-CLIMATE-2024,2,,,,,,,,,,,,paper_v2.pdf,PDF,,,,,,,,,
-liv,en,ML-CLIMATE-2024,3,ML,"Machine Learning in Climate Science - Enhanced","Version 3.0","Updated with new models...","John,Doe,john@example.com,University;Jane,Smith,jane@example.com,AI Lab","machine learning;climate;deep learning","AI;Environment;Neural Networks",global,"computer science",10.5678/ml-v3,cover_v3.png,"ML Climate V3","paper_v3.pdf;code.zip","PDF;Code","supplement_v3.pdf","Supplement V3",Preprints,PRE,2024-05-20,2024-05-15,2024,Research Institute,https://creativecommons.org/licenses/by/4.0
-```
+You can take a look at the example we provide on the [Multi Version Preprints CSV file](./examples/preprints/multiversion_preprints.csv).
+
+### Example: Preprints CSV (Multi-Version)
+
+You can take a look at the example we provide on the [Mixed Preprints CSV file](./examples/preprints/mixed_preprints.csv).
 
 ## File Structure for Import
 
@@ -232,8 +223,8 @@ For multi-version preprints, it's recommended to include version indicators in f
    - Solution:
      - Verify the file exists and the path is correct
      - Use absolute paths for reliability
-     - For relative paths, they are resolved from the OJS root directory
-     - Check file permissions (must be readable by the web server user)
+     - For relative paths, they are resolved from the OPS root directory
+     - Check file permissions (must be readable by the user running the CLI script)
      - Ensure the file is not empty
 
 2. **Invalid Source Directory**

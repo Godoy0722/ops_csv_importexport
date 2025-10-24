@@ -187,6 +187,14 @@ class PreprintCommand
                     }
                 }
 
+                if ($data->references) {
+                    $reason = InvalidRowValidations::validateReferencesFile($data->references, $this->sourceDir);
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        continue;
+                    }
+                }
+
                 $server = CachedEntities::getCachedServer($data->serverPath);
 
                 $reason = InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
@@ -259,11 +267,11 @@ class PreprintCommand
                     $submission = $existingSubmission;
                     $publication = PublicationProcessor::createPublicationVersion($basePublication, $data);
 
-                    $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication);
+                    $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->sourceDir);
                 } else {
                     $initialPublication = PublicationProcessor::createInitialPublication($data);
                     $submission = SubmissionProcessor::process($data, $initialPublication, $server);
-                    $publication = PublicationProcessor::process($submission, $data, $server);
+                    $publication = PublicationProcessor::process($submission, $data, $server, $this->sourceDir);
                 }
 
                 if (!$publication) {

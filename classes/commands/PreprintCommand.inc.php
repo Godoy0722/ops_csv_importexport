@@ -204,6 +204,14 @@ class PreprintCommand
                     }
                 }
 
+				if ($data->references) {
+                    $reason = InvalidRowValidations::validateReferencesFile($data->references, $this->_sourceDir);
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->_expectedRowSize, $reason, $this->_failedRows);
+                        continue;
+                    }
+                }
+
                 $journal = CachedEntities::getCachedJournal($data->serverPath);
 
                 $reason = InvalidRowValidations::validateJournalIsValid($journal, $data->serverPath);
@@ -278,7 +286,7 @@ class PreprintCommand
                     $submission = $existingSubmission;
                     $publication = PublicationProcessor::createPublicationVersion($basePublication, $data);
 
-                    $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication);
+                    $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->_sourceDir);
 
                     $hasGalleyData = !empty($data->galleyFilenames) || !empty($data->suppFilenames);
                     if (!$hasGalleyData) {
@@ -286,7 +294,7 @@ class PreprintCommand
                     }
                 } else {
                     $submission = SubmissionProcessor::process($journal->getId(), $data);
-                    $publication = PublicationProcessor::process($submission, $data, $journal);
+                    $publication = PublicationProcessor::process($submission, $data, $journal, $this->_sourceDir);
                 }
 
                 $galleyIds = [];

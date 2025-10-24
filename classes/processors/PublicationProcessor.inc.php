@@ -26,10 +26,11 @@ class PublicationProcessor
 	 * @param \Submission $submission
 	 * @param object $data
 	 * @param \Journal $journal
+	 * @param string $sourceDir
 	 *
 	 * @return \Publication
 	 */
-    public static function process($submission, $data, $journal)
+    public static function process($submission, $data, $journal, $sourceDir)
     {
 		$publicationDao = CachedDaos::getPublicationDao();
 		$sanitizedAbstract = \PKPString::stripUnsafeHtml($data->preprintAbstract);
@@ -54,10 +55,22 @@ class PublicationProcessor
             $publication->setData('prefix', $data->preprintPrefix, $locale);
         }
 
+		if (!empty($data->references)) {
+            $referencesString = self::getReferencesContent($data->references, $sourceDir);
+
+            if (!empty($referencesString)) {
+                $publication->setData('citationsRaw', $referencesString);
+            }
+        }
+
         $publicationDao->insertObject($publication);
 
-		self::setCopyrightFromSystem($submission, $publication, $data);
+		if ($publication->getData('citationsRaw')) {
+			$citationDao = CachedDaos::getCitationDAO();
+			$citationDao->importCitations($publication->getId(), $publication->getData('citationsRaw'));
+		}
 
+		self::setCopyrightFromSystem($submission, $publication, $data);
         SubmissionProcessor::updateCurrentPublicationId($submission, $publication->getId());
 
         return $publication;
@@ -204,6 +217,12 @@ class PublicationProcessor
         $newPublication->setData('primaryContactId', null);
 		$publicationDao->updateObject($newPublication);
 
+		// Copy and import citations from base publication
+		if (!empty($basePublication->getData('citationsRaw'))) {
+			$citationDao = CachedDaos::getCitationDAO();
+			$citationDao->importCitations($newPublication->getId(), $basePublication->getData('citationsRaw'));
+		}
+
 		$newPublication = $publicationDao->getById($newPublicationId);
 
         return $newPublication;
@@ -217,10 +236,11 @@ class PublicationProcessor
 	 * @param \Publication $publication
 	 * @param object $data
 	 * @param \Publication $basePublication
+	 * @param string $sourceDir
 	 *
 	 * @return \Publication
      */
-    public static function processVersionedPublication($publication, $data, $basePublication)
+    public static function processVersionedPublication($publication, $data, $basePublication, $sourceDir)
     {
         self::updatePublicationAttribute($publication, 'version', (int)$data->version);
         self::updatePublicationAttribute($publication, 'status', STATUS_PUBLISHED);
@@ -255,6 +275,26 @@ class PublicationProcessor
 		if (!empty($data->doi)) {
             self::updatePublicationAttribute($publication, 'pub-id::doi', $data->doi);
         }
+
+		$citationsToImport = null;
+
+		if (!empty($data->references)) {
+            $referencesString = self::getReferencesContent($data->references, $sourceDir);
+
+            if (!empty($referencesString)) {
+                $publication->setData('citationsRaw', $referencesString);
+				$citationsToImport = $referencesString;
+            }
+        } elseif (!empty($basePublication->getData('citationsRaw'))) {
+            $citationsRaw = (string)$basePublication->getData('citationsRaw');
+            $publication->setData('citationsRaw', $citationsRaw);
+			$citationsToImport = $citationsRaw;
+        }
+
+		if ($citationsToImport) {
+			$citationDao = CachedDaos::getCitationDAO();
+			$citationDao->importCitations($publication->getId(), $citationsToImport);
+		}
 
         return $publication;
     }
@@ -292,4 +332,18 @@ class PublicationProcessor
         $refreshedPublication = $publicationDao->getById($newPublication->getId());
 		$newPublication->setData('galleys', $refreshedPublication->getData('galleys'));
 	}
+
+	/**
+     * Process references from a file and add them to the publication
+	 *
+	 * @param string $referencesFilename
+	 * @param string $sourceDir
+	 *
+	 * @return string|false
+     */
+    public static function getReferencesContent($referencesFilename, $sourceDir)
+    {
+        $referencesFilePath = "{$sourceDir}/{$referencesFilename}";
+        return file_get_contents($referencesFilePath);
+    }
 }

@@ -135,3 +135,9 @@ msgstr "Version field must be a positive integer and is required when versionIde
 
 msgid "plugins.importexport.csv.duplicatePreprintVersionFound"
 msgstr "A preprint with identifier \"{$identifier}\" and version \"{$version}\" already exists in this import. Please check the article's version."
+
+msgid "plugins.importexport.csv.invalidReferencesFile"
+msgstr "Invalid references file: \"{$filename}\". Please verify the file exists and is readable."
+
+msgid "plugins.importexport.csv.invalidReferencesFileExtension"
+msgstr "References file must have a .txt extension."

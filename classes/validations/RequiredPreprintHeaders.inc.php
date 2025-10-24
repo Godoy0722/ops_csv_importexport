@@ -46,6 +46,7 @@ class RequiredPreprintHeaders
         'copyrightYear',
 		'copyrightHolder',
 		'licenseUrl',
+		'references',
     ];
 
     static $preprintRequiredHeaders = [

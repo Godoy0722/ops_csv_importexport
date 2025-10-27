@@ -62,10 +62,23 @@ class RequiredPreprintHeaders
         return count($row) === count(self::$preprintHeaders);
     }
 
-    public static function validateRowHasAllRequiredFields(object $row): bool
+    public static function validateRowHasAllRequiredFields(object $row, array $processedPreprints = []): bool
     {
-        if (!empty($row->versionIdentifier) && !empty($row->version) && (int)$row->version > 1) {
-            return true;
+        if (!empty($row->versionIdentifier) && !empty($row->version) && !empty($row->locale)) {
+            $identifier = $row->versionIdentifier;
+            $version = (int)$row->version;
+            $locale = $row->locale;
+
+            if (
+                isset($processedPreprints[$identifier][$version])
+                && !isset($processedPreprints[$identifier][$version][$locale])
+            ) {
+                return true;
+            }
+
+            if ($version > 1) {
+                return true;
+            }
         }
 
         foreach (self::$preprintRequiredHeaders as $requiredHeader) {

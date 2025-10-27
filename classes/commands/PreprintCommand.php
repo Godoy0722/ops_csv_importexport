@@ -69,18 +69,27 @@ class PreprintCommand
     private string $format;
 
     /**
-     * Array to track processed preprints by identifier
+     * Array to track processed preprints by identifier, version, and locale
      * Structure: [
      *     'identifier' => [
      *         'version1' => [
-     *             'data' => csv_row,
-     *             'publication' => Publication,
-     *             'submission' => Submission
+     *             'locale1' => [
+     *                 'data' => csv_row,
+     *                 'publication' => Publication,
+     *                 'submission' => Submission
+     *             ],
+     *             'locale2' => [
+     *                 'data' => csv_row,
+     *                 'publication' => Publication,
+     *                 'submission' => Submission
+     *             ]
      *         ],
      *         'version2' => [
-     *             'data' => csv_row,
-     *             'publication' => Publication,
-     *             'submission' => Submission
+     *             'locale1' => [
+     *                 'data' => csv_row,
+     *                 'publication' => Publication,
+     *                 'submission' => Submission
+     *             ]
      *         ]
      *     ]
      * ]
@@ -139,7 +148,9 @@ class PreprintCommand
                     array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                 );
 
-                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, [RequiredPreprintHeaders::class, 'validateRowHasAllRequiredFields']);
+                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, function($row) {
+                    return RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints);
+                });
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
@@ -257,18 +268,42 @@ class PreprintCommand
                 $existingSubmission = null;
                 /** @var null|Publication */
                 $basePublication = null;
-                if (!empty($data->versionIdentifier) && isset($this->processedPreprints[$data->versionIdentifier])) {
-                    $lastVersionData = end($this->processedPreprints[$data->versionIdentifier]);
+                $isMultiLocaleImport = false;
+
+                if (!empty($data->versionIdentifier) &&
+                    InvalidRowValidations::versionExistsInAnyLocale($data, $this->processedPreprints)) {
+                    $version = (int)$data->version;
+                    $versionData = $this->processedPreprints[$data->versionIdentifier][$version];
+
+                    $firstLocaleData = reset($versionData);
+                    $existingSubmission = $firstLocaleData['submission'];
+                    $basePublication = $firstLocaleData['publication'];
+
+                    if (!isset($versionData[$data->locale])) {
+                        $isMultiLocaleImport = true;
+                    }
+                } elseif (!empty($data->versionIdentifier) && isset($this->processedPreprints[$data->versionIdentifier])) {
+                    // Handle new version (not multi-locale)
+                    $versions = $this->processedPreprints[$data->versionIdentifier];
+                    $lastVersion = end($versions);
+                    $lastVersionData = reset($lastVersion);
                     $existingSubmission = $lastVersionData['submission'];
                     $basePublication = $lastVersionData['publication'];
                 }
 
-                if ($existingSubmission && $basePublication) {
+                if ($isMultiLocaleImport) {
+                    $submission = $existingSubmission;
+                    $publication = $basePublication;
+
+                    $publication = PublicationProcessor::processMultiLocalePublication($publication, $data);
+                } elseif ($existingSubmission && $basePublication) {
+                    // New version import
                     $submission = $existingSubmission;
                     $publication = PublicationProcessor::createPublicationVersion($basePublication, $data);
 
                     $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->sourceDir);
                 } else {
+                    // New submission import
                     $initialPublication = PublicationProcessor::createInitialPublication($data);
                     $submission = SubmissionProcessor::process($data, $initialPublication, $server);
                     $publication = PublicationProcessor::process($submission, $data, $server, $this->sourceDir);
@@ -369,9 +404,17 @@ class PreprintCommand
                     }
                 }
 
-                AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
-                KeywordsProcessor::process($data, $publication->getId(), $basePublication);
-                SubjectsProcessor::process($data, $publication->getId(), $basePublication);
+                if ($isMultiLocaleImport) {
+                    // For multi-locale imports, update existing publication with new locale data
+                    AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
+                    KeywordsProcessor::processMultiLocale($data, $publication->getId());
+                    SubjectsProcessor::processMultiLocale($data, $publication->getId());
+                } else {
+                    // For new submissions or versions, use the regular process
+                    AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
+                    KeywordsProcessor::process($data, $publication->getId(), $basePublication);
+                    SubjectsProcessor::process($data, $publication->getId(), $basePublication);
+                }
 
                 if (
                     ((!empty($data->version) && (int)$data->version === 1) || empty($data->version))
@@ -390,9 +433,13 @@ class PreprintCommand
                 }
 
                 if ($data->categories || $basePublication) {
-                    ($existingSubmission && $basePublication)
-                        ? CategoriesProcessor::processForVersion($data->categories, $data->locale, $server->getId(), $publication->getId(), $basePublication)
-                        : CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
+                    if ($isMultiLocaleImport) {
+                        CategoriesProcessor::processMultiLocale($data->categories, $data->locale, $server->getId(), $publication->getId());
+                    } elseif ($existingSubmission && $basePublication) {
+                        CategoriesProcessor::processForVersion($data->categories, $data->locale, $server->getId(), $publication->getId(), $basePublication);
+                    } else {
+                        CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
+                    }
                 }
 
                 if (!empty($data->versionIdentifier)) {
@@ -480,18 +527,23 @@ class PreprintCommand
     }
 
     /**
-     * Tracks a processed preprint for version management
+     * Tracks a processed preprint for version and locale management
      */
     private function trackProcessedPreprint(object $data, Submission $submission, Publication $publication): void
     {
         $identifier = $data->versionIdentifier;
         $version = (int)$data->version;
+        $locale = $data->locale;
 
         if (!isset($this->processedPreprints[$identifier])) {
             $this->processedPreprints[$identifier] = [];
         }
 
-        $this->processedPreprints[$identifier][$version] = [
+        if (!isset($this->processedPreprints[$identifier][$version])) {
+            $this->processedPreprints[$identifier][$version] = [];
+        }
+
+        $this->processedPreprints[$identifier][$version][$locale] = [
             'data' => $data,
             'submission' => $submission,
             'publication' => $publication
@@ -511,11 +563,14 @@ class PreprintCommand
             $highestVersion = 0;
             $currentVersionData = null;
 
-            foreach ($versions as $versionKey => $versionData) {
-                $versionNumber = (int)$versionData['data']->version;
+            foreach ($versions as $versionKey => $localeData) {
+                // Get the first locale for this version (all locales share the same submission/publication)
+                $firstLocaleData = reset($localeData);
+                $versionNumber = (int)$firstLocaleData['data']->version;
+
                 if ($versionNumber > $highestVersion) {
                     $highestVersion = $versionNumber;
-                    $currentVersionData = $versionData;
+                    $currentVersionData = $firstLocaleData;
                 }
             }
 

@@ -238,8 +238,8 @@ When you provide these fields in your CSV:
    - Version 1 is always the initial/base version
 
 3. **Required Fields**:
-   - **Version 1** must include ALL required fields: `preprintTitle`, `authors`, `datePublished`, etc.
-   - **Versions > 1** can include only the fields you want to update (partial updates)
+   - **Version 1** must include ALL required fields: `serverPath`, `locale`, `preprintTitle`, `authors`, `datePosted`
+   - **Versions > 1** only require `versionIdentifier`, `version`, and `locale` (you can include other fields you want to update)
    - Fields not provided in higher versions inherit values from the previous version
 
 4. **Automatic Current Version**:
@@ -269,6 +269,88 @@ You can mix single-version and multi-version preprints in the same CSV file. Tak
 - Readers can access previous versions through the preprint's version history
 - The import process validates that no duplicate versions exist (same identifier + version number)
 - Versions must be imported in sequence within a single CSV file (version 1 before version 2, etc.)
+
+## Multi-Locale Support
+
+The plugin supports importing preprints with content in multiple languages. This allows you to provide translations of your preprints by importing the same preprint in different locales.
+
+### How Multi-Locale Works
+
+The multi-locale system uses three key fields to manage preprint translations:
+
+- **versionIdentifier**: Links all versions of a preprint together
+- **version**: Indicates the version number
+- **locale**: Specifies the language/locale of the content (e.g., `en`, `pt_BR`, `fr_CA`)
+
+When you provide multiple CSV rows with:
+- Same `versionIdentifier`
+- Same `version`
+- Different `locale`
+
+The system will:
+1. Detect that you're adding a translation to an existing publication
+2. Update the existing publication with the new locale data
+3. Preserve all existing data in other locales
+
+### Multi-Locale Management Rules
+
+1. **Locale Codes**:
+   - Must match locales enabled in your server settings
+   - Common examples: `en` (English), `pt_BR` (Brazilian Portuguese), `fr_CA` (Canadian French)
+   - Must be validated by the server before import
+
+2. **Required Fields for Multi-Locale**:
+   - First locale import (base): Requires ALL mandatory fields (`serverPath`, `locale`, `preprintTitle`, `authors`, `datePosted`)
+   - Additional locale imports: Only require `versionIdentifier`, `version`, and `locale` (you can include other fields you want to translate)
+   - Fields not provided will remain empty for that locale (they won't inherit from other locales)
+
+3. **Localized Fields**:
+   The following fields support multi-locale data:
+   - `preprintTitle`
+   - `preprintSubtitle`
+   - `preprintAbstract`
+   - `preprintPrefix`
+   - `coverage`
+   - `copyrightHolder`
+   - `keywords`
+   - `subjects`
+   - `categories` (category titles)
+   - Author names (`givenName`, `familyName`)
+   - Author affiliations
+
+4. **Non-Localized Fields**:
+   These fields are shared across all locales:
+   - `copyrightYear`
+   - `licenseUrl`
+   - `doi`
+   - `datePosted`
+   - `dateSubmitted`
+   - File attachments (galleys and supplementary files)
+
+### Multi-Locale Best Practices
+
+1. **Import Order**:
+   - Always import the primary/default locale first
+   - Then add additional locales in subsequent rows
+   - Can import all locales in a single CSV file
+
+2. **Consistency**:
+   - Keep `versionIdentifier` and `version` consistent across locales
+
+4. **Validation**:
+   - The system validates that `identifier` + `version` + `locale` is unique
+   - Duplicate combinations will be rejected with error message
+   - Check the `invalid_[filename].csv` file for any failed rows
+
+### Important Multi-Locale Notes
+
+- All locales for a version share the same publication ID
+- Readers can switch between available locales in the frontend
+- Categories can have different titles per locale
+- Author names and affiliations can be provided in multiple locales
+- Keywords and subjects are stored per locale
+- Non-localized fields (DOI, dates, etc.) remain the same across all locales
+- Files (galleys, supplementary) are shared across all locales
 
 ## Troubleshooting
 
@@ -362,7 +444,28 @@ You can mix single-version and multi-version preprints in the same CSV file. Tak
       - For version 2+, you can leave most fields empty to clone from previous version
       - Only fill in the fields you want to update in newer versions
 
-11. **References File Issues**
+11. **Multi-Locale Import Issues**
+    - Error: `Unknown locale or locale not supported by this server: [locale]`
+    - Solution:
+      - Verify the locale is enabled in your server settings
+      - Check that the locale code is correct (e.g., `en`, `pt_BR`, not `pt-BR`)
+      - Enable required locales in the server configuration before importing
+
+    - Error: `Duplicate preprint version and locale found`
+    - Solution:
+      - Check that you don't have duplicate rows with same `versionIdentifier`, `version`, AND `locale`
+      - Each combination of identifier + version + locale must be unique
+      - Review your CSV for accidental duplicate rows
+
+    - **Best Practices for Multi-Locale Imports:**
+      - Import the primary/default locale first
+      - Ensure all locales are enabled in server settings before importing
+      - Keep author email addresses consistent across locales for proper matching
+      - Translate all user-facing fields (title, abstract, keywords, etc.)
+      - Remember that files (galleys) are shared across all locales
+      - Test with a simple two-locale example before large imports
+
+12. **References File Issues**
    - Error: `Invalid references file: [filename]`
    - Solution:
      - Verify the references file exists in the same directory as the CSV file

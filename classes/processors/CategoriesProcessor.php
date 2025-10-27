@@ -84,4 +84,56 @@ class CategoriesProcessor
 
         self::process($categories, $locale, $journalId, $publicationId);
     }
+
+    /**
+     * Process categories for multi-locale import
+     * This handles adding locale-specific data to existing categories
+     */
+    public static function processMultiLocale(string $categories, string $locale, int $journalId, int $publicationId): void
+    {
+        if (empty(trim($categories))) {
+            return;
+        }
+
+        $categoriesArray = explode(';', $categories);
+
+        foreach ($categoriesArray as $categoryPath) {
+            $categoryPath = trim($categoryPath);
+
+            if (empty($categoryPath)) {
+                continue;
+            }
+
+            $lowerCategoryPath = mb_strtolower($categoryPath);
+            $category = CachedEntities::getCachedCategory($lowerCategoryPath, $journalId);
+
+            if (!is_null($category)) {
+                // Category exists, update with new locale title if different
+                $existingTitle = $category->getLocalizedData('title', $locale);
+                if (empty($existingTitle) || $existingTitle !== $categoryPath) {
+                    $category->setTitle($categoryPath, $locale);
+                    Repo::category()->dao->update($category);
+                }
+            } else {
+                // Category doesn't exist, create it (should follow the same logic as process())
+                $category = Repo::category()->newDataObject();
+                $category->setContextId($journalId);
+                $category->setTitle($categoryPath, $locale);
+                $category->setParentId(null);
+                $category->setSequence(REALLY_BIG_NUMBER);
+                $category->setPath($lowerCategoryPath);
+
+                $categoryId = Repo::category()->add($category);
+
+                // Assign to publication if not already assigned
+                $existingCategoryIds = PublicationCategory::withPublicationId($publicationId)
+                    ->pluck('category_id')
+                    ->toArray();
+
+                if (!in_array($categoryId, $existingCategoryIds)) {
+                    Repo::publication()->assignCategoriesToPublication($publicationId, array_merge($existingCategoryIds, [$categoryId]));
+                }
+            }
+        }
+    }
 }

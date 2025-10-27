@@ -179,9 +179,13 @@ class CachedEntities
 
     static function getCachedSectionById(int $baseSectionId, int $serverId, string $locale): ?Section
     {
-        $existingSection = array_find(self::$sections, function (Section $section) use ($baseSectionId) {
-            return $section->getId() === $baseSectionId;
-        });
+        $existingSection = null;
+        foreach (self::$sections as $section) {
+            if ($section instanceof Section && $section->getId() === $baseSectionId) {
+                $existingSection = $section;
+                break;
+            }
+        }
 
         if ($existingSection) {
             return $existingSection;

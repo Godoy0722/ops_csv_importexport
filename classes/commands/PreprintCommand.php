@@ -35,6 +35,7 @@ use APP\plugins\importexport\csv\classes\processors\SubmissionProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredPreprintHeaders;
 use APP\submission\Submission;
+use Illuminate\Support\Facades\DB;
 use PKP\file\FileManager;
 use PKP\services\PKPFileService;
 use PKP\user\User;
@@ -432,6 +433,8 @@ class PreprintCommand
                     PublicationProcessor::updatePublicationAttribute($publication, 'coverImage', $basePublication->getData('coverImage'));
                 }
 
+                $publication = Repo::publication()->get($publication->getId());
+
                 if ($data->categories || $basePublication) {
                     if ($isMultiLocaleImport) {
                         CategoriesProcessor::processMultiLocale($data->categories, $data->locale, $server->getId(), $publication->getId());
@@ -458,6 +461,7 @@ class PreprintCommand
             }
         }
 
+        $this->syncCoverImagesForProcessedPreprints();
         $this->setCurrentVersionsForProcessedPreprints();
     }
 
@@ -548,6 +552,73 @@ class PreprintCommand
             'submission' => $submission,
             'publication' => $publication
         ];
+    }
+
+    private function syncCoverImagesForProcessedPreprints(): void
+    {
+        foreach ($this->processedPreprints as $identifier => $versions) {
+            foreach ($versions as $versionNumber => $localeData) {
+                $firstLocaleData = reset($localeData);
+                $publication = $firstLocaleData['publication'];
+                $publicationId = $publication->getId();
+
+                $serverId = Repo::submission()->get($publication->getData('submissionId'))->getData('contextId');
+                $serverDao = CachedDaos::getServerDao();
+                $server = $serverDao->getById($serverId);
+                if (!$server) {
+                    continue;
+                }
+                $defaultLocale = $server->getPrimaryLocale();
+
+                $coverImageSettings = \Illuminate\Support\Facades\DB::table('publication_settings')
+                    ->where('publication_id', $publicationId)
+                    ->where('setting_name', 'coverImage')
+                    ->get();
+
+                if ($coverImageSettings->isEmpty()) {
+                    continue;
+                }
+
+                $coverImagesByLocale = [];
+                foreach ($coverImageSettings as $setting) {
+                    if (empty($setting->setting_value)) {
+                        continue;
+                    }
+
+                    $coverImageData = json_decode($setting->setting_value, true);
+                    if (!empty($coverImageData)) {
+                        $coverImagesByLocale[$setting->locale] = $coverImageData;
+                    }
+                }
+
+                if (empty($coverImagesByLocale)) {
+                    continue;
+                }
+
+                $sourceCoverImage = isset($coverImagesByLocale[$defaultLocale])
+                    ? $coverImagesByLocale[$defaultLocale]
+                    : reset($coverImagesByLocale);
+
+                $allPublicationLocales = DB::table('publication_settings')
+                    ->where('publication_id', $publicationId)
+                    ->whereNotNull('locale')
+                    ->whereNot('locale', '')
+                    ->distinct()
+                    ->pluck('locale')
+                    ->toArray();
+
+                foreach ($allPublicationLocales as $locale) {
+                    if (!(!isset($coverImagesByLocale[$locale]) && $sourceCoverImage)) {
+                        continue;
+                    }
+
+                    $reloadedPublication = Repo::publication()->get($publicationId);
+                    if ($reloadedPublication) {
+                        PublicationProcessor::updatePublicationAttribute($reloadedPublication, 'coverImage', $sourceCoverImage, $locale);
+                    }
+                }
+            }
+        }
     }
 
     /**

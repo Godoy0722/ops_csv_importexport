@@ -86,4 +86,62 @@ class CategoriesProcessor
 
         self::process($categories, $locale, $journalId, $publicationId);
     }
+
+    /**
+     * Process categories for multi-locale import
+     * This handles adding locale-specific data to existing categories
+     */
+    public static function processMultiLocale(string $categories, string $locale, int $journalId, int $publicationId): void
+    {
+        if (empty(trim($categories))) {
+            return;
+        }
+
+        $existingCategoryIds = Repo::category()->getCollector()
+            ->filterByPublicationIds([$publicationId])
+            ->getIds()
+            ->toArray();
+
+        $categoriesArray = explode(';', $categories);
+
+        foreach ($categoriesArray as $categoryPath) {
+            $categoryPath = trim($categoryPath);
+
+            if (empty($categoryPath)) {
+                continue;
+            }
+
+            $lowerCategoryPath = mb_strtolower($categoryPath);
+            $category = CachedEntities::getCachedCategory($lowerCategoryPath, $journalId);
+
+            if (!is_null($category)) {
+                $existingTitle = $category->getLocalizedData('title', $locale);
+
+                if (empty($existingTitle) || $existingTitle !== $categoryPath) {
+                    $category->setTitle($categoryPath, $locale);
+                    Repo::category()->dao->update($category);
+                }
+
+                if (!in_array($category->getId(), $existingCategoryIds)) {
+                    CachedDaos::getCategoryDao()->insertPublicationAssignment($category->getId(), $publicationId);
+                }
+
+                continue;
+            }
+
+            $category = Repo::category()->newDataObject();
+            $category->setContextId($journalId);
+            $category->setTitle($categoryPath, $locale);
+            $category->setData('locale', $locale);
+            $category->setParentId(null);
+            $category->setSequence(REALLY_BIG_NUMBER);
+            $category->setPath($lowerCategoryPath);
+
+            $categoryId = Repo::category()->add($category);
+            $category = Repo::category()->get($categoryId);
+            CachedEntities::$categories[$lowerCategoryPath] = $category;
+
+            CachedDaos::getCategoryDao()->insertPublicationAssignment($categoryId, $publicationId);
+        }
+    }
 }

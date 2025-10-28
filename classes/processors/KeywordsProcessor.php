@@ -41,10 +41,27 @@ class KeywordsProcessor
         }
 
 		$keywordsList = [$data->locale => array_map('trim', explode(';', $data->keywords))];
-        if (empty($keywordsList[$data->locale])) {
+        if (!empty($keywordsList[$data->locale])) {
+            $submissionKeywordDao->insertKeywords($keywordsList, $publicationId, false);
+        }
+	}
+
+    /**
+     * Process keywords for multi-locale import (adds keywords in new locale)
+     */
+    public static function processMultiLocale(object $data, int $publicationId): void
+    {
+        if (empty($data->keywords)) {
+            return; // No new keywords to add
+        }
+
+        if (!Repo::publication()->get($publicationId)) {
             return;
         }
 
-        $submissionKeywordDao->insertKeywords($keywordsList, $publicationId);
-	}
+        $newKeywords = [$data->locale => array_map('trim', explode(';', $data->keywords))];
+
+        $submissionKeywordDao = CachedDaos::getSubmissionKeywordDao();
+        $submissionKeywordDao->insertKeywords($newKeywords, $publicationId, false);
+    }
 }

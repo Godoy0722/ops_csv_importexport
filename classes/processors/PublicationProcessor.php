@@ -17,6 +17,7 @@
 namespace APP\plugins\importexport\csv\classes\processors;
 
 use APP\facades\Repo;
+use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
 use APP\publication\Publication;
 use APP\server\Server;
 use APP\submission\Submission;
@@ -251,5 +252,35 @@ class PublicationProcessor
     {
         $referencesFilePath = "{$sourceDir}/{$referencesFilename}";
         return file_get_contents($referencesFilePath);
+    }
+
+    /**
+     * Process multi-locale publication data (adds new locale to existing publication)
+     * This method updates an existing publication with data in a new locale
+     */
+    public static function processMultiLocalePublication(Publication $publication, object $data): Publication
+    {
+        $localizedFields = [
+            'title' => 'preprintTitle',
+            'subtitle' => 'preprintSubtitle',
+            'abstract' => 'preprintAbstract',
+            'prefix' => 'preprintPrefix',
+            'coverage' => 'coverage',
+            'copyrightHolder' => 'copyrightHolder',
+        ];
+
+        foreach ($localizedFields as $field => $csvField) {
+            if (!empty($data->{$csvField})) {
+                self::updatePublicationAttribute($publication, $field, $data->{$csvField}, $data->locale);
+            }
+        }
+
+        $server = CachedDaos::getServerDao()->getById($publication->getData('contextId'));
+        if ($server) {
+            $publication->setData('copyrightNotice', $server->getLocalizedData('copyrightNotice', $data->locale));
+            Repo::publication()->dao->update($publication);
+        }
+
+        return $publication;
     }
 }

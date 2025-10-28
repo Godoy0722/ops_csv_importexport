@@ -43,7 +43,26 @@ class SubjectsProcessor
 		$subjectsList = [$data->locale => array_map('trim', explode(';', $data->subjects))];
 
 		if (!empty($subjectsList[$data->locale])) {
-			$submissionSubjectDao->insertSubjects($subjectsList, $publicationId);
+			$submissionSubjectDao->insertSubjects($subjectsList, $publicationId, false);
 		}
 	}
+
+    /**
+     * Process subjects for multi-locale import (adds subjects in new locale)
+     */
+    public static function processMultiLocale(object $data, int $publicationId): void
+    {
+        if (empty($data->subjects)) {
+            return; // No new subjects to add
+        }
+
+        if (!Repo::publication()->get($publicationId)) {
+            return;
+        }
+
+        $newSubjects = [$data->locale => array_map('trim', explode(';', $data->subjects))];
+
+        $submissionSubjectDao = CachedDaos::getSubmissionSubjectDao();
+        $submissionSubjectDao->insertSubjects($newSubjects, $publicationId, false);
+    }
 }

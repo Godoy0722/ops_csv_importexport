@@ -73,12 +73,30 @@ class RequiredPreprintHeaders
      * Validates whether the row contains all required headers.
 	 *
 	 * @param object $row
+	 * @param array $processedPreprints
 	 *
 	 * @return bool
      */
-    public static function validateRowHasAllRequiredFields($row)
+    public static function validateRowHasAllRequiredFields($row, $processedPreprints = [])
     {
-        foreach(self::$preprintRequiredHeaders as $requiredHeader) {
+        if (!empty($row->versionIdentifier) && !empty($row->version) && !empty($row->locale)) {
+            $identifier = $row->versionIdentifier;
+            $version = (int)$row->version;
+            $locale = $row->locale;
+
+            if (
+                isset($processedPreprints[$identifier][$version])
+                && !isset($processedPreprints[$identifier][$version][$locale])
+            ) {
+                return true;
+            }
+
+            if ($version > 1) {
+                return true;
+            }
+        }
+
+        foreach (self::$preprintRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;
             }

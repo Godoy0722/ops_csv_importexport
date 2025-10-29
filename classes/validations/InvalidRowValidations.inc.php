@@ -301,8 +301,25 @@ class InvalidRowValidations
 	}
 
 	/**
-     * Validates that no duplicate version exists for the same preprint identifier
-     * in the current import session
+     * Checks if a version exists in any locale (used for multi-locale imports)
+	 *
+	 * @param object $data
+	 * @param array $processedPreprints
+	 *
+	 * @return bool
+     */
+    public static function versionExistsInAnyLocale($data, $processedPreprints)
+    {
+        $identifier = $data->versionIdentifier;
+        $version = (int)$data->version;
+
+        return isset($processedPreprints[$identifier][$version]) &&
+               !empty($processedPreprints[$identifier][$version]);
+    }
+
+    /**
+     * Validates that no duplicate version exists for the same preprint identifier,
+     * version, and locale combination in the current import session
 	 *
 	 * @param object $data
 	 * @param array $processedPreprints
@@ -313,11 +330,13 @@ class InvalidRowValidations
     {
         $identifier = $data->versionIdentifier;
         $version = (int)$data->version;
+        $locale = $data->locale;
 
-        if (isset($processedPreprints[$identifier][$version])) {
-            return __('plugins.importexport.csv.duplicatePreprintVersionFound', [
+        if (isset($processedPreprints[$identifier][$version][$locale])) {
+            return __('plugins.importexport.csv.duplicatePreprintVersionLocaleFound', [
                 'identifier' => $identifier,
-                'version' => $version
+                'version' => $version,
+                'locale' => $locale
             ]);
         }
 

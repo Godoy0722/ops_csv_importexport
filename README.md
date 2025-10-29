@@ -20,6 +20,11 @@ This plugin allows administrators to import users and preprints with their assoc
     - [Multi Version Preprints](#example-2-multi-version-preprints)
     - [Mixed Preprints](#example-3-mixed-preprints)
   - [Important Notes](#important-notes)
+- [Multi-Locale Support](#multi-locale-support)
+	- [How Multi-Locale Works](#how-multi-locale-works)
+	- [Multi-Locale Management Rules](#multi-locale-management-rules)
+	- [Multi-Locale Best Practices](#multi-locale-best-practices)
+	- [Important Notes](#important-multi-locale-notes)
 - [Troubleshooting](#troubleshooting)
 
 
@@ -302,7 +307,7 @@ The system will:
 2. **Required Fields for Multi-Locale**:
    - First locale import (base): Requires ALL mandatory fields (`serverPath`, `locale`, `preprintTitle`, `authors`, `datePosted`)
    - Additional locale imports: Only require `versionIdentifier`, `version`, and `locale` (you can include other fields you want to translate)
-   - Fields not provided will remain empty for that locale (they won't inherit from other locales)
+   - Fields not provided will remain empty for that locale (they won't inherit from other locales), with the exception of the coverImage, which if not passed on a second locale but present on the first one, will inherit it from the first one.
 
 3. **Localized Fields**:
    The following fields support multi-locale data:
@@ -332,7 +337,7 @@ The system will:
 1. **Import Order**:
    - Always import the primary/default locale first
    - Then add additional locales in subsequent rows
-   - Can import all locales in a single CSV file
+   - You can import all locales in a single CSV file
 
 2. **Consistency**:
    - Keep `versionIdentifier` and `version` consistent across locales

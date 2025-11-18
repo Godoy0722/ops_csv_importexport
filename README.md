@@ -133,6 +133,7 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 | galleyLabels | No | Labels for galleys | PDF;SLIDES | Must match galleyFilenames count |
 | suppFilenames | No | Semicolon-separated supplementary files | supplement.pdf;data.csv | Optional |
 | suppLabels | No | Labels for supplementary files | Supplement;Dataset | Must match suppFilenames count |
+| suppDescriptions | No | Semicolon-separated descriptions for supplementary files | Supplementary analysis;Raw dataset (CSV) | Optional; if provided must match suppFilenames and suppLabels count |
 | sectionTitle | No | Section name | Preprints | Will be created if needed |
 | sectionAbbrev | No | Section abbreviation | PRE | Used if section is created |
 | datePosted | Yes* | Posting date | 2024-01-15 | Format: YYYY-MM-DD |
@@ -509,3 +510,19 @@ The system will:
 - For large imports, monitor server resources as the process may be memory-intensive
 - When importing multi-version preprints, start with a simple 2-version example to verify the workflow
 - Check the `invalid_[filename].csv` file generated after import for any failed rows
+
+#### Supplementary Files Descriptions
+
+You may optionally include a `suppDescriptions` column to provide a short description for each supplementary file. Use a semicolon-separated list matching the order of `suppFilenames` and `suppLabels`.
+
+Example:
+
+```
+suppFilenames:      supplement_v2.pdf;data_v2.csv
+suppLabels:         Supplementary Analysis;Dataset
+suppDescriptions:   Extended methods;Raw experimental results (CSV)
+```
+
+Rules:
+- The number of descriptions must match both `suppFilenames` and `suppLabels` when provided.
+- Descriptions are stored per locale and can be provided again in multi-locale rows to set localized text.

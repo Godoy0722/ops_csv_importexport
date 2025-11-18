@@ -111,8 +111,8 @@ class InvalidRowValidations
      */
     public static function validateSupplementaryFiles(string $suppFilenames, string $suppLabels, string $sourceDir): ?string
     {
-        $suppFilenamesArray = explode(';', $suppFilenames);
-        $suppLabelsArray = explode(';', $suppLabels);
+        $suppFilenamesArray = array_map('trim', explode(';', $suppFilenames));
+        $suppLabelsArray = array_map('trim', explode(';', $suppLabels));
 
         if (count($suppFilenamesArray) !== count($suppLabelsArray)) {
             return __('plugins.importexport.csv.invalidNumberOfLabelsAndSupplementaryFiles');
@@ -123,6 +123,30 @@ class InvalidRowValidations
             if (!is_readable($suppPath)) {
                 return __('plugins.importexport.csv.invalidSupplementaryFile', ['filename' => $suppFilename]);
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * Validates the supplementary descriptions count. Returns the reason if an error occurred,
+     * or null if everything is correct.
+     */
+    public static function validateSupplementaryDescriptions(string $suppFilenames, string $suppLabels, ?string $suppDescriptions): ?string
+    {
+        if (empty($suppDescriptions)) {
+            return null; // descriptions are optional
+        }
+
+        $suppFilenamesArray = array_map('trim', explode(';', $suppFilenames));
+        $suppLabelsArray = array_map('trim', explode(';', $suppLabels));
+        $suppDescriptionsArray = array_map('trim', explode(';', $suppDescriptions));
+
+        if (
+            count($suppDescriptionsArray) !== count($suppFilenamesArray) ||
+            count($suppDescriptionsArray) !== count($suppLabelsArray)
+        ) {
+            return __('plugins.importexport.csv.invalidNumberOfDescriptionsAndSupplementaryFiles');
         }
 
         return null;

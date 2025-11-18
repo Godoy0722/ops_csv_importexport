@@ -29,7 +29,7 @@ class CategoriesProcessor
             return;
         }
 
-        $categoriesArray = explode(';', $categories);
+        $categoriesArray = array_map('trim', explode(';', $categories));
         $publicationCategories = [];
 
         foreach ($categoriesArray as $categoryPath) {

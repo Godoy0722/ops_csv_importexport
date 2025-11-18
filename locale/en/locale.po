@@ -79,6 +79,9 @@ msgstr "Invalid supplementary file \"{$filename}\" for this submission."
 msgid "plugins.importexport.csv.invalidNumberOfLabelsAndSupplementaryFiles"
 msgstr "Supplementary files don't have the same amount as the labels. Please verify it for this row."
 
+msgid "plugins.importexport.csv.invalidNumberOfDescriptionsAndSupplementaryFiles"
+msgstr "Supplementary files don't have the same amount as the descriptions. Please verify it for this row."
+
 msgid "plugins.importexport.csv.noAuthorGroup"
 msgstr "There is no default author group in the journal {$journal}."
 

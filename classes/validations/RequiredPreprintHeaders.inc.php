@@ -39,6 +39,7 @@ class RequiredPreprintHeaders
         'galleyLabels',
         'suppFilenames',
         'suppLabels',
+		'suppDescriptions',
         'sectionTitle',
         'sectionAbbrev',
         'datePosted',

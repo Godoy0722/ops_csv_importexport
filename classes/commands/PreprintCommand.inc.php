@@ -216,6 +216,18 @@ class PreprintCommand
                     }
                 }
 
+				if ($data->suppFilenames && $data->suppLabels && !empty($data->suppDescriptions)) {
+                    $reason = InvalidRowValidations::validateSupplementaryDescriptions(
+                        $data->suppFilenames,
+                        $data->suppLabels,
+                        $data->suppDescriptions
+                    );
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->_expectedRowSize, $reason, $this->_failedRows);
+                        continue;
+                    }
+                }
+
 				if ($data->references) {
                     $reason = InvalidRowValidations::validateReferencesFile($data->references, $this->_sourceDir);
                     if (!is_null($reason)) {
@@ -406,11 +418,15 @@ class PreprintCommand
 					$genreDao = CachedDaos::getGenreDao();
 					$supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $journal->getId())->toArray();
 					$suppGenreId = !empty($supplementaryGenres) ? $supplementaryGenres[0]->getId() : $genreId;
+					$suppDescriptionsArray = !empty($data->suppDescriptions)
+                        ? array_map('trim', explode(';', $data->suppDescriptions))
+                        : [];
 
                     $suppLabelsArray = array_map('trim', explode(';', $data->suppLabels));
                     for($i = 0; $i < count($suppLabelsArray); $i++) {
                         $suppItem = $suppIds[$i];
                         $suppLabel = $suppLabelsArray[$i];
+						$suppDescription = $suppDescriptionsArray[$i] ?? null;
 
                         $this->_handleGalley(
                             $suppItem,
@@ -418,7 +434,8 @@ class PreprintCommand
                             $submission->getId(),
                             $suppGenreId,
                             $suppLabel,
-                            $publication->getId()
+                            $publication->getId(),
+							$suppDescription
                         );
                     }
                 }
@@ -537,10 +554,11 @@ class PreprintCommand
      * @param int $genreId
      * @param string $label
      * @param int $publicationId
+	 * @param ?string $description
 	 *
 	 * @return void
      */
-	private function _handleGalley($item, $data, $submissionId, $genreId, $label, $publicationId)
+	private function _handleGalley($item, $data, $submissionId, $genreId, $label, $publicationId, $description = null)
 	{
 		$galleyCompletePath = "{$this->_sourceDir}/{$item['file']}";
         $galleyExtension = $this->_fileManager->parseFileExtension($galleyCompletePath);
@@ -553,6 +571,7 @@ class PreprintCommand
             $galleyCompletePath,
             $genreId,
             $item['id'],
+			$description
         );
 
 		// Now that we have the submission file ID, it's time to process the galley itself.

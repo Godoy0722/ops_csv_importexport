@@ -141,3 +141,6 @@ msgstr "Invalid references file: \"{$filename}\". Please verify the file exists 
 
 msgid "plugins.importexport.csv.invalidReferencesFileExtension"
 msgstr "References file must have a .txt extension."
+
+msgid "plugins.importexport.csv.invalidNumberOfDescriptionsAndSupplementaryFiles"
+msgstr "Supplementary files don't have the same amount as the descriptions. Please verify it for this row."

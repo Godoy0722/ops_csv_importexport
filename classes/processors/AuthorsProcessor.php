@@ -32,23 +32,13 @@ class AuthorsProcessor
 		$authorsString = array_map('trim', explode(';', $data->authors));
 
         foreach ($authorsString as $index => $authorString) {
-            /**
-             * Examine the author string. The pattern is: "GivenName,FamilyName,email@email.com,affiliation".
-             *
-             * If the preprint has more than one author, it must separate the authors by a semicolon (;). Example:
-             * "<AUTHOR_1_INFORMATION>;<AUTHOR_2_INFORMATION>".
-             *
-             * Fields familyName, email, and affiliation are optional and can be left as empty fields. E.g.:
-             * "GivenName,,,".
-             *
-             * By default, if an author doesn't have an email, the primary contact email will be used in its place.
-             */
-			$givenName = $familyName = $emailAddress = $affiliation = null;
-			$authorParts = array_map('trim', explode(',', $authorString));
-			$givenName = $authorParts[0] ?? '';
-			$familyName = $authorParts[1] ?? '';
-			$emailAddress = $authorParts[2] ?? '';
-			$affiliation = $authorParts[3] ?? '';
+            $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
+            $authorParts = array_map('trim', explode(',', $authorString));
+            $givenName = $authorParts[0] ?? '';
+            $familyName = $authorParts[1] ?? '';
+            $emailAddress = $authorParts[2] ?? '';
+            $orcid = $authorParts[3] ?? '';
+            $affiliation = $authorParts[4] ?? '';
 
 			if (empty($emailAddress)) {
 				$emailAddress = $contactEmail;
@@ -62,6 +52,11 @@ class AuthorsProcessor
             $author->setFamilyName($familyName, $data->locale);
             $author->setEmail($emailAddress);
             $author->setData('publicationId', $publication->getId());
+
+            $normalizedOrcid = self::normalizeOrcid($orcid);
+            if (!empty($normalizedOrcid)) {
+                $author->setOrcid($normalizedOrcid);
+            }
 
             if ($affiliation) {
                 $affiliationEntity = Repo::affiliation()->newDataObject();
@@ -107,6 +102,28 @@ class AuthorsProcessor
         }
     }
 
+    private static function normalizeOrcid(?string $raw): ?string
+    {
+        if (empty($raw)) {
+            return null;
+        }
+
+        $value = trim($raw);
+        $id = $value;
+        if (preg_match('/^https?:\\/\\/orcid\\.org\\/(.+)$/i', $value, $m)) {
+            $id = $m[1];
+        }
+
+        $id = mb_strtoupper(str_replace([' ', '-'], '', $id));
+        if (!preg_match('/^\\d{15}[\\dX]$/', $id)) {
+            return null;
+        }
+
+        $parts = mb_str_split($id, 4);
+        $hyphenated = implode('-', $parts);
+        return 'https://orcid.org/' . $hyphenated;
+    }
+
     /**
      * Process authors for multi-locale import (adds locale data to existing authors)
      */
@@ -125,12 +142,13 @@ class AuthorsProcessor
         $existingAuthors = $publication->getData('authors');
 
         foreach ($authorsString as $index => $authorString) {
-            $givenName = $familyName = $emailAddress = $affiliation = null;
+            $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
             $authorParts = array_map('trim', explode(',', $authorString));
             $givenName = $authorParts[0] ?? '';
             $familyName = $authorParts[1] ?? '';
             $emailAddress = $authorParts[2] ?? '';
-            $affiliation = $authorParts[3] ?? '';
+            $orcid = $authorParts[3] ?? '';
+            $affiliation = $authorParts[4] ?? '';
 
             if (empty($emailAddress)) {
                 $emailAddress = $contactEmail;
@@ -149,6 +167,11 @@ class AuthorsProcessor
             if ($existingAuthor) {
                 $existingAuthor->setGivenName($givenName, $data->locale);
                 $existingAuthor->setFamilyName($familyName, $data->locale);
+
+                $normalizedOrcid = self::normalizeOrcid($orcid);
+                if (!empty($normalizedOrcid)) {
+                    $existingAuthor->setOrcid($normalizedOrcid);
+                }
 
                 if ($affiliation) {
                     $existingAffiliations = $existingAuthor->getAffiliations();
@@ -175,6 +198,11 @@ class AuthorsProcessor
                 $author->setFamilyName($familyName, $data->locale);
                 $author->setEmail($emailAddress);
                 $author->setData('publicationId', $publication->getId());
+
+                $normalizedOrcidNew = self::normalizeOrcid($orcid);
+                if (!empty($normalizedOrcidNew)) {
+                    $author->setOrcid($normalizedOrcidNew);
+                }
 
                 if ($affiliation) {
                     $affiliationEntity = Repo::affiliation()->newDataObject();

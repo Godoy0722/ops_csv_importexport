@@ -25,6 +25,7 @@ This plugin allows administrators to import users and preprints with their assoc
 	- [Multi-Locale Management Rules](#multi-locale-management-rules)
 	- [Multi-Locale Best Practices](#multi-locale-best-practices)
 	- [Important Notes](#important-multi-locale-notes)
+	- [ORCiD in Multi-Locale and Multi-Version](#orcid-in-multi-locale-and-multi-version)
 - [Troubleshooting](#troubleshooting)
 
 
@@ -146,24 +147,36 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 >  - **For version > 1: Only `versionIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
 
 > **Authors Format**
-> The `authors` field in the issues CSV must contain author information in the following format:
+> The `authors` field in the preprints CSV must contain author information in the following format:
 >
 > ```
-> GivenName,FamilyName,Email,Affiliation;GivenName2,FamilyName2,Email2,Affiliation2
+> GivenName,FamilyName,Email,ORCiD,Affiliation;GivenName2,FamilyName2,Email2,ORCiD2,Affiliation2
 > ```
 >
 >  - Fields are separated by commas within each author
 >  - Multiple authors are separated by semicolons
->  - All fields except GivenName are optional and can be left empty
->  - If email is empty, the primary contact email will be used
+>  - All fields except `GivenName` are optional and can be left empty
+>  - If `Email` is empty, the primary contact email of the server will be used
+>  - `ORCiD` must be the author identifier and is optional; see input options below
 >
 > Examples:
 >
 > ```
-> "John,Doe,john@example.com,University of Example; Jane,Smith,,Another University"
-> "Maria,Silva,maria@example.com,"
-> "Carlos,,carlos@example.com,Example Corp"
+> "John,Doe,john@example.com,0000-0002-1825-0097,University of Example; Jane,Smith,,https://orcid.org/0000-0002-1694-233X,Another University"
+> "Maria,Silva,maria@example.com,0000000218250097,"
+> "Carlos,,carlos@example.com,,Example Corp"
 > ```
+
+> **ORCiD Input Options**
+> You may provide the ORCiD in any of the following forms:
+>  - Full URL: `https://orcid.org/0000-0002-1825-0097`
+>  - Hyphenated ID: `0000-0002-1825-0097`
+>  - Digits only: `0000000218250097`
+>
+> Notes:
+>  - The system normalizes the value to the canonical URL form `https://orcid.org/0000-0000-0000-0000`
+>  - The last character may be `X` (checksum), e.g., `0000-0002-1694-233X`
+>  - Invalid formats are ignored without blocking the import
 
 > **Keywords, Subjects, and Categories**
 > These fields use a simple semicolon-separated format:
@@ -356,6 +369,11 @@ The system will:
 - Keywords and subjects are stored per locale
 - Non-localized fields (DOI, dates, etc.) remain the same across all locales
 - Files (galleys, supplementary) are shared across all locales
+
+### ORCiD in Multi-Locale and Multi-Version
+
+- Multi-Locale: ORCiD is non-localized. When importing another locale for the same version, if an ORCiD is provided in that row, it updates the existing author matched by email. If omitted, the existing value is preserved.
+- Multi-Version: If the `authors` field is empty for a new version, authors (including ORCiD) are cloned from the previous version. If authors are provided, the ORCiD is read per author (as above) and saved for that version.
 
 ## Troubleshooting
 

@@ -29,7 +29,7 @@ class CategoriesProcessor
             return;
         }
 
-        $categoriesArray = explode(';', $categories);
+        $categoriesArray = array_map('trim', explode(';', $categories));
 
         foreach ($categoriesArray as $categoryPath) {
             $categoryPath = trim($categoryPath);

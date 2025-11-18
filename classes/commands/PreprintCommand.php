@@ -205,6 +205,18 @@ class PreprintCommand
                     }
                 }
 
+                if ($data->suppFilenames && $data->suppLabels && !empty($data->suppDescriptions)) {
+                    $reason = InvalidRowValidations::validateSupplementaryDescriptions(
+                        $data->suppFilenames,
+                        $data->suppLabels,
+                        $data->suppDescriptions
+                    );
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        continue;
+                    }
+                }
+
                 if ($data->references) {
                     $reason = InvalidRowValidations::validateReferencesFile($data->references, $this->sourceDir);
                     if (!is_null($reason)) {
@@ -399,9 +411,14 @@ class PreprintCommand
                     }
 
                     $suppLabelsArray = array_map('trim', explode(';', $data->suppLabels));
+                    $suppDescriptionsArray = !empty($data->suppDescriptions)
+                        ? array_map('trim', explode(';', $data->suppDescriptions))
+                        : [];
+
                     for($i = 0; $i < count($suppLabelsArray); $i++) {
                         $suppItem = $suppIds[$i];
                         $suppLabel = $suppLabelsArray[$i];
+                        $suppDescription = $suppDescriptionsArray[$i] ?? null;
 
                         $this->handleGalley(
                             $suppItem,
@@ -409,7 +426,8 @@ class PreprintCommand
                             $submission->getId(),
                             $suppGenreId,
                             $suppLabel,
-                            $publication->getId()
+                            $publication->getId(),
+                            $suppDescription
                         );
                     }
                 }
@@ -513,7 +531,8 @@ class PreprintCommand
         int $submissionId,
         int $genreId,
         string $label,
-        int $publicationId
+        int $publicationId,
+        ?string $description = null
     ): void
     {
         $galleyCompletePath = "{$this->sourceDir}/{$item['file']}";
@@ -526,6 +545,7 @@ class PreprintCommand
             $galleyCompletePath,
             $genreId,
             $item['id'],
+            $description
         );
 
         // Now that we have the submission file ID, it's time to process the galley itself.
@@ -583,6 +603,7 @@ class PreprintCommand
                 }
 
                 $coverImagesByLocale = [];
+                /** @var \stdclass $setting */
                 foreach ($coverImageSettings as $setting) {
                     if (empty($setting->setting_value)) {
                         continue;

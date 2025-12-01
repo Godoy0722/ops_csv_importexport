@@ -25,7 +25,7 @@ class CachedEntities
     /** @var int[] */
     static array $userGroupIds = [];
 
-    /** @var \UserGroup[] */
+    /** @var array<int, \UserGroup[]> */
     static array $userGroups = [];
 
     /** @var int[] */
@@ -42,9 +42,6 @@ class CachedEntities
 
     /** @var \User[] */
     static array $users = [];
-
-    /** @var \SubscriptionType[] */
-    static array $subscriptionTypes = [];
 
     /**
      * Retrieves a cached Journal by its path. Returns null if an error occurs.
@@ -239,19 +236,4 @@ class CachedEntities
 
         return $section;
     }
-
-		/**
-		 * Retrieves a cached SubscriptionType by subscriptionType and journalId. Returns null if an error occurs.
-		 *
-		 * @param string $subscriptionType
-		 * @param int $journalId
-		 * @return \SubscriptionType|null
-		 */
-		static function getCachedSubscriptionType(string $subscriptionType, int $journalId)
-		{
-			$subscriptionTypeDao = CachedDaos::getSubscriptionTypeDao();
-			$subscriptionType = $subscriptionTypeDao->getById((int) $subscriptionType, $journalId);
-
-			return self::$subscriptionTypes[$subscriptionType] ?? self::$subscriptionTypes[$subscriptionType] = $subscriptionType;
-		}
 }

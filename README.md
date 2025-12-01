@@ -99,9 +99,6 @@ php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/folder
 | tempPassword | Yes | Temporary password | temppassword123 |
 | roles | No | Semicolon-separated list of roles | Reader;Author |
 | reviewInterests | No | Semicolon-separated interests | interest one;interest two |
-| subscriptionType | No | Subscription type ID | 1 |
-| start_date | If subscriptionType is set | Subscription start date (YYYY-MM-DD) | 2023-01-01 |
-| end_date | If subscriptionType is set | Subscription end date (YYYY-MM-DD) | 2023-12-31 |
 | orcid | No | User's ORCID identifier | 0000-0002-1825-0097 |
 
 > **User Interests:** User interests in the users CSV use a semicolon-separated format:

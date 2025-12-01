@@ -29,6 +29,7 @@ class RequiredUserHeaders
         'tempPassword',
         'roles',
         'reviewInterests',
+        'orcid',
     ];
 
     static $userRequiredHeaders = [

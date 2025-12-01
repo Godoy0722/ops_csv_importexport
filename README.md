@@ -4,38 +4,38 @@ This plugin allows administrators to import users and preprints with their assoc
 
 ## Table of Contents
 - [OPS CSV Import Plugin (CLI)](#ops-csv-import-plugin-cli)
-  - [Table of Contents](#table-of-contents)
-  - [CLI Usage](#cli-usage)
-    - [Importing Users](#importing-users)
-    - [Importing Preprints](#importing-preprints)
-  - [CSV General Rules](#csv-general-rules)
-    - [Users CSV Format](#users-csv-format)
-      - [Users CSV Example](#users-csv-example)
-    - [Preprints CSV Format](#preprints-csv-format)
-      - [Preprints CSV Example](#preprints-csv-example)
-      - [Import File Structure](#import-file-structure)
-  - [Preprint Versions](#preprint-versions)
-    - [How It Works](#how-it-works)
-    - [Version Management Rules](#version-management-rules)
-    - [Practical Examples](#practical-examples)
-      - [Example 1: Single Preprint Without Versions](#example-1-single-preprint-without-versions)
-      - [Example 2: Multi Version Preprints](#example-2-multi-version-preprints)
-      - [Example 3: Mixed Preprints](#example-3-mixed-preprints)
-    - [Important Notes](#important-notes)
-  - [Multi-Locale Support](#multi-locale-support)
-    - [How Multi-Locale Works](#how-multi-locale-works)
-    - [Multi-Locale Management Rules](#multi-locale-management-rules)
-    - [Multi-Locale Best Practices](#multi-locale-best-practices)
-    - [Important Multi-Locale Notes](#important-multi-locale-notes)
-    - [ORCiD in Multi-Locale and Multi-Version](#orcid-in-multi-locale-and-multi-version)
-  - [Troubleshooting](#troubleshooting)
-    - [Common Issues and Solutions](#common-issues-and-solutions)
-      - [File and Path Issues](#file-and-path-issues)
-      - [CSV Format Issues](#csv-format-issues)
-      - [User Import Issues](#user-import-issues)
-      - [Preprint Import Issues](#preprint-import-issues)
-      - [General Troubleshooting Tips](#general-troubleshooting-tips)
-      - [Supplementary Files Descriptions](#supplementary-files-descriptions)
+	- [Table of Contents](#table-of-contents)
+	- [CLI Usage](#cli-usage)
+		- [Importing Users](#importing-users)
+		- [Importing Preprints](#importing-preprints)
+	- [CSV General Rules](#csv-general-rules)
+		- [Users CSV Format](#users-csv-format)
+			- [Users CSV Example](#users-csv-example)
+		- [Preprints CSV Format](#preprints-csv-format)
+			- [Preprints CSV Example](#preprints-csv-example)
+			- [Import File Structure](#import-file-structure)
+	- [Preprint Versions](#preprint-versions)
+		- [How It Works](#how-it-works)
+		- [Version Management Rules](#version-management-rules)
+		- [Practical Examples](#practical-examples)
+			- [Example 1: Single Preprint Without Versions](#example-1-single-preprint-without-versions)
+			- [Example 2: Multi Version Preprints](#example-2-multi-version-preprints)
+			- [Example 3: Mixed Preprints](#example-3-mixed-preprints)
+		- [Important Notes](#important-notes)
+	- [Multi-Locale Support](#multi-locale-support)
+		- [How Multi-Locale Works](#how-multi-locale-works)
+		- [Multi-Locale Management Rules](#multi-locale-management-rules)
+		- [Multi-Locale Best Practices](#multi-locale-best-practices)
+		- [Important Multi-Locale Notes](#important-multi-locale-notes)
+		- [ORCiD in Multi-Locale and Multi-Version](#orcid-in-multi-locale-and-multi-version)
+	- [Supplementary Files Descriptions](#supplementary-files-descriptions)
+	- [Troubleshooting](#troubleshooting)
+		- [Common Issues and Solutions](#common-issues-and-solutions)
+			- [File and Path Issues](#file-and-path-issues)
+			- [CSV Format Issues](#csv-format-issues)
+			- [User Import Issues](#user-import-issues)
+			- [Preprint Import Issues](#preprint-import-issues)
+			- [General Troubleshooting Tips](#general-troubleshooting-tips)
 
 
 ## CLI Usage
@@ -99,9 +99,7 @@ php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/folder
 | tempPassword | Yes | Temporary password | temppassword123 |
 | roles | No | Semicolon-separated list of roles | Reader;Author |
 | reviewInterests | No | Semicolon-separated interests | interest one;interest two |
-| subscriptionType | No | Subscription type ID | 1 |
-| start_date | If subscriptionType is set | Subscription start date (YYYY-MM-DD) | 2023-01-01 |
-| end_date | If subscriptionType is set | Subscription end date (YYYY-MM-DD) | 2023-12-31 |
+| orcid | No | User's ORCID identifier | 0000-0002-1825-0097 |
 
 > **User Interests:** User interests in the users CSV use a semicolon-separated format:
 >
@@ -113,6 +111,27 @@ php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/folder
 >  - Empty values are ignored
 >  - Each interest will be associated with the created user's profile
 >
+
+> **ORCID:** The ORCID field accepts multiple formats and will be automatically normalized to the standard URL format:
+>
+> Accepted formats:
+>  - **Full URL**: `https://orcid.org/0000-0002-1825-0097` or `https://sandbox.orcid.org/0000-0002-1825-0097`
+>  - **Dashed format**: `0000-0002-1825-0097`
+>  - **Numeric format**: `0000000218250097`
+>
+> Notes:
+>  - The last character can be a digit (0-9) or the letter X (checksum character)
+>  - The ORCID checksum is validated during import
+>  - Invalid ORCIDs will cause the row to be rejected
+>  - Leave empty if the user doesn't have an ORCID
+>
+> Examples:
+>
+> ```
+> https://orcid.org/0000-0002-1825-0097
+> 0000-0001-5109-3700
+> 0000000256781235
+> ```
 
 #### Users CSV Example
 
@@ -385,6 +404,23 @@ The system will:
 - Multi-Locale: ORCiD is non-localized. When importing another locale for the same version, if an ORCiD is provided in that row, it updates the existing author matched by email. If omitted, the existing value is preserved.
 - Multi-Version: If the `authors` field is empty for a new version, authors (including ORCiD) are cloned from the previous version. If authors are provided, the ORCiD is read per author (as above) and saved for that version.
 
+## Supplementary Files Descriptions
+
+You may optionally include a `suppDescriptions` column to provide a short description for each supplementary file. Use a semicolon-separated list matching the order of `suppFilenames` and `suppLabels`.
+
+Example:
+
+```
+suppFilenames:      supplement_v2.pdf;data_v2.csv
+suppLabels:         Supplementary Analysis;Dataset
+suppDescriptions:   Extended methods;Raw experimental results (CSV)
+```
+
+Rules:
+- The number of descriptions must match both `suppFilenames` and `suppLabels` when provided.
+- Descriptions are stored per locale and can be provided again in multi-locale rows to set localized text.
+
+
 ## Troubleshooting
 
 ### Common Issues and Solutions
@@ -437,15 +473,28 @@ The system will:
      - Check that subscription type IDs exist in the database
      - Ensure required subscription fields (start_date, end_date) are provided
 
+7. **ORCID Issues**
+   - Error: `Invalid ORCID format: [orcid]`
+   - Solution:
+     - Ensure the ORCID uses one of the accepted formats: full URL, dashed, or numeric
+     - Check that the ORCID has exactly 16 digits (plus dashes or URL prefix)
+     - Verify there are no extra spaces or characters
+
+   - Error: `Invalid ORCID checksum for: [orcid]`
+   - Solution:
+     - The ORCID checksum validation failed, meaning the ORCID is malformed
+     - Double-check the ORCID against the official ORCID record
+     - Ensure you copied the complete ORCID without typos
+
 #### Preprint Import Issues
-7. **Server or Locale Issues**
+8. **Server or Locale Issues**
    - Error: `Unknown server with path [path]` or `Unknown locale [locale]`
    - Solution:
      - Verify the server path in the CSV matches exactly
      - Check that the specified locale is enabled in the server
      - Ensure the server exists and is accessible to the importing user
 
-8. **File Validation Errors**
+9. **File Validation Errors**
    - Error: `Invalid [preprint/cover/galley] file for this submission`
    - Solution:
      - Verify all referenced files exist in the specified location
@@ -453,14 +502,14 @@ The system will:
      - Ensure cover images are in a supported format (JPG, PNG, GIF, WEBP)
      - Verify galley files match the specified labels
 
-9. **Author and Metadata Issues**
+10. **Author and Metadata Issues**
    - Error: `There is no default author group in the server`
    - Solution:
      - Ensure the server has at least one author group configured
      - Verify author information follows the required format
      - Check that required author fields (given name) are provided
 
-10. **Multi-Version Import Issues**
+11. **Multi-Version Import Issues**
     - Error: `Version is required when versionIdentifier is provided`
     - Solution:
       - Ensure both `versionIdentifier` and `version` are filled when using versioning
@@ -477,7 +526,7 @@ The system will:
       - For version 2+, you can leave most fields empty to clone from previous version
       - Only fill in the fields you want to update in newer versions
 
-11. **Multi-Locale Import Issues**
+12. **Multi-Locale Import Issues**
     - Error: `Unknown locale or locale not supported by this server: [locale]`
     - Solution:
       - Verify the locale is enabled in your server settings
@@ -498,7 +547,7 @@ The system will:
       - Remember that files (galleys) are shared across all locales
       - Test with a simple two-locale example before large imports
 
-12. **References File Issues**
+13. **References File Issues**
    - Error: `Invalid references file: [filename]`
    - Solution:
      - Verify the references file exists in the same directory as the CSV file
@@ -519,19 +568,3 @@ The system will:
 - For large imports, monitor server resources as the process may be memory-intensive
 - When importing multi-version preprints, start with a simple 2-version example to verify the workflow
 - Check the `invalid_[filename].csv` file generated after import for any failed rows
-
-#### Supplementary Files Descriptions
-
-You may optionally include a `suppDescriptions` column to provide a short description for each supplementary file. Use a semicolon-separated list matching the order of `suppFilenames` and `suppLabels`.
-
-Example:
-
-```
-suppFilenames:      supplement_v2.pdf;data_v2.csv
-suppLabels:         Supplementary Analysis;Dataset
-suppDescriptions:   Extended methods;Raw experimental results (CSV)
-```
-
-Rules:
-- The number of descriptions must match both `suppFilenames` and `suppLabels` when provided.
-- Descriptions are stored per locale and can be provided again in multi-locale rows to set localized text.

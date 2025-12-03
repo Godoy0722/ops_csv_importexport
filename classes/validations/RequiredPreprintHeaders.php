@@ -22,7 +22,7 @@ class RequiredPreprintHeaders
         'serverPath',
         'locale',
         'versionIdentifier',
-		'version',
+        'version',
         'preprintPrefix',
         'preprintTitle',
         'preprintSubtitle',
@@ -45,9 +45,12 @@ class RequiredPreprintHeaders
         'datePosted',
         'dateSubmitted',
         'copyrightYear',
-		'copyrightHolder',
-		'licenseUrl',
+        'copyrightHolder',
+        'licenseUrl',
         'references',
+        'vorDoi',
+        'supportingAgencies',
+        'username',
     ];
 
     static $preprintRequiredHeaders = [

@@ -170,6 +170,9 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 | copyrightHolder | No | Copyright holder | Public Knowledge Project | Defaults to system setting if not provided |
 | licenseUrl | No | License URL | https://creativecommons.org/licenses/by/4.0 | Defaults to system setting if not provided |
 | references | No | Path to references file (.txt) | references.txt | Optional file containing article references |
+| vorDoi | No | Version of Record DOI URL | https://doi.org/10.1234/vor-abc123 | See [Version of Record](#version-of-record-vor) |
+| supportingAgencies | No | Semicolon-separated funding sources | NIH;NSF;Wellcome Trust | See [Supporting Agencies](#supporting-agencies) |
+| username | No | Username of associated user | jsmith | See [Associated User](#associated-user) |
 
 > **Notes:**
 >  - *Required for first version or single-version preprints
@@ -233,6 +236,57 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 >
 > Brown, A. et al. (2021). "Open Access and the Future of Research Dissemination", International Journal of Scholarly Research, 12(4), 567-589.
 > ```
+
+> **Version of Record (VOR)**
+> The `vorDoi` field allows you to specify the DOI of the published Version of Record for a preprint:
+>  - When provided, automatically sets the preprint's relation status to "Published"
+>  - This indicates that the preprint has been formally published in a peer-reviewed venue
+>  - Leave empty if the preprint has not been published elsewhere
+>
+> Accepted formats:
+>  - **Full URL**: `https://doi.org/10.1234/example` or `http://dx.doi.org/10.1234/example`
+>  - **DOI identifier**: `10.1234/example`
+>  - **With doi: prefix**: `doi:10.1234/example`
+>
+> Notes:
+>  - All formats are automatically normalized to `https://doi.org/...` before storing
+>  - The DOI must start with `10.` followed by a registrant code (4+ digits)
+>
+> Examples:
+> ```
+> https://doi.org/10.1016/j.example.2024.123456
+> 10.1038/s41586-024-07890-x
+> doi:10.1126/science.abc1234
+> ```
+
+> **Supporting Agencies**
+> The `supportingAgencies` field allows you to specify funding sources or institutional support for the research:
+>  - Use semicolon-separated values for multiple agencies
+>  - Leading/trailing spaces are automatically trimmed
+>  - This field is multilingual - provide translations in multi-locale imports
+>
+> Examples:
+> ```
+> National Institutes of Health;National Science Foundation
+> Wellcome Trust
+> FAPESP;CNPq;CAPES
+> ```
+
+> **Associated User**
+> The `username` field allows you to associate a preprint with a specific existing user in the system:
+>  - Provide the username of an existing user in OPS
+>  - This user will be recorded as the uploader of the submission files
+>  - If the username is not found, the system will use the default CLI user (the one specified in the command) and print a notice
+>  - Leave empty to use the default CLI user
+>
+> Behavior when username is not found:
+> ```
+> Notice: Username "unknownuser" not found. Submission ID 123 was added using default user "admin".
+> ```
+>
+> Notes:
+>  - The user lookup is case-insensitive
+>  - Disabled users are also matched
 
 #### Preprints CSV Example
 
@@ -558,6 +612,24 @@ Rules:
    - Solution:
      - Ensure the references file has a .txt extension
      - References files must be in plain text format
+
+14. **VOR DOI Issues**
+    - Error: `Invalid VOR DOI format: [vorDoi]`
+    - Solution:
+      - Ensure the VOR DOI uses one of the accepted formats:
+        - Full URL: `https://doi.org/10.1234/example`
+        - DOI identifier: `10.1234/example`
+        - With prefix: `doi:10.1234/example`
+      - The DOI must start with `10.` followed by a registrant code (4+ digits)
+      - Check for extra spaces or invalid characters
+
+15. **Associated User Issues**
+    - Notice: `Username "[username]" not found. Submission ID [id] was added using default user "[defaultUsername]".`
+    - This is a notice, not an error - the import will continue
+    - Solution if you want to use the specific user:
+      - Verify the username exists in OPS
+      - Check for typos in the username
+      - Ensure the user account is not deleted (disabled users are still matched)
 
 #### General Troubleshooting Tips
 - Always back up your database before running imports

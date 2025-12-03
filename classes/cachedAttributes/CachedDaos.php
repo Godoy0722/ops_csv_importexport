@@ -22,6 +22,7 @@ use PKP\category\DAO as CategoryDAO;
 use PKP\db\DAO;
 use PKP\db\DAORegistry;
 use PKP\submission\GenreDAO;
+use PKP\submission\SubmissionAgencyDAO;
 use PKP\submission\SubmissionKeywordDAO;
 use PKP\submission\SubmissionSubjectDAO;
 use PKP\user\InterestDAO;
@@ -67,5 +68,11 @@ class CachedDaos
     public static function getCategoryDao(): CategoryDAO
 	{
 		return self::$cachedDaos['CategoryDAO'] ??= Repo::category()->dao;
+	}
+
+    /** Retrieves the cached CategoryDAO instance. */
+    public static function getSubmissionAgencyDao(): SubmissionAgencyDAO
+	{
+        return self::$cachedDaos['SubmissionAgencyDAO'] ??= DAORegistry::getDAO('SubmissionAgencyDAO');
 	}
 }

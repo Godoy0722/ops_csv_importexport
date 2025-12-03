@@ -18,6 +18,7 @@ namespace APP\plugins\importexport\csv\classes\processors;
 
 use APP\facades\Repo;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
+use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\publication\Publication;
 use APP\server\Server;
 use APP\submission\Submission;
@@ -282,5 +283,69 @@ class PublicationProcessor
         }
 
         return $publication;
+    }
+
+    /**
+     * Update the VOR DOI for a publication.
+     * When a VOR DOI is provided, it automatically sets the relationStatus to PUBLISHED (3).
+     * The DOI is normalized to URL format (https://doi.org/...) before storing.
+     */
+    public static function updateVorDoi(Publication $publication, ?string $vorDoi): void
+    {
+        $normalizedDoi = InvalidRowValidations::normalizeVorDoi($vorDoi);
+
+        self::updatePublicationAttribute($publication, 'vorDoi', $normalizedDoi);
+        self::updatePublicationAttribute($publication, 'relationStatus', Publication::PUBLICATION_RELATION_PUBLISHED);
+    }
+
+    /**
+     * Process supporting agencies for a new publication or new version
+     */
+    public static function processSupportingAgencies(object $data, int $publicationId, ?Publication $basePublication = null): void
+    {
+        $submissionAgencyDao = CachedDaos::getSubmissionAgencyDao();
+
+        if (empty($data->supportingAgencies) && !is_null($basePublication)) {
+            $baseSupportingAgencies = $basePublication->getData('supportingAgencies');
+
+            if (empty($baseSupportingAgencies)) {
+                return;
+            }
+
+            if (Repo::publication()->get($publicationId)) {
+                $submissionAgencyDao->insertAgencies($baseSupportingAgencies, $publicationId);
+            }
+
+            return;
+        }
+
+        if (empty($data->supportingAgencies)) {
+            return;
+        }
+
+        $agenciesList = [$data->locale => array_map('trim', explode(';', $data->supportingAgencies))];
+
+        if (!empty($agenciesList[$data->locale])) {
+            $submissionAgencyDao->insertAgencies($agenciesList, $publicationId, false);
+        }
+    }
+
+    /**
+     * Process supporting agencies for multi-locale import (adds agencies in new locale)
+     */
+    public static function processSupportingAgenciesMultiLocale(object $data, int $publicationId): void
+    {
+        if (empty($data->supportingAgencies)) {
+            return;
+        }
+
+        if (!Repo::publication()->get($publicationId)) {
+            return;
+        }
+
+        $newAgencies = [$data->locale => array_map('trim', explode(';', $data->supportingAgencies))];
+
+        $submissionAgencyDao = CachedDaos::getSubmissionAgencyDao();
+        $submissionAgencyDao->insertAgencies($newAgencies, $publicationId, false);
     }
 }

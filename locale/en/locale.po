@@ -153,3 +153,9 @@ msgstr "Invalid ORCID format: \"{$orcid}\". Accepted formats: URL (https://orcid
 
 msgid "plugins.importexport.csv.invalidOrcidChecksum"
 msgstr "Invalid ORCID checksum for: \"{$orcid}\". Please verify the ORCID is correct."
+
+msgid "plugins.importexport.csv.invalidVorDoiFormat"
+msgstr "Invalid VOR DOI format: \"{$vorDoi}\". Accepted formats: DOI URL (https://doi.org/10.1234/example), DOI identifier (10.1234/example), or with prefix (doi:10.1234/example)."
+
+msgid "plugins.importexport.csv.usernameNotFoundUsingDefault"
+msgstr "Notice: Username \"{$username}\" not found. Submission ID {$submissionId} was added using default user \"{$defaultUsername}\"."

@@ -225,6 +225,22 @@ class PreprintCommand
                     }
                 }
 
+                if ($data->vorDoi) {
+                    $reason = InvalidRowValidations::validateVorDoi($data->vorDoi);
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        continue;
+                    }
+                }
+
+                $fileUploadUser = $this->user;
+                $usedDefaultUser = false;
+                if (!empty($data->username)) {
+                    $csvUser = Repo::user()->getByUsername($data->username, true);
+
+                    $csvUser ? $fileUploadUser = $csvUser : $usedDefaultUser = true;
+                }
+
                 $server = CachedEntities::getCachedServer($data->serverPath);
 
                 $reason = InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
@@ -372,7 +388,8 @@ class PreprintCommand
                             $submission->getId(),
                             $genreId,
                             $galleyLabel,
-                            $publication->getId()
+                            $publication->getId(),
+                            $fileUploadUser
                         );
                     }
                 }
@@ -427,6 +444,7 @@ class PreprintCommand
                             $suppGenreId,
                             $suppLabel,
                             $publication->getId(),
+                            $fileUploadUser,
                             $suppDescription
                         );
                     }
@@ -437,11 +455,17 @@ class PreprintCommand
                     AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
                     KeywordsProcessor::processMultiLocale($data, $publication->getId());
                     SubjectsProcessor::processMultiLocale($data, $publication->getId());
+                    PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication->getId());
                 } else {
                     // For new submissions or versions, use the regular process
                     AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
                     KeywordsProcessor::process($data, $publication->getId(), $basePublication);
                     SubjectsProcessor::process($data, $publication->getId(), $basePublication);
+                    PublicationProcessor::processSupportingAgencies($data, $publication->getId(), $basePublication);
+                }
+
+                if (!empty($data->vorDoi)) {
+                    PublicationProcessor::updateVorDoi($publication, $data->vorDoi);
                 }
 
                 if (
@@ -468,6 +492,14 @@ class PreprintCommand
 
                 if (!empty($data->versionIdentifier)) {
                     $this->trackProcessedPreprint($data, $submission, $publication);
+                }
+
+                if ($usedDefaultUser) {
+                    echo __('plugins.importexport.csv.usernameNotFoundUsingDefault', [
+                        'username' => $data->username,
+                        'submissionId' => $submission->getId(),
+                        'defaultUsername' => $this->user->getUsername()
+                    ]) . "\n";
                 }
             }
 
@@ -532,6 +564,7 @@ class PreprintCommand
         int $genreId,
         string $label,
         int $publicationId,
+        User $fileUploadUser,
         ?string $description = null
     ): void
     {
@@ -540,7 +573,7 @@ class PreprintCommand
 
         $submissionFile = SubmissionFileProcessor::process(
             $data->locale,
-            $this->user->getId(),
+            $fileUploadUser->getId(),
             $submissionId,
             $galleyCompletePath,
             $genreId,

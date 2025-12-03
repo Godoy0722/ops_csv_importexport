@@ -486,4 +486,66 @@ class InvalidRowValidations
 
         return $digits[15] === $expectedCheckDigit;
     }
+
+	/**
+     * Validates the VOR DOI field. Returns the reason if an error occurred,
+     * or null if everything is correct.
+     *
+     * Accepted formats:
+     * - Full URL: https://doi.org/10.1234/example
+     * - DOI identifier: 10.1234/example
+     * - With doi: prefix: doi:10.1234/example
+	 *
+	 * @param string|null $vorDoi
+	 *
+	 * @return string|null
+     */
+    public static function validateVorDoi($vorDoi)
+    {
+        if (empty($vorDoi)) {
+            return null;
+        }
+
+        $normalizedDoi = self::normalizeVorDoi($vorDoi);
+
+        if ($normalizedDoi === null) {
+            return __('plugins.importexport.csv.invalidVorDoiFormat', ['vorDoi' => $vorDoi]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalizes a VOR DOI value to the full URL format.
+	 *
+	 * @param string|null $vorDoi
+	 *
+	 * @return string|null
+     */
+    public static function normalizeVorDoi($vorDoi)
+    {
+        if (empty($vorDoi)) {
+            return null;
+        }
+
+        $vorDoi = trim($vorDoi);
+
+        // Already a valid DOI URL (https://doi.org/... or http://doi.org/... or https://dx.doi.org/...)
+        if (preg_match('/^https?:\/\/(dx\.)?doi\.org\/10\.\d{4,}(\.\d+)*\/\S+$/i', $vorDoi)) {
+            // Normalize to https://doi.org format
+            return preg_replace('/^https?:\/\/(dx\.)?doi\.org\//i', 'https://doi.org/', $vorDoi);
+        }
+
+        // DOI with doi: prefix (doi:10.1234/example)
+        if (preg_match('/^doi:(10\.\d{4,}(\.\d+)*\/\S+)$/i', $vorDoi, $matches)) {
+            return 'https://doi.org/' . $matches[1];
+        }
+
+        // Just the DOI identifier (10.1234/example)
+        if (preg_match('/^10\.\d{4,}(\.\d+)*\/\S+$/', $vorDoi)) {
+            return 'https://doi.org/' . $vorDoi;
+        }
+
+        return null;
+    }
 }

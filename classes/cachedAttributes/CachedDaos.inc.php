@@ -192,4 +192,14 @@ class CachedDaos
 	{
 		return self::_getDao('CitationDAO');
 	}
+
+	/**
+	 * Retrieves the cached SubscriptionTypeDAO instance.
+	 *
+	 * @return \SubmissionAgencyDAO
+	 */
+	public static function getSubmissionAgencyDAO()
+	{
+		return self::_getDao('SubmissionAgencyDAO');
+	}
 }

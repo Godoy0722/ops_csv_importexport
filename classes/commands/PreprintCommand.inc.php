@@ -236,6 +236,22 @@ class PreprintCommand
                     }
                 }
 
+				if ($data->vorDoi) {
+                    $reason = InvalidRowValidations::validateVorDoi($data->vorDoi);
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->_expectedRowSize, $reason, $this->_failedRows);
+                        continue;
+                    }
+                }
+
+                $fileUploadUser = $this->_user;
+                $usedDefaultUser = false;
+                if (!empty($data->username)) {
+                    $csvUser = CachedDaos::getUserDao()->getByUsername($data->username, true);
+
+                    $csvUser ? $fileUploadUser = $csvUser : $usedDefaultUser = true;
+                }
+
                 $journal = CachedEntities::getCachedJournal($data->serverPath);
 
                 $reason = InvalidRowValidations::validateJournalIsValid($journal, $data->serverPath);
@@ -380,7 +396,8 @@ class PreprintCommand
                             $submission->getId(),
                             $genreId,
                             $galleyLabel,
-                            $publication->getId()
+                            $publication->getId(),
+							$fileUploadUser
                         );
                     }
                 }
@@ -435,6 +452,7 @@ class PreprintCommand
                             $suppGenreId,
                             $suppLabel,
                             $publication->getId(),
+							$fileUploadUser,
 							$suppDescription
                         );
                     }
@@ -448,11 +466,17 @@ class PreprintCommand
                     AuthorsProcessor::processMultiLocale($data, $journal->getContactEmail(), $submission->getId(), $publication, $userGroupId);
                     KeywordsProcessor::processMultiLocale($data, $publication->getId());
                     SubjectsProcessor::processMultiLocale($data, $publication->getId());
+					PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication->getId());
                 } else {
                     // For new submissions or versions, use the regular process
                     AuthorsProcessor::process($data, $journal->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
                     KeywordsProcessor::process($data, $publication->getId(), $basePublication);
                     SubjectsProcessor::process($data, $publication->getId(), $basePublication);
+					PublicationProcessor::processSupportingAgencies($data, $publication->getId(), $basePublication);
+                }
+
+				if (!empty($data->vorDoi)) {
+                    PublicationProcessor::updateVorDoi($publication, $data->vorDoi);
                 }
 
 				if ($data->coverage || ($basePublication && !$data->coverage)) {
@@ -485,6 +509,14 @@ class PreprintCommand
 
 				if (!empty($data->versionIdentifier)) {
                     $this->_trackProcessedPreprint($data, $submission, $publication);
+                }
+
+				if ($usedDefaultUser) {
+                    echo __('plugins.importexport.csv.usernameNotFoundUsingDefault', [
+                        'username' => $data->username,
+                        'submissionId' => $submission->getId(),
+                        'defaultUsername' => $this->_user->getUsername()
+                    ]) . "\n";
                 }
             }
 
@@ -554,11 +586,12 @@ class PreprintCommand
      * @param int $genreId
      * @param string $label
      * @param int $publicationId
+	 * @param \User $fileUploadUser
 	 * @param ?string $description
 	 *
 	 * @return void
      */
-	private function _handleGalley($item, $data, $submissionId, $genreId, $label, $publicationId, $description = null)
+	private function _handleGalley($item, $data, $submissionId, $genreId, $label, $publicationId, $fileUploadUser, $description = null)
 	{
 		$galleyCompletePath = "{$this->_sourceDir}/{$item['file']}";
         $galleyExtension = $this->_fileManager->parseFileExtension($galleyCompletePath);
@@ -566,7 +599,7 @@ class PreprintCommand
 		import('plugins.importexport.csv.classes.processors.SubmissionFileProcessor');
         $file = SubmissionFileProcessor::process(
             $data->locale,
-            $this->_user->getId(),
+            $fileUploadUser->getId(),
             $submissionId,
             $galleyCompletePath,
             $genreId,

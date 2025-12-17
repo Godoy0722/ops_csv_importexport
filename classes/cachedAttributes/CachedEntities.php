@@ -89,9 +89,9 @@ class CachedEntities
     }
 
 	/** Retrieves a cached User by username. Returns null if an error occurs. */
-    static function getCachedUserByUsername(string $username): ?User
+    static function getCachedUserByUsername(string $username, bool $allowDisabled = false): ?User
     {
-		return self::$users[$username] ??= Repo::user()->getByUsername($username);
+		return self::$users[$username] ??= Repo::user()->getByUsername($username, $allowDisabled);
     }
 
 	/**

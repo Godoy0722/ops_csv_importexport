@@ -239,8 +239,7 @@ class PreprintCommand
                 $fileUploadUser = $this->user;
                 $usedDefaultUser = false;
                 if (!empty($data->username)) {
-                    $csvUser = Repo::user()->getByUsername($data->username, true);
-
+                    $csvUser = CachedEntities::getCachedUserByUsername($data->username, true);
                     $csvUser ? $fileUploadUser = $csvUser : $usedDefaultUser = true;
                 }
 

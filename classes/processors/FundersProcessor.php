@@ -21,7 +21,6 @@ use APP\plugins\generic\funding\classes\FunderAward;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
 use APP\publication\Publication;
 use APP\submission\Submission;
-use PKP\db\DAORegistry;
 use PKP\db\DAOResultFactory;
 use PKP\plugins\PluginRegistry;
 
@@ -48,7 +47,6 @@ class FundersProcessor
 
     /**
      * Check if Crossref registry validation is enabled in the Funding plugin settings.
-     * This corresponds to the 'enableGrantIdValidation' setting.
      */
     public static function isCrossrefValidationEnabled(int $contextId): bool
     {
@@ -179,7 +177,6 @@ class FundersProcessor
 
             $funderId = $funderDao->insertObject($funder);
 
-            // Create awards if provided
             if (!empty($awardsString) && $funderId) {
                 $awardsArray = array_map('trim', explode('|', $awardsString));
 
@@ -210,7 +207,6 @@ class FundersProcessor
 
         /** @var Funder|null $baseFunder */
         while ($baseFunder = $baseFunders->next()) {
-            // Create new funder
             $newFunder = $funderDao->newDataObject();
             $newFunder->setContextId($contextId);
             $newFunder->setSubmissionId($newSubmissionId);
@@ -234,8 +230,7 @@ class FundersProcessor
     }
 
     /**
-     * Validate funders string format.
-     * Returns null if valid, error message if invalid.
+     * Validate funders string format. Returns null if valid, error message if invalid.
      */
     public static function validateFundersFormat(?string $fundersString): ?string
     {

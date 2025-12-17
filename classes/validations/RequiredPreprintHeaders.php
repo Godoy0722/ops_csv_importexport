@@ -49,6 +49,7 @@ class RequiredPreprintHeaders
         'licenseUrl',
         'references',
         'vorDoi',
+        'supportingAgencies',
         'username',
         'funders',
     ];

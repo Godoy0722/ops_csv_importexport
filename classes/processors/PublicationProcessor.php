@@ -304,4 +304,65 @@ class PublicationProcessor
         self::updatePublicationAttribute($publication, 'vorDoi', $normalizedDoi);
         self::updatePublicationAttribute($publication, 'relationStatus', Publication::PUBLICATION_RELATION_PUBLISHED);
     }
+
+    /**
+     * Process supporting agencies for a new publication or new version
+     */
+    public static function processSupportingAgencies(object $data, int $publicationId, ?Publication $basePublication = null): void
+    {
+        if (empty($data->supportingAgencies) && !is_null($basePublication)) {
+            $baseSupportingAgencies = $basePublication->getData('supportingAgencies');
+
+            if (empty($baseSupportingAgencies)) {
+                return;
+            }
+
+            $publication = Repo::publication()->get($publicationId);
+            if ($publication) {
+                Repo::publication()->edit($publication, ['supportingAgencies' => $baseSupportingAgencies]);
+            }
+
+            return;
+        }
+
+        if (empty($data->supportingAgencies)) {
+            return;
+        }
+
+        $agenciesList = [$data->locale => array_map('trim', explode(';', $data->supportingAgencies))];
+
+        if (empty($agenciesList[$data->locale])) {
+            return;
+        }
+
+        $publication = Repo::publication()->get($publicationId);
+
+        if (!$publication) {
+            return;
+        }
+
+        Repo::publication()->edit($publication, ['supportingAgencies' => $agenciesList]);
+    }
+
+    /**
+     * Process supporting agencies for multi-locale import (adds agencies in new locale)
+     */
+    public static function processSupportingAgenciesMultiLocale(object $data, int $publicationId): void
+    {
+        if (empty($data->supportingAgencies)) {
+            return;
+        }
+
+        $publication = Repo::publication()->get($publicationId);
+        if (!$publication) {
+            return;
+        }
+
+        $existingAgencies = $publication->getData('supportingAgencies') ?? [];
+
+        $newAgencies = array_map('trim', explode(';', $data->supportingAgencies));
+        $existingAgencies[$data->locale] = $newAgencies;
+
+        Repo::publication()->edit($publication, ['supportingAgencies' => $existingAgencies]);
+    }
 }

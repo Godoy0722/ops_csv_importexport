@@ -28,6 +28,12 @@ This plugin allows administrators to import users and preprints with their assoc
 		- [Multi-Locale Best Practices](#multi-locale-best-practices)
 		- [Important Multi-Locale Notes](#important-multi-locale-notes)
 		- [ORCiD in Multi-Locale and Multi-Version](#orcid-in-multi-locale-and-multi-version)
+	- [Funders Support](#funders-support)
+		- [Prerequisites](#prerequisites)
+		- [Funders Data Structure](#funders-data-structure)
+		- [Funders Examples](#funders-examples)
+		- [Crossref Registry Validation](#crossref-registry-validation)
+		- [Important Funders Notes](#important-funders-notes)
 	- [Supplementary Files Descriptions](#supplementary-files-descriptions)
 	- [Troubleshooting](#troubleshooting)
 		- [Common Issues and Solutions](#common-issues-and-solutions)
@@ -173,6 +179,7 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 | vorDoi | No | Version of Record DOI URL | https://doi.org/10.1234/vor-abc123 | See [Version of Record](#version-of-record-vor) |
 | supportingAgencies | No | Semicolon-separated funding sources | NIH;NSF;Wellcome Trust | See [Supporting Agencies](#supporting-agencies) |
 | username | No | Username of associated user | jsmith | See [Associated User](#associated-user) |
+| funders | No | Structured funder information | See [Funders Support](#funders-support) | Requires Funding plugin |
 
 > **Notes:**
 >  - *Required for first version or single-version preprints
@@ -458,6 +465,105 @@ The system will:
 - Multi-Locale: ORCiD is non-localized. When importing another locale for the same version, if an ORCiD is provided in that row, it updates the existing author matched by email. If omitted, the existing value is preserved.
 - Multi-Version: If the `authors` field is empty for a new version, authors (including ORCiD) are cloned from the previous version. If authors are provided, the ORCiD is read per author (as above) and saved for that version.
 
+## Funders Support
+
+The CSV import plugin supports importing structured funder information for preprints using the `funders` column. This feature integrates with the **Funding plugin** to provide rich funding metadata that can be exported to Crossref, DataCite, and OpenAIRE.
+
+### Prerequisites
+
+Before using the `funders` column, you must install and enable the **Funding plugin** for your server:
+
+1. **Install the Funding Plugin**: Download and install the Funding plugin from the official repository:
+   - GitHub: [https://github.com/ajnyga/funding](https://github.com/ajnyga/funding)
+   - Follow the installation instructions in the plugin's README
+
+2. **Enable the Plugin**: Go to **Settings → Website → Plugins** and enable the "Funding Plugin" for your server.
+
+> **Important**: If you include funders data in your CSV but the Funding plugin is not installed or not enabled for the target server, the row will be rejected and added to the invalid CSV file with an error message.
+
+### Funders Data Structure
+
+The `funders` column uses a structured format with multiple separators to represent complex funding information:
+
+```
+FunderName,FunderIdentification,Award1|Award2;FunderName2,FunderIdentification2,Award3
+```
+
+**Separators:**
+| Separator | Purpose | Example |
+|-----------|---------|---------|
+| `;` (semicolon) | Separates multiple funders | `Funder1,...;Funder2,...` |
+| `,` (comma) | Separates fields within a single funder | `Name,DOI,Awards` |
+| `\|` (pipe) | Separates multiple awards for the same funder | `Award1\|Award2\|Award3` |
+
+**Funder Fields (comma-separated):**
+| Position | Field | Required | Description | Example |
+|----------|-------|----------|-------------|---------|
+| 1 | Funder Name | Yes | Name of the funding organization | National Science Foundation |
+| 2 | Funder Identification | No* | Crossref Funder Registry DOI | http://dx.doi.org/10.13039/100000001 |
+| 3 | Awards | No | Grant/award numbers (pipe-separated) | NSF-2024-001\|NSF-2024-002 |
+
+> *The Funder Identification becomes required when Crossref validation is enabled in the plugin settings. See [Crossref Registry Validation](#crossref-registry-validation).
+
+### Funders Examples
+
+**Single funder with one award:**
+```
+National Science Foundation,http://dx.doi.org/10.13039/100000001,NSF-2024-001
+```
+
+**Single funder with multiple awards:**
+```
+National Institutes of Health,http://dx.doi.org/10.13039/100000002,R01-AI-123456|R21-AI-789012
+```
+
+**Multiple funders with mixed awards:**
+```
+National Science Foundation,http://dx.doi.org/10.13039/100000001,QC-2024-001|QC-2024-002;Department of Energy,http://dx.doi.org/10.13039/100000015,DE-SC0021234
+```
+
+**Funder without awards:**
+```
+Wellcome Trust,http://dx.doi.org/10.13039/100010269,
+```
+
+**Multiple funders, one without Crossref DOI (only valid if Crossref validation is disabled):**
+```
+FAPESP,http://dx.doi.org/10.13039/501100001807,2024/12345-6;Internal University Fund,,
+```
+
+### Crossref Registry Validation
+
+The Funding plugin has an optional setting called **"Enable Grant ID Validation"** (`enableGrantIdValidation`). When this setting is enabled:
+
+1. **All funders must have a valid Crossref Funder Registry DOI** in their identification field
+2. Valid Crossref DOIs follow the pattern: `http://dx.doi.org/10.13039/...` or `https://doi.org/10.13039/...`
+3. Rows with funders missing valid Crossref DOIs will be rejected
+
+**Error messages when validation fails:**
+- `Funder "[name]" at position [n] is not from the Crossref Funder Registry. The funder identification must be a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...).`
+- `Funder "[name]" at position [n] is missing a Crossref Funder Registry identification. Please provide a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...).`
+
+**Finding Crossref Funder DOIs:**
+You can search for funders and their DOIs at: [https://search.crossref.org/search/funders](https://search.crossref.org/search/funders)
+
+### Important Funders Notes
+
+1. **Submission-Level Data**: Funders are linked to the submission, not individual publications. This means all versions of a preprint share the same funding information.
+
+2. **Multi-Locale Support**: Funders data is not localized. You only need to provide funders in one row per submission. If you're importing multi-locale data, include the funders in the first/primary locale row only.
+
+3. **Multi-Version Support**:
+   - For version 1: Provide full funders data
+   - For versions > 1: If the `funders` column is empty, existing funders are preserved (not cloned from previous versions since they're already at submission level)
+   - If funders data is provided in a later version row, it will be ignored if funders already exist for that submission
+
+4. **Duplicate Prevention**: The system checks if funders already exist for a submission before adding new ones. Existing funders will not be duplicated or overwritten.
+
+5. **Plugin Integration**: The CSV import uses the same business logic as the Funding plugin's web interface (`FunderForm::execute()`), ensuring consistent data handling.
+
+6. **Data Export**: Imported funders will be included in Crossref XML, DataCite XML, and OpenAIRE metadata exports when using the respective plugins.
+
 ## Supplementary Files Descriptions
 
 You may optionally include a `suppDescriptions` column to provide a short description for each supplementary file. Use a semicolon-separated list matching the order of `suppFilenames` and `suppLabels`.
@@ -630,6 +736,36 @@ Rules:
       - Verify the username exists in OPS
       - Check for typos in the username
       - Ensure the user account is not deleted (disabled users are still matched)
+
+16. **Funders Issues**
+    - Error: `The Funding plugin is not installed or not enabled for this server.`
+    - Solution:
+      - Install the Funding plugin from [https://github.com/ajnyga/funding](https://github.com/ajnyga/funding)
+      - Enable the plugin in **Settings → Website → Plugins → Generic Plugins**
+      - Ensure the plugin is enabled for the specific server you're importing to
+
+    - Error: `Funder "[name]" at position [n] is not from the Crossref Funder Registry.`
+    - Solution:
+      - Provide a valid Crossref Funder Registry DOI (e.g., `http://dx.doi.org/10.13039/100000001`)
+      - Search for the correct DOI at [https://search.crossref.org/search/funders](https://search.crossref.org/search/funders)
+      - If you don't want Crossref validation, disable the "Enable Grant ID Validation" setting in the Funding plugin
+
+    - Error: `Funder "[name]" at position [n] is missing a Crossref Funder Registry identification.`
+    - Solution:
+      - Add the funder's Crossref DOI in the second field of the funder data
+      - If the funder doesn't have a Crossref DOI and you need to import it, disable the "Enable Grant ID Validation" setting
+
+    - Error: `Invalid funder format at position [n].`
+    - Solution:
+      - Ensure each funder has at least a name (first field)
+      - Check that you're using the correct separators: `;` between funders, `,` between fields, `|` between awards
+      - Verify there are no extra commas or semicolons
+
+    - **Best Practices for Funders Import:**
+      - Verify the Funding plugin is installed and enabled before running the import
+      - Look up Crossref Funder DOIs at [https://search.crossref.org/search/funders](https://search.crossref.org/search/funders)
+      - Test with a single preprint with funders before large imports
+      - Remember that funders are at submission level, so only provide them once per preprint (not per version or locale)
 
 #### General Troubleshooting Tips
 - Always back up your database before running imports

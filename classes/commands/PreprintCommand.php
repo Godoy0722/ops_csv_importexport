@@ -472,12 +472,14 @@ class PreprintCommand
                     KeywordsProcessor::processMultiLocale($data, $publication->getId());
                     SubjectsProcessor::processMultiLocale($data, $publication->getId());
                     FundersProcessor::processMultiLocale($data, $submission, $server->getId());
+                    PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication->getId());
                 } else {
                     // For new submissions or versions, use the regular process
                     AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
                     KeywordsProcessor::process($data, $publication->getId(), $basePublication);
                     SubjectsProcessor::process($data, $publication->getId(), $basePublication);
                     FundersProcessor::process($data, $submission, $server->getId(), $basePublication);
+                    PublicationProcessor::processSupportingAgencies($data, $publication->getId(), $basePublication);
                 }
 
                 if (!empty($data->vorDoi)) {

@@ -17,6 +17,7 @@
 namespace APP\plugins\importexport\csv\classes\validations;
 
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
+use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
 use APP\server\Server;
 
 class InvalidRowValidations
@@ -421,6 +422,112 @@ class InvalidRowValidations
         // Just the DOI identifier (10.1234/example)
         if (preg_match('/^10\.\d{4,}(\.\d+)*\/\S+$/', $vorDoi)) {
             return 'https://doi.org/' . $vorDoi;
+        }
+
+        return null;
+    }
+
+    /**
+     * Validates the funders string format. Returns the reason if an error occurred,
+     * or null if everything is correct.
+     *
+     * Funder format: "FunderName,FunderIdentification,Award1|Award2;FunderName2,FunderIdentification2,Award3"
+     * - Each funder is separated by `;`
+     * - Funder fields are separated by `,`
+     * - Multiple awards for the same funder are separated by `|`
+     */
+    public static function validateFunders(?string $fundersString): ?string
+    {
+        if (empty($fundersString)) {
+            return null;
+        }
+
+        $fundersArray = array_map('trim', explode(';', $fundersString));
+
+        foreach ($fundersArray as $index => $funderString) {
+            if (empty($funderString)) {
+                continue;
+            }
+
+            $funderParts = array_map('trim', explode(',', $funderString));
+            $funderName = $funderParts[0] ?? '';
+
+            if (empty($funderName)) {
+                return __('plugins.importexport.csv.invalidFunderFormat', ['index' => $index + 1]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Validates that the Funding plugin is enabled when funders data is provided.
+     * Returns an error message if funders data is present but the plugin is not enabled,
+     * or null if everything is correct.
+     */
+    public static function validateFundingPluginEnabled(?string $fundersString, int $contextId): ?string
+    {
+        if (empty($fundersString)) {
+            return null;
+        }
+
+        if (!FundersProcessor::isFundingPluginEnabled($contextId)) {
+            return __('plugins.importexport.csv.fundingPluginNotEnabled');
+        }
+
+        return null;
+    }
+
+    /**
+     * Validates that all funders have valid Crossref registry identifications.
+     * This validation is only applied when the Funding plugin's 'enableGrantIdValidation'
+     * setting is enabled for the context.
+     *
+     * Returns an error message if any funder lacks a valid Crossref DOI,
+     * or null if everything is correct (or if validation is disabled).
+     */
+    public static function validateFundersCrossrefRegistry(?string $fundersString, int $contextId): ?string
+    {
+        if (empty($fundersString)) {
+            return null;
+        }
+
+        if (!FundersProcessor::isCrossrefValidationEnabled($contextId)) {
+            return null;
+        }
+
+        $fundersArray = array_map('trim', explode(';', $fundersString));
+
+        foreach ($fundersArray as $index => $funderString) {
+            if (empty($funderString)) {
+                continue;
+            }
+
+            $funderParts = array_map('trim', explode(',', $funderString));
+            $funderName = $funderParts[0] ?? '';
+            $funderIdentification = $funderParts[1] ?? '';
+
+            if (empty($funderName)) {
+                continue;
+            }
+
+            // Check if the funder identification contains a valid Crossref Funder Registry DOI
+            // Valid formats: https://doi.org/10.13039/... or http://dx.doi.org/10.13039/...
+            if (!empty($funderIdentification)) {
+                $hasCrossrefDoi = preg_match('/https?:\/\/(dx\.)?doi\.org\/10\.13039\//', $funderIdentification);
+                if (!$hasCrossrefDoi) {
+                    return __('plugins.importexport.csv.funderNotInCrossrefRegistry', [
+                        'funderName' => $funderName,
+                        'index' => $index + 1
+                    ]);
+                }
+            } else {
+                // Funder identification is required for Crossref registry validation
+                return __('plugins.importexport.csv.funderMissingCrossrefId', [
+                    'funderName' => $funderName,
+                    'index' => $index + 1
+                ]);
+            }
         }
 
         return null;

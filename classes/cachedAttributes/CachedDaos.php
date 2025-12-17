@@ -17,6 +17,8 @@
 namespace APP\plugins\importexport\csv\classes\cachedAttributes;
 
 use APP\facades\Repo;
+use APP\plugins\generic\funding\classes\FunderAwardDAO;
+use APP\plugins\generic\funding\classes\FunderDAO;
 use APP\server\ServerDAO;
 use PKP\db\DAO;
 use PKP\db\DAORegistry;
@@ -37,6 +39,18 @@ class CachedDaos
     public static function getGenreDao(): GenreDAO
     {
         return self::$cachedDaos['GenreDAO'] ??= DAORegistry::getDAO('GenreDAO');
+    }
+
+    /** Retrieves the cached FunderDAO instance. */
+    public static function getFunderDao(): FunderDAO
+    {
+        return self::$cachedDaos['FunderDAO'] ??= new FunderDAO();
+    }
+
+    /** Retrieves the cached FunderAwardDAO instance. */
+    public static function getFunderAwardDao(): FunderAwardDAO
+    {
+        return self::$cachedDaos['FunderAwardDAO'] ??= new FunderAwardDAO();
     }
 
     /** Retrieves the cached CategoryDAO instance. */

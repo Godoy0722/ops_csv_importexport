@@ -25,6 +25,7 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\handlers\CSVFileHandler;
 use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
+use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
 use APP\plugins\importexport\csv\classes\processors\GalleyProcessor;
 use APP\plugins\importexport\csv\classes\processors\KeywordsProcessor;
 use APP\plugins\importexport\csv\classes\processors\PublicationProcessor;
@@ -227,6 +228,14 @@ class PreprintCommand
                     }
                 }
 
+                if ($data->funders) {
+                    $reason = InvalidRowValidations::validateFunders($data->funders);
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        continue;
+                    }
+                }
+
                 $fileUploadUser = $this->user;
                 $usedDefaultUser = false;
                 if (!empty($data->username)) {
@@ -265,6 +274,22 @@ class PreprintCommand
                 if (!is_null($reason)) {
                     CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
+                }
+
+                // Validate Funding plugin is enabled if funders data is provided
+                if ($data->funders) {
+                    $reason = InvalidRowValidations::validateFundingPluginEnabled($data->funders, $server->getId());
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        continue;
+                    }
+
+                    // Validate funders are from Crossref registry (only when enableGrantIdValidation is enabled)
+                    $reason = InvalidRowValidations::validateFundersCrossrefRegistry($data->funders, $server->getId());
+                    if (!is_null($reason)) {
+                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        continue;
+                    }
                 }
 
                 $this->initializeStaticVariables();
@@ -446,13 +471,13 @@ class PreprintCommand
                     AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
                     KeywordsProcessor::processMultiLocale($data, $publication->getId());
                     SubjectsProcessor::processMultiLocale($data, $publication->getId());
-                    PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication->getId());
+                    FundersProcessor::processMultiLocale($data, $submission, $server->getId());
                 } else {
                     // For new submissions or versions, use the regular process
                     AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
                     KeywordsProcessor::process($data, $publication->getId(), $basePublication);
                     SubjectsProcessor::process($data, $publication->getId(), $basePublication);
-                    PublicationProcessor::processSupportingAgencies($data, $publication->getId(), $basePublication);
+                    FundersProcessor::process($data, $submission, $server->getId(), $basePublication);
                 }
 
                 if (!empty($data->vorDoi)) {

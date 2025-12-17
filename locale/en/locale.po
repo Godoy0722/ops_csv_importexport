@@ -162,3 +162,15 @@ msgstr "Invalid VOR DOI format: \"{$vorDoi}\". Accepted formats: DOI URL (https:
 
 msgid "plugins.importexport.csv.usernameNotFoundUsingDefault"
 msgstr "Notice: Username \"{$username}\" not found. Submission ID {$submissionId} was added using default user \"{$defaultUsername}\"."
+
+msgid "plugins.importexport.csv.fundingPluginNotEnabled"
+msgstr "The Funding plugin is not installed or not enabled for this server. Please enable it before importing rows with funders data."
+
+msgid "plugins.importexport.csv.invalidFunderFormat"
+msgstr "Invalid funder format at position {$index}. Each funder must have at least a name."
+
+msgid "plugins.importexport.csv.funderNotInCrossrefRegistry"
+msgstr "Funder \"{$funderName}\" at position {$index} is not from the Crossref Funder Registry. The funder identification must be a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...)."
+
+msgid "plugins.importexport.csv.funderMissingCrossrefId"
+msgstr "Funder \"{$funderName}\" at position {$index} is missing a Crossref Funder Registry identification. Please provide a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...)."

@@ -133,8 +133,10 @@ class UserCommand
                     }
                 }
 
+                $passwordWasGenerated = false;
                 if (is_null($data->tempPassword)) {
                     $data->tempPassword = Validation::generatePassword();
+                    $passwordWasGenerated = true;
                 }
 
                 $user = UsersProcessor::process($data, $server->getPrimaryLocale());
@@ -143,7 +145,9 @@ class UserCommand
                 UserInterestsProcessor::process($userInterests, $userId);
                 UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
 
-                if ($this->sendWelcomeEmail) {
+                $shouldSendEmail = $passwordWasGenerated || $this->sendWelcomeEmail;
+
+                if ($shouldSendEmail) {
                     WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                 }
             }

@@ -133,10 +133,10 @@ class UserCommand
                     }
                 }
 
-                $passwordWasGenerated = false;
+                // Generate password if tempPassword column is empty
+                // User will need to use password reset function to receive a reset link
                 if (is_null($data->tempPassword)) {
                     $data->tempPassword = Validation::generatePassword();
-                    $passwordWasGenerated = true;
                 }
 
                 $user = UsersProcessor::process($data, $server->getPrimaryLocale());
@@ -145,9 +145,8 @@ class UserCommand
                 UserInterestsProcessor::process($userInterests, $userId);
                 UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
 
-                $shouldSendEmail = $passwordWasGenerated || $this->sendWelcomeEmail;
-
-                if ($shouldSendEmail) {
+                // Only send welcome email if explicitly requested via CLI flag
+                if ($this->sendWelcomeEmail) {
                     WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                 }
             }

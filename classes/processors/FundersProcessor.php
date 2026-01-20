@@ -31,18 +31,9 @@ class FundersProcessor
      */
     public static function isFundingPluginEnabled(int $contextId): bool
     {
-        $fundingPlugin = PluginRegistry::getPlugin('generic', 'FundingPlugin');
-
-        if (!$fundingPlugin) {
-            PluginRegistry::loadCategory('generic', true, $contextId);
-            $fundingPlugin = PluginRegistry::getPlugin('generic', 'FundingPlugin');
-        }
-
-        if (!$fundingPlugin || !$fundingPlugin->getEnabled($contextId)) {
-            return false;
-        }
-
-        return true;
+        // @review There's this loadPlugin() which can be used, as the same thing is needed on the method below, then I think a getFundingPlugin() method can be added
+        $fundingPlugin = PluginRegistry::getPlugin('generic', 'FundingPlugin') ?? PluginRegistry::loadPlugin('generic', 'funding');
+        return $fundingPlugin?->getEnabled($contextId);
     }
 
     /**
@@ -89,15 +80,11 @@ class FundersProcessor
             return;
         }
 
-        if (empty($data->funders) && !is_null($basePublication)) {
-            $baseSubmissionId = $basePublication->getData('submissionId');
-            if ($baseSubmissionId !== $submission->getId()) {
+        // @review The empty($data->funders) is duplicated, so it can be unified
+        if (empty($data->funders)) {
+            if (($baseSubmissionId = $basePublication?->getData('submissionId')) && $baseSubmissionId !== $submission->getId()) {
                 self::cloneFundersFromSubmission($baseSubmissionId, $submission->getId(), $contextId);
             }
-            return;
-        }
-
-        if (empty($data->funders)) {
             return;
         }
 
@@ -205,8 +192,9 @@ class FundersProcessor
         /** @var DAOResultFactory<Funder> */
         $baseFunders = $funderDao->getBySubmissionId($baseSubmissionId);
 
-        /** @var Funder|null $baseFunder */
-        while ($baseFunder = $baseFunders->next()) {
+        /** @var Funder $baseFunder */
+        // @review You can use the toIterator() to avoid using the next(), then it will decrease the amount of work in case this plugin gets updates to not use the "DAO" stuff
+        foreach ($baseFunders->toIterator() as $baseFunder) {
             $newFunder = $funderDao->newDataObject();
             $newFunder->setContextId($contextId);
             $newFunder->setSubmissionId($newSubmissionId);
@@ -215,16 +203,15 @@ class FundersProcessor
 
             $newFunderId = $funderDao->insertObject($newFunder);
 
-            if ($newFunderId) {
-                /** @var DAOResultFactory<FunderAward> */
-                $baseAwards = $funderAwardDao->getByFunderId($baseFunder->getId());
-                /** @var FunderAward $baseAward */
-                while ($baseAward = $baseAwards->next()) {
-                    $newAward = $funderAwardDao->newDataObject();
-                    $newAward->setFunderId($newFunderId);
-                    $newAward->setFunderAwardNumber($baseAward->getFunderAwardNumber());
-                    $funderAwardDao->insertObject($newAward);
-                }
+            // @review This isn't expected to fail, so an ID should be always available
+            /** @var DAOResultFactory<FunderAward> */
+            $baseAwards = $funderAwardDao->getByFunderId($baseFunder->getId());
+            /** @var FunderAward $baseAward */
+            foreach ($baseAwards->toIterator() as $baseAward) {
+                $newAward = $funderAwardDao->newDataObject();
+                $newAward->setFunderId($newFunderId);
+                $newAward->setFunderAwardNumber($baseAward->getFunderAwardNumber());
+                $funderAwardDao->insertObject($newAward);
             }
         }
     }

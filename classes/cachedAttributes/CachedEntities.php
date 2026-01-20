@@ -62,35 +62,29 @@ class CachedEntities
     }
 
     /** Retrieves a cached userGroup ID by serverId. Returns null if an error occurs. */
-    static function getCachedUserGroupId(string $serverPath, int $serverId): ?int
+    // @review More meaningful name
+    static function getCachedAuthorUserGroupId(string $serverPath, int $serverId): ?int
     {
-        if (isset(self::$userGroupIds[$serverPath])) {
+        // @review I think it's ok to cache null values, so this should cover it
+        if (array_key_exists($serverPath, self::$userGroupIds)) {
             return self::$userGroupIds[$serverPath];
         }
 
-        $userGroups = Repo::userGroup()->getByRoleIds([Role::ROLE_ID_AUTHOR], $serverId);
-
-        if (empty($userGroups)) {
-            return null;
-        }
-
-        $userGroup = $userGroups->first();
-        if (is_null($userGroup)) {
-            return null;
-        }
-
-        return self::$userGroupIds[$serverPath] = $userGroup->id;
+        $userGroup = Repo::userGroup()->getByRoleIds([Role::ROLE_ID_AUTHOR], $serverId)->first();
+        return self::$userGroupIds[$serverPath] = $userGroup?->id;
     }
 
 	/** Retrieves a cached User by email. Returns null if an error occurs. */
     static function getCachedUserByEmail(string $email): ?User
     {
+        // @review We can also set the cache by username, then the next method will re-use the cache
 		return self::$users[$email] ??= Repo::user()->getByEmail($email);
     }
 
 	/** Retrieves a cached User by username. Returns null if an error occurs. */
     static function getCachedUserByUsername(string $username, bool $allowDisabled = false): ?User
     {
+        // @review Just like the previous comment, here we can also set the cache by email to be re-used by the previous method
 		return self::$users[$username] ??= Repo::user()->getByUsername($username, $allowDisabled);
     }
 
@@ -179,17 +173,12 @@ class CachedEntities
 
     static function getCachedSectionById(int $baseSectionId, int $serverId, string $locale): ?Section
     {
-        $existingSection = null;
-        foreach (self::$sections as $section) {
-            if ($section instanceof Section && $section->getId() === $baseSectionId) {
-                $existingSection = $section;
-                break;
-            }
+        // @review Adding the cache by ID, should allow us to do something more optimized
+        $section = self::$sections[$baseSectionId] ?? null;
+        if ($section) {
+            return $section;
         }
 
-        if ($existingSection) {
-            return $existingSection;
-        }
 
         $section = Repo::section()->get($baseSectionId, $serverId);
         $sectionTitle = $section->getTitle($locale);
@@ -197,6 +186,7 @@ class CachedEntities
 
         $customSectionKey = $sectionTitle . '_' . mb_strtoupper(trim($sectionAbbrev));
         self::$sections[$customSectionKey] = $section;
+        self::$sections[$baseSectionId] = $section;
         return $section;
     }
 }

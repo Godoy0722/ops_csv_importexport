@@ -47,6 +47,7 @@ class WelcomeEmailHandler
                 Notification::NOTIFICATION_TYPE_ERROR,
                 ['contents' => __('email.compose.error')]
             );
+            // @review As we're echo'ing the problems, then I think here we should do the same
             error_log($e->getMessage());
         }
     }

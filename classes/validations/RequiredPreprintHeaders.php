@@ -81,6 +81,7 @@ class RequiredPreprintHeaders
                 return true;
             }
 
+            //1 is enough to cover duplicate check?
             if ($version > 1) {
                 return true;
             }

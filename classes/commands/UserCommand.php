@@ -43,7 +43,8 @@ class UserCommand
 
     private User $senderEmailUser;
 
-    public function __construct(string $sourceDir, User $user, bool $sendWelcomeEmail)
+    // @review The attributes can be promoted (then the declaration/attribution can be dropped)
+    public function __construct(private string $sourceDir, private User $user, private bool $sendWelcomeEmail)
     {
         $this->expectedRowSize = count(RequiredUserHeaders::$userHeaders);
         $this->sourceDir = $sourceDir;
@@ -54,7 +55,7 @@ class UserCommand
     public function run(): void
     {
         foreach (new \DirectoryIterator($this->sourceDir) as $fileInfo) {
-            if (!$fileInfo->isFile() || $fileInfo->getExtension() !== 'csv') {
+            if (!$fileInfo->isFile() || mb_strtolower($fileInfo->getExtension()) !== 'csv') {
                 continue;
             }
 
@@ -86,6 +87,7 @@ class UserCommand
                     continue;
                 }
 
+                // @review If the row has more cells than expected, then the array_combine will fail, so besides the pad, there should be also an array_slice too (or an error message)
                 $fieldsList = array_pad(array_map('trim', $fields), $this->expectedRowSize, null);
                 $data = (object) array_combine(RequiredUserHeaders::$userHeaders, $fieldsList);
 
@@ -144,6 +146,7 @@ class UserCommand
                 UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
 
                 if ($this->sendWelcomeEmail) {
+                    // @review There were some discussions about strategies for mail delivery
                     WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                 }
             }

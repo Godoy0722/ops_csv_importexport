@@ -112,13 +112,9 @@ class PublicationProcessor
 
     static function updatePublicationAttribute(Publication $publication, string $attribute, mixed $data, ?string $locale = null)
     {
-        if (!is_null($locale)) {
-            $publication->setData($attribute, $data, $locale);
-            Repo::publication()->dao->update($publication);
-            return;
-        }
-
+        // @review I think it's not needed to check if the locale is null, the default value of the $locale argument, when it's not passed, is also null
         $publication->setData($attribute, $data);
+        // @review Better to call the method below after updating all fields, if I'm not mistaken, there's a place in the code with multiple calls to this method
         Repo::publication()->dao->update($publication);
     }
 
@@ -220,6 +216,7 @@ class PublicationProcessor
      */
     public static function createPublicationVersion(Publication $basePublication, object $data): Publication
     {
+        // @review The same comment I left about the "clone $author"
         $newPublication = clone $basePublication;
         $newPublication->setData('id', null);
         $newPublication->setData('datePublished', null);
@@ -236,6 +233,7 @@ class PublicationProcessor
             return $newPublication;
         }
 
+        // @review Hmm, if we're going to reset anyway, then these attributes could be set before calling the "insert()", and further updates won't be needed
         $newPublication->setData('authors', []);
         $newPublication->setData('primaryContactId', null);
         Repo::publication()->dao->update($newPublication);

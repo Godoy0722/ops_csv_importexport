@@ -97,10 +97,12 @@ class PreprintCommand
      * ]
      *
      * @var array
+     * @review We can use array shapes (https://phpstan.org/writing-php-code/phpdoc-types#array-shapes) to declare such things, then the "structure:" can be removed
      */
     private array $processedPreprints;
 
-    public function __construct(string $sourceDir, User $user)
+    // @review We can use the "argument promotion" syntax, then you don't need to declare the attributes above, and also won't need to assign the values below
+    public function __construct(private string $sourceDir, private User $user)
     {
         $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
         $this->sourceDir = $sourceDir;
@@ -111,7 +113,8 @@ class PreprintCommand
     public function run()
     {
         foreach (new \DirectoryIterator($this->sourceDir) as $fileInfo) {
-            if (!$fileInfo->isFile() || $fileInfo->getExtension() !== 'csv') {
+            // @review Better to assume files can be using uppercase as well
+            if (!$fileInfo->isFile() || mb_strtolower($fileInfo->getExtension()) !== 'csv') {
                 continue;
             }
 
@@ -123,6 +126,7 @@ class PreprintCommand
             }
 
             $basename = $fileInfo->getBasename();
+            // @review I think the file should be created just if something goes wrong, then it won't be needed to delete the file at the end
             $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
 
             if (is_null($invalidCsvFile)) {
@@ -150,6 +154,7 @@ class PreprintCommand
                     array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                 );
 
+                // @review Can be turned into an arrow function
                 $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, function($row) {
                     return RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints);
                 });
@@ -293,6 +298,7 @@ class PreprintCommand
 
                 $this->initializeStaticVariables();
 
+                // @review Maybe this logic can be moved into another method
                 $coverImageUploadName = null;
                 if ($data->coverImageFilename) {
                     $reason = InvalidRowValidations::validateCoverImageIsValid($data->coverImageFilename, $this->sourceDir);
@@ -307,10 +313,12 @@ class PreprintCommand
 
                     $destFilePath = $this->publicFileManager->getContextFilesPath($server->getId()) . '/' . $coverImageUploadName;
                     $srcFilePath = "{$this->sourceDir}/{$data->coverImageFilename}";
+                    // @review Perhaps it's better to check if the file exists/generate a unique name, to avoid overwriting user files
                     $bookCoverImageSaved = $this->fileManager->copyFile($srcFilePath, $destFilePath);
 
                     if (!$bookCoverImageSaved) {
                         $reason = __('plugin.importexport.csv.erroWhileSavingBookCoverImage');
+                        // @review Generic comment: instead of passing many arguments, maybe you can pass $this or do a `$csvFileHandler = new CSVFileHandler(things that can be re-used)`
                         CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
 
                         continue;
@@ -332,9 +340,8 @@ class PreprintCommand
                     $existingSubmission = $firstLocaleData['submission'];
                     $basePublication = $firstLocaleData['publication'];
 
-                    if (!isset($versionData[$data->locale])) {
-                        $isMultiLocaleImport = true;
-                    }
+                    $isMultiLocaleImport = !isset($versionData[$data->locale]);
+                    // @review There's already a check for "!empty($data->versionIdentifier)" above, so it can be unified
                 } elseif (!empty($data->versionIdentifier) && isset($this->processedPreprints[$data->versionIdentifier])) {
                     // Handle new version (not multi-locale)
                     $versions = $this->processedPreprints[$data->versionIdentifier];
@@ -368,6 +375,7 @@ class PreprintCommand
                     continue;
                 }
 
+                // @review As most of the logic is separated into other methods, I think this piece can also be moved to another method
                 // Array to store each galley ID to its respective galley file
                 $galleyIds = [];
                 if ($data->galleyFilenames) {
@@ -413,6 +421,7 @@ class PreprintCommand
                 if ($data->suppFilenames) {
                     // Get supplementary genre for supplementary files
                     $genreDao = CachedDaos::getGenreDao();
+                    // @review I think this can be cached as well
                     $supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $server->getId())->toArray();
                     $suppGenreId = !empty($supplementaryGenres) ? $supplementaryGenres[0]->getId() : $genreId;
                     $suppIds = [];
@@ -427,6 +436,7 @@ class PreprintCommand
                             $fieldsList
                         );
 
+                        // @review I understand that if one fail, then we'll remove all galleys and end up using a bad ID below at `$suppIds[] = ['file' => $suppFile, 'id' => $suppFileId]`
                         if (is_null($suppFileId)) {
                             foreach($galleyIds as $galleyItem) {
                                 $this->fileService->delete($galleyItem['id']);
@@ -465,6 +475,7 @@ class PreprintCommand
                     }
                 }
 
+                // @review Generic comment: After watching these processMultiLocale() vs process() I see a lot of duplicated code, so I think they can be unified
                 if ($isMultiLocaleImport) {
                     // For multi-locale imports, update existing publication with new locale data
                     AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
@@ -485,10 +496,7 @@ class PreprintCommand
                     PublicationProcessor::updateVorDoi($publication, $data->vorDoi);
                 }
 
-                if (
-                    ((!empty($data->version) && (int)$data->version === 1) || empty($data->version))
-                    && !empty($data->coverage)
-                ) {
+                if ((empty($data->version) || (int)$data->version === 1) && !empty($data->coverage)) {
                     PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
                 }
 
@@ -541,6 +549,7 @@ class PreprintCommand
         $this->setCurrentVersionsForProcessedPreprints();
     }
 
+    // @review This code can be moved to the constructor
     /** Insert static data that will be used for the submission processing */
     private function initializeStaticVariables(): void
     {

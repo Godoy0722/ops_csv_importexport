@@ -16,6 +16,7 @@
 
 namespace APP\plugins\importexport\csv\classes\handlers;
 
+// @review Generic comment: instead of XMLReader, we're using XmlReader
 class CSVFileHandler
 {
     /** Create a new readable SplFileObject. Return null if an error occurred. */
@@ -26,6 +27,7 @@ class CSVFileHandler
             $file->setFlags(\SplFileObject::READ_CSV);
             return $file;
         } catch (\Exception $e) {
+            // @review I think it's better to throw an Exception than returning null
             echo __('plugins.importexport.csv.couldNotOpenFile', [
                 'filePath' => $filePath,
                 'errorMessage' => $e->getMessage(),
@@ -43,6 +45,7 @@ class CSVFileHandler
 
             return $invalidRowsFile;
         } catch (\Exception $e) {
+            // @review I think it's better to throw an Exception than returning null
             echo $e->getMessage() . "\n\n";
             echo __('plugins.importexport.csv.couldNotCreateFile', ['filename' => $sourceDir . '/' . $filename]) . "\n";
             return null;
@@ -57,6 +60,7 @@ class CSVFileHandler
         string $reason,
         int &$failedRows
     ) {
+        // @review Not that important, but it's possible to check if the fputcsv() failed
         $invalidRowsCsvFile->fputcsv(array_merge(array_pad($fields, $rowSize, null), [$reason]));
 		++$failedRows;
 	}

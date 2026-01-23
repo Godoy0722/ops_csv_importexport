@@ -42,25 +42,21 @@ class CSVImportExportPlugin extends ImportExportPlugin
     /** @copydoc Plugin::register() */
     public function register($category, $path, $mainContextId = null)
     {
-        $success = parent::register($category, $path, $mainContextId);
-		$isInstalled = !!Config::getVar('general', 'installed');
-		$isUpgrading = defined('RUNNING_UPGRADE');
-
-        if (!$isInstalled || $isUpgrading) {
-            return $success;
+        if (!parent::register($category, $path, $mainContextId)) {
+            return false;
         }
 
-        if ($success && $this->getEnabled()) {
+        if (!Application::isUnderMaintenance() && $this->getEnabled()) {
             $this->addLocaleData();
         }
 
-        return $success;
+        return true;
     }
 
     /**
      * @copydoc Plugin::getDisplayName()
      */
-    public function getDisplayName()
+    public function getDisplayName(): string // @review Add types whenever possible, there are some other methods that can receive a type
     {
         return __('plugins.importexport.csv.displayName');
     }
@@ -105,7 +101,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $this->command = array_shift($args);
 		$this->username = array_shift($args);
         $this->sourceDir = array_shift($args);
-        $this->sendWelcomeEmail = array_shift($args) ?? false;
+        $this->sendWelcomeEmail = array_shift($args) === 'true' ?? false; // @review I think it's better to check against a value or just use a flag "--sendWelcomeEmail"
 
         if (! in_array($this->command, ['preprints', 'users']) || !$this->sourceDir || !$this->username) {
 			$this->usage($scriptName);
@@ -117,8 +113,10 @@ class CSVImportExportPlugin extends ImportExportPlugin
             exit(1);
         }
 
+        // @review There are some formatting issues (the tabs on the next line should be spaces)
 		$this->validateUser();
 
+        // @review Not important, but I think the match() should be used when possible, it looks cleaner
         switch ($this->command) {
             case 'preprints':
 				(new PreprintCommand($this->sourceDir, $this->user))->run();
@@ -127,11 +125,12 @@ class CSVImportExportPlugin extends ImportExportPlugin
                 (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail))->run();
                 break;
             default:
-                throw new \InvalidArgumentException("Comando inválido: {$this->command}");
+                throw new \InvalidArgumentException(__("Comando inválido: {$this->command}"); // @review Here it's missing the localization
         }
 
 		$endTime = microtime(true);
 		$executionTime = $endTime - $startTime;
+		// @review This can be localized as well, there's support for $variables
 		echo "Executed in: " . number_format($executionTime, 2) . " seconds\n";
     }
 

@@ -31,6 +31,7 @@ class SubmissionProcessor
         $submission->setData('status', Submission::STATUS_PUBLISHED);
         $submission->setData('locale', $data->locale);
         $submission->setData('stageId', WORKFLOW_STAGE_ID_PRODUCTION);
+        // @review This should be modified to '', it's probably the reason why I see a button to "Complete submission", which shouldn't be there
         $submission->setData('submissionProgress', '0');
         $submission->setData('abstract', $data->preprintAbstract, $data->locale);
         $submission->setData('dateSubmitted', $data->dateSubmitted ?? $data->datePosted);

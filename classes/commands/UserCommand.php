@@ -58,13 +58,19 @@ class UserCommand
                 continue;
             }
 
+            // Skip invalid_*.csv files created by previous failed imports
+            $basename = $fileInfo->getBasename();
+            if (str_starts_with($basename, 'invalid_')) {
+                echo __('plugins.importexport.csv.skippingInvalidFile', ['filename' => $basename]) . "\n";
+                continue;
+            }
+
             $filePath = $fileInfo->getPathname();
             $file = CSVFileHandler::createReadableCSVFile($filePath);
             if (is_null($file)) {
                 continue;
             }
 
-            $basename = $fileInfo->getBasename();
             $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredUserHeaders::$userHeaders);
             if (is_null($invalidCsvFile)) {
                 continue;

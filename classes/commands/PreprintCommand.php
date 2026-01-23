@@ -115,6 +115,13 @@ class PreprintCommand
                 continue;
             }
 
+            // Skip invalid_*.csv files created by previous failed imports
+            $basename = $fileInfo->getBasename();
+            if (str_starts_with($basename, 'invalid_')) {
+                echo __('plugins.importexport.csv.skippingInvalidFile', ['filename' => $basename]) . "\n";
+                continue;
+            }
+
             $filePath = $fileInfo->getPathname();
             $file = CSVFileHandler::createReadableCSVFile($filePath);
 
@@ -122,7 +129,6 @@ class PreprintCommand
                 continue;
             }
 
-            $basename = $fileInfo->getBasename();
             $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
 
             if (is_null($invalidCsvFile)) {
@@ -511,6 +517,9 @@ class PreprintCommand
                     } else {
                         CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
                     }
+
+                    // Reload publication to populate categoryIds property after assignment
+                    $publication = Repo::publication()->get($publication->getId());
                 }
 
                 if (!empty($data->versionIdentifier)) {

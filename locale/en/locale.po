@@ -174,3 +174,6 @@ msgstr "Funder \"{$funderName}\" at position {$index} is not from the Crossref F
 
 msgid "plugins.importexport.csv.funderMissingCrossrefId"
 msgstr "Funder \"{$funderName}\" at position {$index} is missing a Crossref Funder Registry identification. Please provide a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...)."
+
+msgid "plugins.importexport.csv.skippingInvalidFile"
+msgstr "Skipping \"{$filename}\" (file from previous failed import). To re-import failed rows, fix errors in this file, rename it without the 'invalid_' prefix, and run the import again."

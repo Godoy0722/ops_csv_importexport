@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <title>Dashboard for D:\Codes\PKP\OPS\3.5\ops\plugins\importexport\csv\classes\processors</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="../_css/bootstrap.min.css?v=11.0.9" rel="stylesheet" type="text/css">
+  <link href="../_css/nv.d3.min.css?v=11.0.9" rel="stylesheet" type="text/css">
+  <link href="../_css/style.css?v=11.0.9" rel="stylesheet" type="text/css">
+  <link href="../_css/custom.css" rel="stylesheet" type="text/css">
+ </head>
+ <body>
+  <header>
+   <div class="container-fluid">
+    <div class="row">
+     <div class="col-md-12">
+      <nav aria-label="breadcrumb">
+       <ol class="breadcrumb">
+         <li class="breadcrumb-item"><a href="../index.html">D:\Codes\PKP\OPS\3.5\ops\plugins\importexport\csv\classes</a></li>
+         <li class="breadcrumb-item"><a href="index.html">processors</a></li>
+         <li class="breadcrumb-item active">(Dashboard)</li>
+
+       </ol>
+      </nav>
+     </div>
+    </div>
+   </div>
+  </header>
+  <div class="container-fluid">
+   <div class="row">
+    <div class="col-md-12">
+     <h2>Classes</h2>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Coverage Distribution</h3>
+     <div id="classCoverageDistribution" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Complexity</h3>
+     <div id="classComplexity" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Insufficient Coverage</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Class</th>
+         <th class="text-right">Coverage</th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="CategoriesProcessor.php.html#24">APP\plugins\importexport\csv\classes\processors\CategoriesProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#27">APP\plugins\importexport\csv\classes\processors\FundersProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="GalleyProcessor.php.html#21">APP\plugins\importexport\csv\classes\processors\GalleyProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="KeywordsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\KeywordsProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SectionsProcessor.php.html#24">APP\plugins\importexport\csv\classes\processors\SectionsProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubjectsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\SubjectsProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubmissionFileProcessor.php.html#25">APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubmissionProcessor.php.html#24">APP\plugins\importexport\csv\classes\processors\SubmissionProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="UserGroupsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="UserInterestsProcessor.php.html#21">APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor</a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#26">APP\plugins\importexport\csv\classes\processors\PublicationProcessor</a></td><td class="text-right">5%</td></tr>
+       <tr><td><a href="AuthorsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\AuthorsProcessor</a></td><td class="text-right">11%</td></tr>
+       <tr><td><a href="UsersProcessor.php.html#25">APP\plugins\importexport\csv\classes\processors\UsersProcessor</a></td><td class="text-right">33%</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Project Risks</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Class</th>
+         <th class="text-right"><abbr title="Change Risk Anti-Patterns (CRAP) Index">CRAP</abbr></th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="PublicationProcessor.php.html#26">APP\plugins\importexport\csv\classes\processors\PublicationProcessor</a></td><td class="text-right">1907</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#27">APP\plugins\importexport\csv\classes\processors\FundersProcessor</a></td><td class="text-right">1406</td></tr>
+       <tr><td><a href="AuthorsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\AuthorsProcessor</a></td><td class="text-right">657</td></tr>
+       <tr><td><a href="CategoriesProcessor.php.html#24">APP\plugins\importexport\csv\classes\processors\CategoriesProcessor</a></td><td class="text-right">342</td></tr>
+       <tr><td><a href="KeywordsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\KeywordsProcessor</a></td><td class="text-right">110</td></tr>
+       <tr><td><a href="SubjectsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\SubjectsProcessor</a></td><td class="text-right">110</td></tr>
+       <tr><td><a href="SectionsProcessor.php.html#24">APP\plugins\importexport\csv\classes\processors\SectionsProcessor</a></td><td class="text-right">42</td></tr>
+       <tr><td><a href="UsersProcessor.php.html#25">APP\plugins\importexport\csv\classes\processors\UsersProcessor</a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="SubmissionFileProcessor.php.html#25">APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor</a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="UserGroupsProcessor.php.html#22">APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor</a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="UserInterestsProcessor.php.html#21">APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor</a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="GalleyProcessor.php.html#21">APP\plugins\importexport\csv\classes\processors\GalleyProcessor</a></td><td class="text-right">6</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-12">
+     <h2>Methods</h2>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Coverage Distribution</h3>
+     <div id="methodCoverageDistribution" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Complexity</h3>
+     <div id="methodComplexity" style="height: 300px;">
+       <svg></svg>
+     </div>
+    </div>
+   </div>
+   <div class="row">
+    <div class="col-md-6">
+     <h3>Insufficient Coverage</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Method</th>
+         <th class="text-right">Coverage</th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="AuthorsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\AuthorsProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="AuthorsProcessor.php.html#80"><abbr title="APP\plugins\importexport\csv\classes\processors\AuthorsProcessor::cloneAuthorsFromBasePublication">cloneAuthorsFromBasePublication</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="AuthorsProcessor.php.html#129"><abbr title="APP\plugins\importexport\csv\classes\processors\AuthorsProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="CategoriesProcessor.php.html#26"><abbr title="APP\plugins\importexport\csv\classes\processors\CategoriesProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="CategoriesProcessor.php.html#73"><abbr title="APP\plugins\importexport\csv\classes\processors\CategoriesProcessor::processForVersion">processForVersion</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="CategoriesProcessor.php.html#92"><abbr title="APP\plugins\importexport\csv\classes\processors\CategoriesProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#32"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::isFundingPluginEnabled">isFundingPluginEnabled</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#51"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::isCrossrefValidationEnabled">isCrossrefValidationEnabled</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#78"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#110"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::submissionHasFunders">submissionHasFunders</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#124"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#150"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::createFundersFromString">createFundersFromString</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#200"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::cloneFundersFromSubmission">cloneFundersFromSubmission</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#235"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::validateFundersFormat">validateFundersFormat</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="GalleyProcessor.php.html#23"><abbr title="APP\plugins\importexport\csv\classes\processors\GalleyProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="KeywordsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\KeywordsProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="KeywordsProcessor.php.html#59"><abbr title="APP\plugins\importexport\csv\classes\processors\KeywordsProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#46"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#81"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::updatePrimaryContactId">updatePrimaryContactId</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#86"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::updateCoverage">updateCoverage</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#91"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::updateCoverImage">updateCoverImage</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#108"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::updateSectionId">updateSectionId</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#113"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::updatePublicationAttribute">updatePublicationAttribute</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#125"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::setCopyrightFromSystem">setCopyrightFromSystem</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#156"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processVersionedPublication">processVersionedPublication</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#221"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::createPublicationVersion">createPublicationVersion</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#260"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processMultiLocalePublication">processMultiLocalePublication</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#300"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::updateVorDoi">updateVorDoi</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#311"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processSupportingAgencies">processSupportingAgencies</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#350"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processSupportingAgenciesMultiLocale">processSupportingAgenciesMultiLocale</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SectionsProcessor.php.html#26"><abbr title="APP\plugins\importexport\csv\classes\processors\SectionsProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubjectsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\SubjectsProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubjectsProcessor.php.html#59"><abbr title="APP\plugins\importexport\csv\classes\processors\SubjectsProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubmissionFileProcessor.php.html#27"><abbr title="APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubmissionFileProcessor.php.html#61"><abbr title="APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor::updateAssocInfo">updateAssocInfo</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubmissionProcessor.php.html#26"><abbr title="APP\plugins\importexport\csv\classes\processors\SubmissionProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="SubmissionProcessor.php.html#42"><abbr title="APP\plugins\importexport\csv\classes\processors\SubmissionProcessor::setCurrentPublicationId">setCurrentPublicationId</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="UserGroupsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="UserInterestsProcessor.php.html#23"><abbr title="APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+       <tr><td><a href="UsersProcessor.php.html#27"><abbr title="APP\plugins\importexport\csv\classes\processors\UsersProcessor::process">process</abbr></a></td><td class="text-right">0%</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+    <div class="col-md-6">
+     <h3>Project Risks</h3>
+     <div class="scrollbox">
+      <table class="table">
+       <thead>
+        <tr>
+         <th>Method</th>
+         <th class="text-right"><abbr title="Change Risk Anti-Patterns (CRAP) Index">CRAP</abbr></th>
+        </tr>
+       </thead>
+       <tbody>
+       <tr><td><a href="AuthorsProcessor.php.html#129"><abbr title="APP\plugins\importexport\csv\classes\processors\AuthorsProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">210</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#156"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processVersionedPublication">processVersionedPublication</abbr></a></td><td class="text-right">156</td></tr>
+       <tr><td><a href="AuthorsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\AuthorsProcessor::process">process</abbr></a></td><td class="text-right">72</td></tr>
+       <tr><td><a href="CategoriesProcessor.php.html#92"><abbr title="APP\plugins\importexport\csv\classes\processors\CategoriesProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">72</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#150"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::createFundersFromString">createFundersFromString</abbr></a></td><td class="text-right">72</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#311"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processSupportingAgencies">processSupportingAgencies</abbr></a></td><td class="text-right">72</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#78"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::process">process</abbr></a></td><td class="text-right">56</td></tr>
+       <tr><td><a href="KeywordsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\KeywordsProcessor::process">process</abbr></a></td><td class="text-right">56</td></tr>
+       <tr><td><a href="SubjectsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\SubjectsProcessor::process">process</abbr></a></td><td class="text-right">56</td></tr>
+       <tr><td><a href="CategoriesProcessor.php.html#26"><abbr title="APP\plugins\importexport\csv\classes\processors\CategoriesProcessor::process">process</abbr></a></td><td class="text-right">42</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#46"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::process">process</abbr></a></td><td class="text-right">42</td></tr>
+       <tr><td><a href="SectionsProcessor.php.html#26"><abbr title="APP\plugins\importexport\csv\classes\processors\SectionsProcessor::process">process</abbr></a></td><td class="text-right">42</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#235"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::validateFundersFormat">validateFundersFormat</abbr></a></td><td class="text-right">30</td></tr>
+       <tr><td><a href="AuthorsProcessor.php.html#80"><abbr title="APP\plugins\importexport\csv\classes\processors\AuthorsProcessor::cloneAuthorsFromBasePublication">cloneAuthorsFromBasePublication</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="CategoriesProcessor.php.html#73"><abbr title="APP\plugins\importexport\csv\classes\processors\CategoriesProcessor::processForVersion">processForVersion</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#32"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::isFundingPluginEnabled">isFundingPluginEnabled</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#51"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::isCrossrefValidationEnabled">isCrossrefValidationEnabled</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#124"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="FundersProcessor.php.html#200"><abbr title="APP\plugins\importexport\csv\classes\processors\FundersProcessor::cloneFundersFromSubmission">cloneFundersFromSubmission</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#260"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processMultiLocalePublication">processMultiLocalePublication</abbr></a></td><td class="text-right">20</td></tr>
+       <tr><td><a href="KeywordsProcessor.php.html#59"><abbr title="APP\plugins\importexport\csv\classes\processors\KeywordsProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#221"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::createPublicationVersion">createPublicationVersion</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#350"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::processSupportingAgenciesMultiLocale">processSupportingAgenciesMultiLocale</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="SubjectsProcessor.php.html#59"><abbr title="APP\plugins\importexport\csv\classes\processors\SubjectsProcessor::processMultiLocale">processMultiLocale</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="UserGroupsProcessor.php.html#24"><abbr title="APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor::process">process</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="UserInterestsProcessor.php.html#23"><abbr title="APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor::process">process</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="UsersProcessor.php.html#27"><abbr title="APP\plugins\importexport\csv\classes\processors\UsersProcessor::process">process</abbr></a></td><td class="text-right">12</td></tr>
+       <tr><td><a href="GalleyProcessor.php.html#23"><abbr title="APP\plugins\importexport\csv\classes\processors\GalleyProcessor::process">process</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="PublicationProcessor.php.html#113"><abbr title="APP\plugins\importexport\csv\classes\processors\PublicationProcessor::updatePublicationAttribute">updatePublicationAttribute</abbr></a></td><td class="text-right">6</td></tr>
+       <tr><td><a href="SubmissionFileProcessor.php.html#27"><abbr title="APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor::process">process</abbr></a></td><td class="text-right">6</td></tr>
+
+       </tbody>
+      </table>
+     </div>
+    </div>
+   </div>
+   <footer>
+    <hr/>
+    <p>
+     <small>Generated by <a href="https://github.com/sebastianbergmann/php-code-coverage" target="_top">php-code-coverage 11.0.9</a> using <a href="https://www.php.net/" target="_top">PHP 8.3.15</a> and <a href="https://phpunit.de/">PHPUnit 11.5.11</a> at Wed Jan 21 16:55:09 UTC 2026.</small>
+    </p>
+   </footer>
+  </div>
+  <script src="../_js/jquery.min.js?v=11.0.9" type="text/javascript"></script>
+  <script src="../_js/d3.min.js?v=11.0.9" type="text/javascript"></script>
+  <script src="../_js/nv.d3.min.js?v=11.0.9" type="text/javascript"></script>
+  <script type="text/javascript">
+$(document).ready(function() {
+  nv.addGraph(function() {
+    var chart = nv.models.multiBarChart();
+    chart.tooltips(false)
+      .showControls(false)
+      .showLegend(false)
+      .reduceXTicks(false)
+      .staggerLabels(true)
+      .yAxis.tickFormat(d3.format('d'));
+
+    d3.select('#classCoverageDistribution svg')
+      .datum(getCoverageDistributionData([10,1,1,0,1,0,0,0,0,0,0,0], "Class Coverage"))
+      .transition().duration(500).call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  nv.addGraph(function() {
+    var chart = nv.models.multiBarChart();
+    chart.tooltips(false)
+      .showControls(false)
+      .showLegend(false)
+      .reduceXTicks(false)
+      .staggerLabels(true)
+      .yAxis.tickFormat(d3.format('d'));
+
+    d3.select('#methodCoverageDistribution svg')
+      .datum(getCoverageDistributionData([40,0,0,0,0,0,0,0,0,0,0,4], "Method Coverage"))
+      .transition().duration(500).call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  function getCoverageDistributionData(data, label) {
+    var labels = [
+      '0%',
+      '0-10%',
+      '10-20%',
+      '20-30%',
+      '30-40%',
+      '40-50%',
+      '50-60%',
+      '60-70%',
+      '70-80%',
+      '80-90%',
+      '90-100%',
+      '100%'
+    ];
+    var values = [];
+    $.each(labels, function(key) {
+      values.push({x: labels[key], y: data[key]});
+    });
+
+    return [
+      {
+        key: label,
+        values: values,
+        color: "#4572A7"
+      }
+    ];
+  }
+  nv.addGraph(function() {
+    var chart = nv.models.scatterChart()
+      .showDistX(true)
+      .showDistY(true)
+      .showLegend(false)
+      .forceX([0, 100]);
+    chart.tooltipContent(function(graph) {
+      return '<p>' + graph.point.class + '</p>';
+    });
+
+    chart.xAxis.axisLabel('Code Coverage (in percent)');
+    chart.yAxis.axisLabel('Cyclomatic Complexity');
+
+    d3.select('#classComplexity svg')
+      .datum(getComplexityData([[11.320754716981133,30,"<a href=\"AuthorsProcessor.php.html#22\">APP\\plugins\\importexport\\csv\\classes\\processors\\AuthorsProcessor<\/a>"],[0,18,"<a href=\"CategoriesProcessor.php.html#24\">APP\\plugins\\importexport\\csv\\classes\\processors\\CategoriesProcessor<\/a>"],[0,37,"<a href=\"FundersProcessor.php.html#27\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor<\/a>"],[0,2,"<a href=\"GalleyProcessor.php.html#21\">APP\\plugins\\importexport\\csv\\classes\\processors\\GalleyProcessor<\/a>"],[0,10,"<a href=\"KeywordsProcessor.php.html#22\">APP\\plugins\\importexport\\csv\\classes\\processors\\KeywordsProcessor<\/a>"],[5.555555555555555,47,"<a href=\"PublicationProcessor.php.html#26\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor<\/a>"],[0,6,"<a href=\"SectionsProcessor.php.html#24\">APP\\plugins\\importexport\\csv\\classes\\processors\\SectionsProcessor<\/a>"],[0,10,"<a href=\"SubjectsProcessor.php.html#22\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubjectsProcessor<\/a>"],[0,3,"<a href=\"SubmissionFileProcessor.php.html#25\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubmissionFileProcessor<\/a>"],[0,2,"<a href=\"SubmissionProcessor.php.html#24\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubmissionProcessor<\/a>"],[0,3,"<a href=\"UserGroupsProcessor.php.html#22\">APP\\plugins\\importexport\\csv\\classes\\processors\\UserGroupsProcessor<\/a>"],[0,3,"<a href=\"UserInterestsProcessor.php.html#21\">APP\\plugins\\importexport\\csv\\classes\\processors\\UserInterestsProcessor<\/a>"],[33.33333333333333,5,"<a href=\"UsersProcessor.php.html#25\">APP\\plugins\\importexport\\csv\\classes\\processors\\UsersProcessor<\/a>"]], 'Class Complexity'))
+      .transition()
+      .duration(500)
+      .call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  nv.addGraph(function() {
+    var chart = nv.models.scatterChart()
+      .showDistX(true)
+      .showDistY(true)
+      .showLegend(false)
+      .forceX([0, 100]);
+    chart.tooltipContent(function(graph) {
+      return '<p>' + graph.point.class + '</p>';
+    });
+
+    chart.xAxis.axisLabel('Code Coverage (in percent)');
+    chart.yAxis.axisLabel('Method Complexity');
+
+    d3.select('#methodComplexity svg')
+      .datum(getComplexityData([[0,8,"<a href=\"AuthorsProcessor.php.html#24\">APP\\plugins\\importexport\\csv\\classes\\processors\\AuthorsProcessor::process<\/a>"],[0,4,"<a href=\"AuthorsProcessor.php.html#80\">APP\\plugins\\importexport\\csv\\classes\\processors\\AuthorsProcessor::cloneAuthorsFromBasePublication<\/a>"],[100,4,"<a href=\"AuthorsProcessor.php.html#104\">APP\\plugins\\importexport\\csv\\classes\\processors\\AuthorsProcessor::normalizeOrcid<\/a>"],[0,14,"<a href=\"AuthorsProcessor.php.html#129\">APP\\plugins\\importexport\\csv\\classes\\processors\\AuthorsProcessor::processMultiLocale<\/a>"],[0,6,"<a href=\"CategoriesProcessor.php.html#26\">APP\\plugins\\importexport\\csv\\classes\\processors\\CategoriesProcessor::process<\/a>"],[0,4,"<a href=\"CategoriesProcessor.php.html#73\">APP\\plugins\\importexport\\csv\\classes\\processors\\CategoriesProcessor::processForVersion<\/a>"],[0,8,"<a href=\"CategoriesProcessor.php.html#92\">APP\\plugins\\importexport\\csv\\classes\\processors\\CategoriesProcessor::processMultiLocale<\/a>"],[0,4,"<a href=\"FundersProcessor.php.html#32\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::isFundingPluginEnabled<\/a>"],[0,4,"<a href=\"FundersProcessor.php.html#51\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::isCrossrefValidationEnabled<\/a>"],[0,7,"<a href=\"FundersProcessor.php.html#78\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::process<\/a>"],[0,1,"<a href=\"FundersProcessor.php.html#110\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::submissionHasFunders<\/a>"],[0,4,"<a href=\"FundersProcessor.php.html#124\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::processMultiLocale<\/a>"],[0,8,"<a href=\"FundersProcessor.php.html#150\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::createFundersFromString<\/a>"],[0,4,"<a href=\"FundersProcessor.php.html#200\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::cloneFundersFromSubmission<\/a>"],[0,5,"<a href=\"FundersProcessor.php.html#235\">APP\\plugins\\importexport\\csv\\classes\\processors\\FundersProcessor::validateFundersFormat<\/a>"],[0,2,"<a href=\"GalleyProcessor.php.html#23\">APP\\plugins\\importexport\\csv\\classes\\processors\\GalleyProcessor::process<\/a>"],[0,7,"<a href=\"KeywordsProcessor.php.html#24\">APP\\plugins\\importexport\\csv\\classes\\processors\\KeywordsProcessor::process<\/a>"],[0,3,"<a href=\"KeywordsProcessor.php.html#59\">APP\\plugins\\importexport\\csv\\classes\\processors\\KeywordsProcessor::processMultiLocale<\/a>"],[100,2,"<a href=\"PublicationProcessor.php.html#32\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::createInitialPublication<\/a>"],[0,6,"<a href=\"PublicationProcessor.php.html#46\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::process<\/a>"],[0,1,"<a href=\"PublicationProcessor.php.html#81\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::updatePrimaryContactId<\/a>"],[0,1,"<a href=\"PublicationProcessor.php.html#86\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::updateCoverage<\/a>"],[0,1,"<a href=\"PublicationProcessor.php.html#91\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::updateCoverImage<\/a>"],[0,1,"<a href=\"PublicationProcessor.php.html#108\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::updateSectionId<\/a>"],[0,2,"<a href=\"PublicationProcessor.php.html#113\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::updatePublicationAttribute<\/a>"],[0,1,"<a href=\"PublicationProcessor.php.html#125\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::setCopyrightFromSystem<\/a>"],[0,12,"<a href=\"PublicationProcessor.php.html#156\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::processVersionedPublication<\/a>"],[0,3,"<a href=\"PublicationProcessor.php.html#221\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::createPublicationVersion<\/a>"],[0,4,"<a href=\"PublicationProcessor.php.html#260\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::processMultiLocalePublication<\/a>"],[100,1,"<a href=\"PublicationProcessor.php.html#289\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::getReferencesContent<\/a>"],[0,1,"<a href=\"PublicationProcessor.php.html#300\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::updateVorDoi<\/a>"],[0,8,"<a href=\"PublicationProcessor.php.html#311\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::processSupportingAgencies<\/a>"],[0,3,"<a href=\"PublicationProcessor.php.html#350\">APP\\plugins\\importexport\\csv\\classes\\processors\\PublicationProcessor::processSupportingAgenciesMultiLocale<\/a>"],[0,6,"<a href=\"SectionsProcessor.php.html#26\">APP\\plugins\\importexport\\csv\\classes\\processors\\SectionsProcessor::process<\/a>"],[0,7,"<a href=\"SubjectsProcessor.php.html#24\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubjectsProcessor::process<\/a>"],[0,3,"<a href=\"SubjectsProcessor.php.html#59\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubjectsProcessor::processMultiLocale<\/a>"],[0,2,"<a href=\"SubmissionFileProcessor.php.html#27\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubmissionFileProcessor::process<\/a>"],[0,1,"<a href=\"SubmissionFileProcessor.php.html#61\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubmissionFileProcessor::updateAssocInfo<\/a>"],[0,1,"<a href=\"SubmissionProcessor.php.html#26\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubmissionProcessor::process<\/a>"],[0,1,"<a href=\"SubmissionProcessor.php.html#42\">APP\\plugins\\importexport\\csv\\classes\\processors\\SubmissionProcessor::setCurrentPublicationId<\/a>"],[0,3,"<a href=\"UserGroupsProcessor.php.html#24\">APP\\plugins\\importexport\\csv\\classes\\processors\\UserGroupsProcessor::process<\/a>"],[0,3,"<a href=\"UserInterestsProcessor.php.html#23\">APP\\plugins\\importexport\\csv\\classes\\processors\\UserInterestsProcessor::process<\/a>"],[0,3,"<a href=\"UsersProcessor.php.html#27\">APP\\plugins\\importexport\\csv\\classes\\processors\\UsersProcessor::process<\/a>"],[100,2,"<a href=\"UsersProcessor.php.html#53\">APP\\plugins\\importexport\\csv\\classes\\processors\\UsersProcessor::getValidUsername<\/a>"]], 'Method Complexity'))
+      .transition()
+      .duration(500)
+      .call(chart);
+
+    nv.utils.windowResize(chart.update);
+
+    return chart;
+  });
+
+  function getComplexityData(data, label) {
+    var values = [];
+    $.each(data, function(key) {
+      var value = Math.round(data[key][0]*100) / 100;
+      values.push({
+        x: value,
+        y: data[key][1],
+        class: data[key][2],
+        size: 0.05,
+        shape: 'diamond'
+      });
+    });
+
+    return [
+      {
+        key: label,
+        values: values,
+        color: "#4572A7"
+      }
+    ];
+  }
+});
+  </script>
+ </body>
+</html>

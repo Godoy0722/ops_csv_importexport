@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/commands/PreprintCommand.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class PreprintCommand
@@ -20,9 +20,8 @@ use APP\core\Application;
 use APP\facades\Repo;
 use APP\file\PublicFileManager;
 use APP\publication\Publication;
-use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
-use APP\plugins\importexport\csv\classes\handlers\CSVFileHandler;
+use APP\plugins\importexport\csv\classes\handlers\CsvFileHandler;
 use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
 use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
@@ -35,19 +34,19 @@ use APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredPreprintHeaders;
+use APP\server\ServerDAO;
 use APP\submission\Submission;
 use Illuminate\Support\Facades\DB;
+use PKP\db\DAORegistry;
 use PKP\file\FileManager;
 use PKP\services\PKPFileService;
+use PKP\submission\GenreDAO;
 use PKP\user\User;
 
 class PreprintCommand
 {
     /** Expected row size for a CSV based on the command passed as argument */
     private int $expectedRowSize;
-
-    /** The folder containing all CSV files that the command must go through */
-    private string $sourceDir;
 
     private int $processedRows;
 
@@ -58,8 +57,6 @@ class PreprintCommand
     private FileManager $fileManager;
 
     private PKPFileService $fileService;
-
-    private User $user;
 
     /**
      * The file directory array map used by the application.
@@ -100,18 +97,24 @@ class PreprintCommand
      */
     private array $processedPreprints;
 
-    public function __construct(string $sourceDir, User $user)
+    public function __construct(private string $sourceDir, private User $user)
     {
         $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
-        $this->sourceDir = $sourceDir;
-        $this->user = $user;
         $this->processedPreprints = [];
+
+        // Initialize static variables.
+        $this->dirNames ??= Application::getFileDirectories();
+        $this->format ??= trim($this->dirNames['context'], '/') . '/%d/' . trim($this->dirNames['submission'], '/') . '/%d';
+        $this->fileManager ??= new FileManager();
+        $this->publicFileManager ??= new PublicFileManager();
+        $this->fileService ??= app()->get('file');
     }
 
-    public function run()
+    public function run(): void
     {
         foreach (new \DirectoryIterator($this->sourceDir) as $fileInfo) {
-            if (!$fileInfo->isFile() || $fileInfo->getExtension() !== 'csv') {
+            // Accept CSV files regardless of extension case (e.g., .csv, .CSV, .Csv)
+            if (!$fileInfo->isFile() || strcasecmp($fileInfo->getExtension(), 'csv') !== 0) {
                 continue;
             }
 
@@ -123,13 +126,15 @@ class PreprintCommand
             }
 
             $filePath = $fileInfo->getPathname();
-            $file = CSVFileHandler::createReadableCSVFile($filePath);
+            $file = CsvFileHandler::createReadableCSVFile($filePath);
 
             if (is_null($file)) {
                 continue;
             }
 
-            $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
+            $basename = $fileInfo->getBasename();
+            // @review I think the file should be created just if something goes wrong, then it won't be needed to delete the file at the end
+            $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
 
             if (is_null($invalidCsvFile)) {
                 continue;
@@ -147,7 +152,7 @@ class PreprintCommand
 
                 $reason = InvalidRowValidations::validateRowContainAllFields($fields, $this->expectedRowSize);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
@@ -156,24 +161,24 @@ class PreprintCommand
                     array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                 );
 
-                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, function($row) {
-                    return RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints);
-                });
+                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, fn($row)
+                    => RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints));
+
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
                 $reason = InvalidRowValidations::validatePreprintVersioningFields($data);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
                 if (!empty($data->versionIdentifier)) {
                     $reason = InvalidRowValidations::validateNoDuplicateVersion($data, $this->processedPreprints);
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -188,7 +193,7 @@ class PreprintCommand
                     );
 
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -201,7 +206,7 @@ class PreprintCommand
                     );
 
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -213,7 +218,7 @@ class PreprintCommand
                         $data->suppDescriptions
                     );
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -221,7 +226,7 @@ class PreprintCommand
                 if ($data->references) {
                     $reason = InvalidRowValidations::validateReferencesFile($data->references, $this->sourceDir);
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -229,7 +234,7 @@ class PreprintCommand
                 if ($data->vorDoi) {
                     $reason = InvalidRowValidations::validateVorDoi($data->vorDoi);
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -237,7 +242,7 @@ class PreprintCommand
                 if ($data->funders) {
                     $reason = InvalidRowValidations::validateFunders($data->funders);
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -253,13 +258,13 @@ class PreprintCommand
 
                 $reason = InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
                 $reason = InvalidRowValidations::validateServerLocale($server, $data->locale);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
@@ -269,15 +274,15 @@ class PreprintCommand
 
                 $reason = InvalidRowValidations::validateGenreIdValid($genreId, $genreName);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
-                $userGroupId = CachedEntities::getCachedUserGroupId($data->serverPath, $server->getId());
+                $userGroupId = CachedEntities::getCachedAuthorUserGroupId($data->serverPath, $server->getId());
 
                 $reason = InvalidRowValidations::validateUserGroupId($userGroupId, $data->serverPath);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
@@ -285,25 +290,24 @@ class PreprintCommand
                 if ($data->funders) {
                     $reason = InvalidRowValidations::validateFundingPluginEnabled($data->funders, $server->getId());
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
 
                     // Validate funders are from Crossref registry (only when enableGrantIdValidation is enabled)
                     $reason = InvalidRowValidations::validateFundersCrossrefRegistry($data->funders, $server->getId());
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
 
-                $this->initializeStaticVariables();
-
+                // @review Maybe this logic can be moved into another method
                 $coverImageUploadName = null;
                 if ($data->coverImageFilename) {
                     $reason = InvalidRowValidations::validateCoverImageIsValid($data->coverImageFilename, $this->sourceDir);
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
 
@@ -313,11 +317,18 @@ class PreprintCommand
 
                     $destFilePath = $this->publicFileManager->getContextFilesPath($server->getId()) . '/' . $coverImageUploadName;
                     $srcFilePath = "{$this->sourceDir}/{$data->coverImageFilename}";
+
+                    // Use a secure 48-character random alphanumeric string as a prefix to avoid overwriting user files
+                    $randomPrefix = bin2hex(random_bytes(24)); // 48 hex characters
+                    $sanitizedFileName = basename($sanitizedCoverImageName);
+                    $coverImageUploadName = $randomPrefix . '-' . $sanitizedFileName;
+                    $destFilePath = $this->publicFileManager->getContextFilesPath($server->getId()) . '/' . $coverImageUploadName;
                     $bookCoverImageSaved = $this->fileManager->copyFile($srcFilePath, $destFilePath);
 
                     if (!$bookCoverImageSaved) {
                         $reason = __('plugin.importexport.csv.erroWhileSavingBookCoverImage');
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        // @review Generic comment: instead of passing many arguments, maybe you can pass $this or do a `$csvFileHandler = new CSVFileHandler(things that can be re-used)`
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
 
                         continue;
                     }
@@ -329,25 +340,24 @@ class PreprintCommand
                 $basePublication = null;
                 $isMultiLocaleImport = false;
 
-                if (!empty($data->versionIdentifier) &&
-                    InvalidRowValidations::versionExistsInAnyLocale($data, $this->processedPreprints)) {
-                    $version = (int)$data->version;
-                    $versionData = $this->processedPreprints[$data->versionIdentifier][$version];
+                if (!empty($data->versionIdentifier)) {
+                    if (InvalidRowValidations::versionExistsInAnyLocale($data, $this->processedPreprints)) {
+                        $version = (int)$data->version;
+                        $versionData = $this->processedPreprints[$data->versionIdentifier][$version];
 
-                    $firstLocaleData = reset($versionData);
-                    $existingSubmission = $firstLocaleData['submission'];
-                    $basePublication = $firstLocaleData['publication'];
+                        $firstLocaleData = reset($versionData);
+                        $existingSubmission = $firstLocaleData['submission'];
+                        $basePublication = $firstLocaleData['publication'];
 
-                    if (!isset($versionData[$data->locale])) {
-                        $isMultiLocaleImport = true;
+                        $isMultiLocaleImport = !isset($versionData[$data->locale]);
+                    } elseif (isset($this->processedPreprints[$data->versionIdentifier])) {
+                        // Handle new version (not multi-locale)
+                        $versions = $this->processedPreprints[$data->versionIdentifier];
+                        $lastVersion = end($versions);
+                        $lastVersionData = reset($lastVersion);
+                        $existingSubmission = $lastVersionData['submission'];
+                        $basePublication = $lastVersionData['publication'];
                     }
-                } elseif (!empty($data->versionIdentifier) && isset($this->processedPreprints[$data->versionIdentifier])) {
-                    // Handle new version (not multi-locale)
-                    $versions = $this->processedPreprints[$data->versionIdentifier];
-                    $lastVersion = end($versions);
-                    $lastVersionData = reset($lastVersion);
-                    $existingSubmission = $lastVersionData['submission'];
-                    $basePublication = $lastVersionData['publication'];
                 }
 
                 if ($isMultiLocaleImport) {
@@ -370,10 +380,11 @@ class PreprintCommand
 
                 if (!$publication) {
                     $reason = __('plugins.importexport.csv.errorWhileCreatingPublication');
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
+                // @review As most of the logic is separated into other methods, I think this piece can also be moved to another method
                 // Array to store each galley ID to its respective galley file
                 $galleyIds = [];
                 if ($data->galleyFilenames) {
@@ -418,7 +429,8 @@ class PreprintCommand
                 // Process supplementary files
                 if ($data->suppFilenames) {
                     // Get supplementary genre for supplementary files
-                    $genreDao = CachedDaos::getGenreDao();
+                    $genreDao = DAORegistry::getDAO('GenreDAO'); /** @var GenreDAO $genreDao */
+                    // @review I think this can be cached as well
                     $supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $server->getId())->toArray();
                     $suppGenreId = !empty($supplementaryGenres) ? $supplementaryGenres[0]->getId() : $genreId;
                     $suppIds = [];
@@ -433,6 +445,7 @@ class PreprintCommand
                             $fieldsList
                         );
 
+                        // @review I understand that if one fail, then we'll remove all galleys and end up using a bad ID below at `$suppIds[] = ['file' => $suppFile, 'id' => $suppFileId]`
                         if (is_null($suppFileId)) {
                             foreach($galleyIds as $galleyItem) {
                                 $this->fileService->delete($galleyItem['id']);
@@ -471,6 +484,7 @@ class PreprintCommand
                     }
                 }
 
+                // @review Generic comment: After watching these processMultiLocale() vs process() I see a lot of duplicated code, so I think they can be unified
                 if ($isMultiLocaleImport) {
                     // For multi-locale imports, update existing publication with new locale data
                     AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
@@ -491,10 +505,7 @@ class PreprintCommand
                     PublicationProcessor::updateVorDoi($publication, $data->vorDoi);
                 }
 
-                if (
-                    ((!empty($data->version) && (int)$data->version === 1) || empty($data->version))
-                    && !empty($data->coverage)
-                ) {
+                if ((empty($data->version) || (int)$data->version === 1) && !empty($data->coverage)) {
                     PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
                 }
 
@@ -550,16 +561,6 @@ class PreprintCommand
         $this->setCurrentVersionsForProcessedPreprints();
     }
 
-    /** Insert static data that will be used for the submission processing */
-    private function initializeStaticVariables(): void
-    {
-        $this->dirNames ??= Application::getFileDirectories();
-        $this->format ??= trim($this->dirNames['context'], '/') . '/%d/' . trim($this->dirNames['submission'], '/') . '/%d';
-        $this->fileManager ??= new FileManager();
-        $this->publicFileManager ??= new PublicFileManager();
-        $this->fileService ??= app()->get('file');
-    }
-
     /**
      * Save a submission file. If an error occurred, the method will delete the submission already saved
      * and return null.
@@ -580,7 +581,7 @@ class PreprintCommand
 
             return $this->fileService->add($completePath, $submissionDir . '/' . uniqid() . '.' . $extension);
         } catch (\Exception $e) {
-            CSVFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
+            CsvFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
 
             Repo::submission()->delete($submission);
 
@@ -651,7 +652,7 @@ class PreprintCommand
                 $publicationId = $publication->getId();
 
                 $serverId = Repo::submission()->get($publication->getData('submissionId'))->getData('contextId');
-                $serverDao = CachedDaos::getServerDao();
+                $serverDao = DAORegistry::getDAO('ServerDAO'); /** @var ServerDAO $serverDao */
                 $server = $serverDao->getById($serverId);
                 if (!$server) {
                     continue;

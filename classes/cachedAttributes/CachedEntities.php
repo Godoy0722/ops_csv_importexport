@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/cachedAttributes/CachedEntities.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class CachedEntities
@@ -18,12 +18,14 @@
 namespace APP\plugins\importexport\csv\classes\cachedAttributes;
 
 use APP\facades\Repo;
-use APP\publication\Publication;
 use APP\section\Section;
 use APP\server\Server;
+use APP\server\ServerDAO;
 use APP\subscription\SubscriptionType;
 use PKP\category\Category;
+use PKP\db\DAORegistry;
 use PKP\security\Role;
+use PKP\submission\GenreDAO;
 use PKP\user\User;
 use PKP\userGroup\UserGroup;
 
@@ -56,53 +58,57 @@ class CachedEntities
     /** Retrieves a cached Server by its path. Returns null if an error occurs. */
     static function getCachedServer(string $serverPath): ?Server
     {
-        $serverDao = CachedDaos::getServerDao();
+        $serverDao = DAORegistry::getDAO('ServerDAO'); /** @var ServerDAO $serverDao */
 
-        return self::$servers[$serverPath] ?? self::$servers[$serverPath] = $serverDao->getByPath($serverPath);
+        return static::$servers[$serverPath] ?? static::$servers[$serverPath] = $serverDao->getByPath($serverPath);
     }
 
     /** Retrieves a cached userGroup ID by serverId. Returns null if an error occurs. */
-    static function getCachedUserGroupId(string $serverPath, int $serverId): ?int
+    static function getCachedAuthorUserGroupId(string $serverPath, int $serverId): ?int
     {
-        if (isset(self::$userGroupIds[$serverPath])) {
-            return self::$userGroupIds[$serverPath];
-        }
-
-        $userGroups = Repo::userGroup()->getByRoleIds([Role::ROLE_ID_AUTHOR], $serverId);
-
-        if (empty($userGroups)) {
-            return null;
-        }
-
-        $userGroup = $userGroups->first();
-        if (is_null($userGroup)) {
-            return null;
-        }
-
-        return self::$userGroupIds[$serverPath] = $userGroup->id;
+        // Cache null values as well, so repeated misses aren't retried
+        return static::$userGroupIds[$serverPath] ??= Repo::userGroup()->getByRoleIds([Role::ROLE_ID_AUTHOR], $serverId)->first()?->id;
     }
 
-	/** Retrieves a cached User by email. Returns null if an error occurs. */
+    /** Retrieves a cached User by email. Returns null if an error occurs. */
     static function getCachedUserByEmail(string $email): ?User
     {
-		return self::$users[$email] ??= Repo::user()->getByEmail($email);
+        if (!isset(static::$users[$email])) {
+            $user = Repo::user()->getByEmail($email);
+            if ($user) {
+                static::$users[$email] = $user;
+                static::$users[$user->getUsername()] = $user;
+            } else {
+                static::$users[$email] = null;
+            }
+        }
+        return static::$users[$email];
     }
 
-	/** Retrieves a cached User by username. Returns null if an error occurs. */
+    /** Retrieves a cached User by username. Returns null if an error occurs. */
     static function getCachedUserByUsername(string $username, bool $allowDisabled = false): ?User
     {
-		return self::$users[$username] ??= Repo::user()->getByUsername($username, $allowDisabled);
+        if (!isset(static::$users[$username])) {
+            $user = Repo::user()->getByUsername($username, $allowDisabled);
+            if ($user) {
+                static::$users[$username] = $user;
+                static::$users[$user->getEmail()] = $user;
+            } else {
+                static::$users[$username] = null;
+            }
+        }
+        return static::$users[$username];
     }
 
-	/**
-	 * Retrieves a cached UserGroup by serverId. Returns null if an error occurs.
-	 *
-	 * @return UserGroup[]
-	 */
+    /**
+     * Retrieves a cached UserGroup by serverId. Returns null if an error occurs.
+     *
+     * @return UserGroup[]
+     */
     static function getCachedUserGroupsByServerId(int $serverId): array
     {
-        if (isset(self::$userGroups[$serverId])) {
-            return self::$userGroups[$serverId];
+        if (isset(static::$userGroups[$serverId])) {
+            return static::$userGroups[$serverId];
         }
 
         $userGroups = [];
@@ -112,13 +118,13 @@ class CachedEntities
             $userGroups[$userGroup->id] = $userGroup;
         }
 
-        return self::$userGroups[$serverId] = $userGroups;
+        return static::$userGroups[$serverId] = $userGroups;
     }
 
-	/** Retrieves a cached UserGroup by name and serverId. Returns null if an error occurs. */
+    /** Retrieves a cached UserGroup by name and serverId. Returns null if an error occurs. */
     static function getCachedUserGroupByName(string $name, int $serverId, string $locale): ?UserGroup
     {
-        $userGroups = self::getCachedUserGroupsByServerId($serverId);
+        $userGroups = static::getCachedUserGroupsByServerId($serverId);
 
         foreach ($userGroups as $userGroup) {
             if (mb_strtolower($userGroup->name[$locale]) === mb_strtolower($name)) {
@@ -132,14 +138,15 @@ class CachedEntities
     /** Retrieves a cached genre ID by genreName and serverId. Returns null if an error occurs. */
     static function getCachedGenreId(string $genreName, int $serverId): ?int
     {
-		return self::$genreIds[$genreName] ??= CachedDaos::getGenreDao()->getByKey($genreName, $serverId)->getId();
+        $genreDao = DAORegistry::getDAO('GenreDAO'); /** @var GenreDAO $genreDao */
+        return static::$genreIds[$genreName] ??= $genreDao->getByKey($genreName, $serverId)->getId();
     }
 
     /** Retrieves a cached Category by categoryName and serverId. Returns null if an error occurs. */
     static function getCachedCategory(string $categoryName, int $serverId): ?Category
     {
-        if (isset(self::$categories[$categoryName])) {
-            return self::$categories[$categoryName];
+        if (isset(static::$categories[$categoryName])) {
+            return static::$categories[$categoryName];
         }
 
         $categories = Repo::category()->getCollector()
@@ -148,7 +155,7 @@ class CachedEntities
 
         foreach ($categories as $category) {
             if ($category->getPath() === $categoryName) {
-                return self::$categories[$categoryName] = $category;
+                return static::$categories[$categoryName] = $category;
             }
         }
 
@@ -160,8 +167,8 @@ class CachedEntities
     {
         $customSectionKey = $sectionTitle . '_' . mb_strtoupper(trim($sectionAbbrev));
 
-        if (isset(self::$sections[$customSectionKey])) {
-            return self::$sections[$customSectionKey];
+        if (isset(static::$sections[$customSectionKey])) {
+            return static::$sections[$customSectionKey];
         }
 
         $sections = Repo::section()->getCollector()
@@ -170,7 +177,7 @@ class CachedEntities
 
         foreach ($sections as $section) {
             if ($section->getAbbrev($locale) === $sectionAbbrev && $section->getTitle($locale) === $sectionTitle) {
-                return self::$sections[$customSectionKey] = $section;
+                return static::$sections[$customSectionKey] = $section;
             }
         }
 
@@ -179,24 +186,23 @@ class CachedEntities
 
     static function getCachedSectionById(int $baseSectionId, int $serverId, string $locale): ?Section
     {
-        $existingSection = null;
-        foreach (self::$sections as $section) {
-            if ($section instanceof Section && $section->getId() === $baseSectionId) {
-                $existingSection = $section;
-                break;
-            }
-        }
-
-        if ($existingSection) {
-            return $existingSection;
+        // Cache by ID first to avoid redundant lookups
+        if (isset(static::$sections[$baseSectionId])) {
+            return static::$sections[$baseSectionId];
         }
 
         $section = Repo::section()->get($baseSectionId, $serverId);
+        if (!$section) {
+            return null;
+        }
+
         $sectionTitle = $section->getTitle($locale);
         $sectionAbbrev = $section->getAbbrev($locale);
-
         $customSectionKey = $sectionTitle . '_' . mb_strtoupper(trim($sectionAbbrev));
-        self::$sections[$customSectionKey] = $section;
+
+        static::$sections[$baseSectionId] = $section;
+        static::$sections[$customSectionKey] = $section;
+
         return $section;
     }
 }

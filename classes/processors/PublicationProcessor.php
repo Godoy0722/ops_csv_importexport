@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/PublicationProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class PublicationProcessor
@@ -21,7 +21,9 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\publication\Publication;
 use APP\server\Server;
+use APP\server\ServerDAO;
 use APP\submission\Submission;
+use PKP\db\DAORegistry;
 
 class PublicationProcessor
 {
@@ -112,13 +114,9 @@ class PublicationProcessor
 
     static function updatePublicationAttribute(Publication $publication, string $attribute, mixed $data, ?string $locale = null)
     {
-        if (!is_null($locale)) {
-            $publication->setData($attribute, $data, $locale);
-            Repo::publication()->dao->update($publication);
-            return;
-        }
-
+        // @review I think it's not needed to check if the locale is null, the default value of the $locale argument, when it's not passed, is also null
         $publication->setData($attribute, $data);
+        // @review Better to call the method below after updating all fields, if I'm not mistaken, there's a place in the code with multiple calls to this method
         Repo::publication()->dao->update($publication);
     }
 
@@ -220,6 +218,7 @@ class PublicationProcessor
      */
     public static function createPublicationVersion(Publication $basePublication, object $data): Publication
     {
+        // @review The same comment I left about the "clone $author"
         $newPublication = clone $basePublication;
         $newPublication->setData('id', null);
         $newPublication->setData('datePublished', null);
@@ -236,6 +235,7 @@ class PublicationProcessor
             return $newPublication;
         }
 
+        // @review Hmm, if we're going to reset anyway, then these attributes could be set before calling the "insert()", and further updates won't be needed
         $newPublication->setData('authors', []);
         $newPublication->setData('primaryContactId', null);
         Repo::publication()->dao->update($newPublication);
@@ -274,7 +274,8 @@ class PublicationProcessor
             }
         }
 
-        $server = CachedDaos::getServerDao()->getById($publication->getData('contextId'));
+        $serverDao = DAORegistry::getDAO('ServerDAO'); /** @var ServerDAO $serverDao */
+        $server = $serverDao->getById($publication->getData('contextId'));
         if ($server) {
             $publication->setData('copyrightNotice', $server->getLocalizedData('copyrightNotice', $data->locale));
             Repo::publication()->dao->update($publication);

@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/validations/RequiredPreprintHeaders.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class RequiredPreprintHeaders
@@ -81,6 +81,7 @@ class RequiredPreprintHeaders
                 return true;
             }
 
+            //1 is enough to cover duplicate check?
             if ($version > 1) {
                 return true;
             }

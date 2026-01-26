@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/CSVImportExportPlugin.inc.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class CSVImportExportPlugin
@@ -15,10 +15,10 @@
 
 namespace APP\plugins\importexport\csv;
 
+use APP\core\Application;
 use APP\facades\Repo;
 use APP\plugins\importexport\csv\classes\commands\PreprintCommand;
 use APP\plugins\importexport\csv\classes\commands\UserCommand;
-use PKP\config\Config;
 use PKP\plugins\ImportExportPlugin;
 use PKP\user\User;
 
@@ -40,27 +40,23 @@ class CSVImportExportPlugin extends ImportExportPlugin
     private bool $sendWelcomeEmail = false;
 
     /** @copydoc Plugin::register() */
-    public function register($category, $path, $mainContextId = null)
+    public function register($category, $path, $mainContextId = null): bool
     {
-        $success = parent::register($category, $path, $mainContextId);
-		$isInstalled = !!Config::getVar('general', 'installed');
-		$isUpgrading = defined('RUNNING_UPGRADE');
-
-        if (!$isInstalled || $isUpgrading) {
-            return $success;
+        if (!parent::register($category, $path, $mainContextId)) {
+            return false;
         }
 
-        if ($success && $this->getEnabled()) {
+        if (!Application::isUnderMaintenance() && $this->getEnabled()) {
             $this->addLocaleData();
         }
 
-        return $success;
+        return true;
     }
 
     /**
      * @copydoc Plugin::getDisplayName()
      */
-    public function getDisplayName()
+    public function getDisplayName(): string
     {
         return __('plugins.importexport.csv.displayName');
     }
@@ -68,7 +64,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
     /**
      * @copydoc Plugin::getDescription()
      */
-    public function getDescription()
+    public function getDescription(): string
     {
         return __('plugins.importexport.csv.description');
     }
@@ -76,7 +72,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
     /**
      * @copydoc Plugin::getName()
      */
-    public function getName()
+    public function getName(): string
     {
         return 'CSVImportExportPlugin';
     }
@@ -84,7 +80,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
     /**
      * @copydoc PKPImportExportPlugin::usage
      */
-    public function usage($scriptName)
+    public function usage($scriptName): void
     {
         echo __('plugins.importexport.csv.cliUsage', [
             'scriptName' => $scriptName,
@@ -99,48 +95,43 @@ class CSVImportExportPlugin extends ImportExportPlugin
     /**
      * @see PKPImportExportPlugin::executeCLI()
      */
-    public function executeCLI($scriptName, &$args)
+    public function executeCLI($scriptName, &$args): void
     {
         $startTime = microtime(true);
         $this->command = array_shift($args);
-		$this->username = array_shift($args);
+        $this->username = array_shift($args);
         $this->sourceDir = array_shift($args);
-        $this->sendWelcomeEmail = array_shift($args) ?? false;
+        $this->sendWelcomeEmail = array_shift($args) === 'true' ?? false; // @review I think it's better to check against a value or just use a flag "--sendWelcomeEmail"
 
         if (! in_array($this->command, ['preprints', 'users']) || !$this->sourceDir || !$this->username) {
-			$this->usage($scriptName);
-			exit(1);
-		}
+            $this->usage($scriptName);
+            exit(1);
+        }
 
         if (! is_dir($this->sourceDir)) {
             echo __('plugins.importexport.csv.unknownSourceDir', ['sourceDir' => $this->sourceDir]) . "\n";
             exit(1);
         }
 
-		$this->validateUser();
+        $this->validateUser();
 
-        switch ($this->command) {
-            case 'preprints':
-				(new PreprintCommand($this->sourceDir, $this->user))->run();
-                break;
-            case 'users':
-                (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail))->run();
-                break;
-            default:
-                throw new \InvalidArgumentException("Comando inválido: {$this->command}");
-        }
+        match ($this->command) {
+            'preprints' => (new PreprintCommand($this->sourceDir, $this->user))->run(),
+            'users' => (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail))->run(),
+            default => throw new \InvalidArgumentException(__('plugins.importexport.csv.invalidCommand', ['command' => $this->command])),
+        };
 
-		$endTime = microtime(true);
-		$executionTime = $endTime - $startTime;
-		echo "Executed in: " . number_format($executionTime, 2) . " seconds\n";
+        $endTime = microtime(true);
+        $executionTime = $endTime - $startTime;
+        echo __('plugins.importexport.csv.ExecutedInNSeconds', ['seconds' => number_format($executionTime, 2)]);
     }
 
-	private function validateUser()
+    private function validateUser(): void
     {
-		$this->user = Repo::user()->getByUsername($this->username);
-		if (!$this->user) {
-			echo __('plugins.importexport.csv.unknownUser', ['username' => $this->username]) . "\n";
-			exit(1);
-		}
-	}
+        $this->user = Repo::user()->getByUsername($this->username);
+        if (!$this->user) {
+            echo __('plugins.importexport.csv.unknownUser', ['username' => $this->username]) . "\n";
+            exit(1);
+        }
+    }
 }

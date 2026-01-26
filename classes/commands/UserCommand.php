@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/commands/UserCommand.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class UserCommand
@@ -17,7 +17,7 @@
 namespace APP\plugins\importexport\csv\classes\commands;
 
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
-use APP\plugins\importexport\csv\classes\handlers\CSVFileHandler;
+use APP\plugins\importexport\csv\classes\handlers\CsvFileHandler;
 use APP\plugins\importexport\csv\classes\handlers\WelcomeEmailHandler;
 use APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor;
 use APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor;
@@ -32,29 +32,23 @@ class UserCommand
     /** Expected row size for a CSV based on the command passed as argument */
     private int $expectedRowSize;
 
-    /** The folder containing all CSV files that the command must go through */
-    private string $sourceDir;
-
     private int $processedRows;
 
     private int $failedRows;
 
-    private bool $sendWelcomeEmail;
-
-    private User $senderEmailUser;
-
-    public function __construct(string $sourceDir, User $user, bool $sendWelcomeEmail)
-    {
+    // @review The attributes can be promoted (then the declaration/attribution can be dropped)
+    public function __construct(
+        private string $sourceDir,
+        private User $senderEmailUser,
+        private bool $sendWelcomeEmail
+    ) {
         $this->expectedRowSize = count(RequiredUserHeaders::$userHeaders);
-        $this->sourceDir = $sourceDir;
-        $this->senderEmailUser = $user;
-        $this->sendWelcomeEmail = $sendWelcomeEmail;
     }
 
     public function run(): void
     {
         foreach (new \DirectoryIterator($this->sourceDir) as $fileInfo) {
-            if (!$fileInfo->isFile() || $fileInfo->getExtension() !== 'csv') {
+            if (!$fileInfo->isFile() || mb_strtolower($fileInfo->getExtension()) !== 'csv') {
                 continue;
             }
 
@@ -66,12 +60,12 @@ class UserCommand
             }
 
             $filePath = $fileInfo->getPathname();
-            $file = CSVFileHandler::createReadableCSVFile($filePath);
+            $file = CsvFileHandler::createReadableCSVFile($filePath);
             if (is_null($file)) {
                 continue;
             }
 
-            $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredUserHeaders::$userHeaders);
+            $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredUserHeaders::$userHeaders);
             if (is_null($invalidCsvFile)) {
                 continue;
             }
@@ -88,7 +82,7 @@ class UserCommand
 
                 $reason = InvalidRowValidations::validateRowContainAllFields($fields, $this->expectedRowSize);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
@@ -97,7 +91,7 @@ class UserCommand
 
                 $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, [RequiredUserHeaders::class, 'validateRowHasAllRequiredFields']);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
@@ -105,20 +99,20 @@ class UserCommand
 
                 $reason = InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
                 $existingUserByEmail = CachedEntities::getCachedUserByEmail($data->email);
                 if (!is_null($existingUserByEmail)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, __('plugins.importexport.csv.userAlreadyExistsWithEmail', ['email' => $data->email]), $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, __('plugins.importexport.csv.userAlreadyExistsWithEmail', ['email' => $data->email]), $this->failedRows);
                     continue;
                 }
 
                 if ($data->username) {
                     $existingUserByUsername = CachedEntities::getCachedUserByUsername($data->username);
                     if (!is_null($existingUserByUsername)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, __('plugins.importexport.csv.userAlreadyExistsWithUsername', ['username' => $data->username]), $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, __('plugins.importexport.csv.userAlreadyExistsWithUsername', ['username' => $data->username]), $this->failedRows);
                         continue;
                     }
                 }
@@ -127,14 +121,14 @@ class UserCommand
 
                 $reason = InvalidRowValidations::validateAllUserGroupsAreValid($roles, $server->getId(), $server->getPrimaryLocale());
                 if (!is_null($reason)) {
-                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                     continue;
                 }
 
                 if (!empty($data->orcid)) {
                     $reason = InvalidRowValidations::validateOrcid($data->orcid);
                     if (!is_null($reason)) {
-                        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
+                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
                         continue;
                     }
                 }
@@ -153,6 +147,7 @@ class UserCommand
 
                 // Only send welcome email if explicitly requested via CLI flag
                 if ($this->sendWelcomeEmail) {
+                    // @review There were some discussions about strategies for mail delivery
                     WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                 }
             }

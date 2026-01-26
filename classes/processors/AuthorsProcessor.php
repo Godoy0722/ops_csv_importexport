@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/AuthorsProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class AuthorsProcessor
@@ -21,27 +21,31 @@ use APP\publication\Publication;
 
 class AuthorsProcessor
 {
-	public static function process(object $data, string $contactEmail, int $submissionId, Publication $publication, int $userGroupId, ?Publication $basePublication = null)
+    public static function process(object $data, string $contactEmail, int $submissionId, Publication $publication, int $userGroupId, ?Publication $basePublication = null)
     {
+        // @review I think I didn't see this cloneAuthorsFromBasePublication() on the processMultiLocale
         if (empty($data->authors) && !is_null($basePublication)) {
-            self::cloneAuthorsFromBasePublication($basePublication, $publication, $submissionId);
+            // @review All self:: can be replaced by static::, but a big deal, but in general, that's the expected behavior (call a possible extended implementation instead of a fixed one)
+            static::cloneAuthorsFromBasePublication($basePublication, $publication, $submissionId);
             return;
         }
 
-		$authorsString = array_map('trim', explode(';', $data->authors));
+        $authorsString = array_map('trim', explode(';', $data->authors));
 
         foreach ($authorsString as $index => $authorString) {
+            // @review Not needed to initialize the variables here, they will be overwritten later
             $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
             $authorParts = array_map('trim', explode(',', $authorString));
             $givenName = $authorParts[0] ?? '';
             $familyName = $authorParts[1] ?? '';
+            // @review As the email is important, maybe it makes sense to validate it too
             $emailAddress = $authorParts[2] ?? '';
             $orcid = $authorParts[3] ?? '';
             $affiliation = $authorParts[4] ?? '';
 
-			if (empty($emailAddress)) {
-				$emailAddress = $contactEmail;
-			}
+            if (empty($emailAddress)) {
+                $emailAddress = $contactEmail;
+            }
 
             $author = Repo::author()->newDataObject();
 
@@ -52,7 +56,7 @@ class AuthorsProcessor
             $author->setEmail($emailAddress);
             $author->setData('publicationId', $publication->getId());
 
-            $normalizedOrcid = self::normalizeOrcid($orcid);
+            $normalizedOrcid = static::normalizeOrcid($orcid);
             if (!empty($normalizedOrcid)) {
                 $author->setOrcid($normalizedOrcid);
             }
@@ -67,12 +71,13 @@ class AuthorsProcessor
 
             $authorId = Repo::author()->add($author);
 
-			if ($index === 0) {
+            if ($index === 0) {
+                // @review This is not present on the multilocale variant, anyway, I think it should be removed from here and also from the codebase (the source of truth is the publication)
                 Repo::author()->edit($author, ['primaryContact' => true]);
                 PublicationProcessor::updatePrimaryContactId($publication, $authorId);
-			}
-		}
-	}
+            }
+        }
+    }
 
     /**
      * Clone authors from base publication to new versioned publication
@@ -83,12 +88,9 @@ class AuthorsProcessor
         int $submissionId
     ): void
     {
-        $authors = $basePublication->getData('authors');
-        if (empty($authors)) {
-            return;
-        }
-
+        $authors = $basePublication->getData('authors') ?: []; // @review In case it can be empty... Then the checks can be simplified below
         foreach ($authors as $author) {
+            // @review This would be nice, but given the clone doesn't clone sub-objects, we might have problems (e.g. $author->subObjectThatShouldNotBeReusedOnTheNewAuthor), like changing entitites/references of the cloned object
             $newAuthor = clone $author;
             $newAuthor->setData('id', null);
             $newAuthor->setData('publicationId', $newPublication->getId());
@@ -138,9 +140,13 @@ class AuthorsProcessor
         }
 
         $authorsString = array_map('trim', explode(';', $data->authors));
-        $existingAuthors = $publication->getData('authors');
+        $existingAuthors = $publication->getData('authors') ?: [];
 
-        foreach ($authorsString as $index => $authorString) {
+        if (empty($existingAuthors)) {
+            return;
+        }
+
+        foreach ($authorsString as $authorString) {
             $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
             $authorParts = array_map('trim', explode(',', $authorString));
             $givenName = $authorParts[0] ?? '';
@@ -154,20 +160,25 @@ class AuthorsProcessor
             }
 
             $existingAuthor = null;
-            if (!empty($existingAuthors)) {
-                foreach ($existingAuthors as $author) {
-                    if ($author->getEmail() === $emailAddress) {
-                        $existingAuthor = $author;
-                        break;
-                    }
+            foreach ($existingAuthors as $author) {
+                if ($author->getEmail() === $emailAddress) {
+                    $existingAuthor = $author;
+                    break;
                 }
             }
+            /* @review We can check if the "$existingAuthor" wasn't found and create one
+            if (!$existingAuthor) {
+                $author = Repo::author()->newDataObject();
+            }
 
+            Then the code should be basically the same, and we can remove the duplicated pieces...
+            At the end it's just needed to do a small check to update errr: `if ($existingAuthor) Repo::author()->dao->update($author); else Repo::author()->add($author);`
+            */
             if ($existingAuthor) {
                 $existingAuthor->setGivenName($givenName, $data->locale);
                 $existingAuthor->setFamilyName($familyName, $data->locale);
 
-                $normalizedOrcid = self::normalizeOrcid($orcid);
+                $normalizedOrcid = static::normalizeOrcid($orcid);
                 if (!empty($normalizedOrcid)) {
                     $existingAuthor->setOrcid($normalizedOrcid);
                 }
@@ -198,7 +209,7 @@ class AuthorsProcessor
                 $author->setEmail($emailAddress);
                 $author->setData('publicationId', $publication->getId());
 
-                $normalizedOrcidNew = self::normalizeOrcid($orcid);
+                $normalizedOrcidNew = static::normalizeOrcid($orcid);
                 if (!empty($normalizedOrcidNew)) {
                     $author->setOrcid($normalizedOrcidNew);
                 }

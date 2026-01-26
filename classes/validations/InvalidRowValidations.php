@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/validations/InvalidRowValidations.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class InvalidRowValidations
@@ -32,9 +32,17 @@ class InvalidRowValidations
      */
     public static function validateRowContainAllFields(array $fields, int $expectedSize): ?string
     {
-        return count($fields) < $expectedSize
-            ? __('plugins.importexport.csv.rowDoesntContainAllFields')
-            : null;
+        $fieldCount = count($fields);
+
+        if ($fieldCount < $expectedSize) {
+            return __('plugins.importexport.csv.rowDoesntContainAllFields');
+        }
+
+        if ($fieldCount > $expectedSize) {
+            return __('plugins.importexport.csv.rowContainsTooManyFields');
+        }
+
+        return null;
     }
 
     /**
@@ -74,9 +82,10 @@ class InvalidRowValidations
             return __('plugins.importexport.csv.invalidBookCoverImage');
         }
 
+        // @review I think the mb_strtolower() before calling the pathinfo might make the path invalid on a case sensitivite OS (Linux)
         $coverImgExtension = pathinfo(mb_strtolower($coverImageFilename), PATHINFO_EXTENSION);
 
-        if (!in_array($coverImgExtension, self::$coverImageAllowedTypes)) {
+        if (!in_array($coverImgExtension, static::$coverImageAllowedTypes)) {
             return __('plugins.importexport.csv.invalidFileExtension');
         }
 
@@ -93,6 +102,7 @@ class InvalidRowValidations
         $galleyLabelsArray = explode(';', $galleyLabels);
 
         if (count($galleyFilenamesArray) !== count($galleyLabelsArray)) {
+            // @review For all these validate*() methods, I think it would be more interesting to throw an Exception instead of returning an error message, then handle them on a generic way with a try/catch
             return __('plugins.importexport.csv.invalidNumberOfLabelsAndGalleys');
         }
 
@@ -172,7 +182,7 @@ class InvalidRowValidations
         if (!is_array($supportedLocales) || count($supportedLocales) < 1) {
             $supportedLocales = [$server->getPrimaryLocale()];
         }
-
+        // @review Perhaps it's better to allow the user to type "pt_br" instead of "pt_BR" (or to display the available locales to help)?!
         return !in_array($locale, $supportedLocales)
             ? __('plugins.importexport.csv.unknownLocale', ['locale' => $locale])
             : null;
@@ -194,7 +204,7 @@ class InvalidRowValidations
     public static function validateUserGroupId(?int $userGroupId, string $serverPath): ?string
     {
         return !$userGroupId
-            ? __('plugins.importexport.csv.noAuthorGroup', ['journal' => $serverPath])
+            ? __('plugins.importexport.csv.noAuthorGroup', ['server' => $serverPath])
             : null;
     }
 
@@ -208,6 +218,7 @@ class InvalidRowValidations
 
         $allDbRoles = 0;
         foreach ($roles as $role) {
+            // @review Here an arrow function can be used as well, then the `use` will not be needed
             $matchingGroups = array_filter($userGroups, function($userGroup) use ($role, $locale) {
                 return mb_strtolower($userGroup->name[$locale]) === mb_strtolower($role);
             });
@@ -219,6 +230,7 @@ class InvalidRowValidations
             : null;
     }
 
+    // @review Add comments to methods that have none
     public static function validatePreprintVersioningFields(object $data): ?string
     {
         if (!empty($data->versionIdentifier) && empty($data->version)) {
@@ -263,8 +275,7 @@ class InvalidRowValidations
         $identifier = $data->versionIdentifier;
         $version = (int)$data->version;
 
-        return isset($processedPreprints[$identifier][$version]) &&
-               !empty($processedPreprints[$identifier][$version]);
+        return !empty($processedPreprints[$identifier][$version]);
     }
 
     /**
@@ -307,19 +318,19 @@ class InvalidRowValidations
             return null;
         }
 
-        $normalizedOrcid = self::normalizeOrcid($orcid);
+        $normalizedOrcid = static::normalizeOrcid($orcid);
 
         if ($normalizedOrcid === null) {
             return __('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]);
         }
 
-        $digits = preg_replace('/[^0-9X]/', '', $normalizedOrcid);
+        $digits = preg_replace('/[^0-9X]/i', '', $normalizedOrcid);
 
         if (strlen($digits) !== 16) {
             return __('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]);
         }
 
-        if (!self::validateOrcidChecksum($digits)) {
+        if (!static::validateOrcidChecksum($digits)) {
             return __('plugins.importexport.csv.invalidOrcidChecksum', ['orcid' => $orcid]);
         }
 
@@ -337,11 +348,11 @@ class InvalidRowValidations
             return null;
         }
 
-        if (preg_match('/^https:\/\/(sandbox\.)?orcid\.org\/(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/', $orcid)) {
+        if (preg_match('/^https:\/\/(sandbox\.)?orcid\.org\/(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/i', $orcid)) {
             return $orcid;
         }
 
-        if (preg_match('/^(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/', $orcid)) {
+        if (preg_match('/^(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/i', $orcid)) {
             return 'https://orcid.org/' . $orcid;
         }
 
@@ -361,6 +372,7 @@ class InvalidRowValidations
      */
     private static function validateOrcidChecksum(string $digits): bool
     {
+        // @review Not sure what the internal Orcid integration can do, but a web request to check if the entry exists could be useful
         $total = 0;
         for ($i = 0; $i < 15; $i++) {
             $total = ($total + (int) $digits[$i]) * 2;
@@ -388,7 +400,7 @@ class InvalidRowValidations
             return null;
         }
 
-        $normalizedDoi = self::normalizeVorDoi($vorDoi);
+        $normalizedDoi = static::normalizeVorDoi($vorDoi);
 
         if ($normalizedDoi === null) {
             return __('plugins.importexport.csv.invalidVorDoiFormat', ['vorDoi' => $vorDoi]);
@@ -514,7 +526,7 @@ class InvalidRowValidations
             // Check if the funder identification contains a valid Crossref Funder Registry DOI
             // Valid formats: https://doi.org/10.13039/... or http://dx.doi.org/10.13039/...
             if (!empty($funderIdentification)) {
-                $hasCrossrefDoi = preg_match('/https?:\/\/(dx\.)?doi\.org\/10\.13039\//', $funderIdentification);
+                $hasCrossrefDoi = preg_match('/https?:\/\/(dx\.)?doi\.org\/10\.13039\//i', $funderIdentification);
                 if (!$hasCrossrefDoi) {
                     return __('plugins.importexport.csv.funderNotInCrossrefRegistry', [
                         'funderName' => $funderName,

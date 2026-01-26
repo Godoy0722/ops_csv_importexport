@@ -52,6 +52,9 @@ msgstr "Could not create the file \"{$filename}\"."
 msgid "plugins.importexport.csv.rowDoesntContainAllFields"
 msgstr "Row doesn't contain all fields."
 
+msgid "plugins.importexport.csv.rowContainsTooManyFields"
+msgstr "Row contains more fields than expected."
+
 msgid "plugins.importexport.csv.verifyRequiredFieldsForThisRow"
 msgstr "Verify the required fields for this row."
 
@@ -177,3 +180,6 @@ msgstr "Funder \"{$funderName}\" at position {$index} is missing a Crossref Fund
 
 msgid "plugins.importexport.csv.skippingInvalidFile"
 msgstr "Skipping \"{$filename}\" (file from previous failed import). To re-import failed rows, fix errors in this file, rename it without the 'invalid_' prefix, and run the import again."
+
+msgid "plugins.importexport.csv.ExecutedInNSeconds"
+msgstr "Executed in: {$seconds} seconds.\n"

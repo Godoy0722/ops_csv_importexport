@@ -64,7 +64,7 @@ class RequiredPreprintHeaders
 
     public static function validateRowHasAllFields(array $row): bool
     {
-        return count($row) === count(self::$preprintHeaders);
+        return count($row) === count(static::$preprintHeaders);
     }
 
     public static function validateRowHasAllRequiredFields(object $row, array $processedPreprints = []): bool
@@ -87,7 +87,7 @@ class RequiredPreprintHeaders
             }
         }
 
-        foreach (self::$preprintRequiredHeaders as $requiredHeader) {
+        foreach (static::$preprintRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;
             }

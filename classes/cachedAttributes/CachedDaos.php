@@ -1,2 +1,0 @@
-<?php
-// @review If the idea is just to cache DAOs, then this whole file can go away (not needed to cache this), otherwise, if the idea is to avoid repeating code/adding type hints ("@var XXXX"), then I think it's ok to keep.

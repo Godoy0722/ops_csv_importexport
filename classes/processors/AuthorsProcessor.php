@@ -21,11 +21,16 @@ use APP\publication\Publication;
 
 class AuthorsProcessor
 {
-    public static function process(object $data, string $contactEmail, int $submissionId, Publication $publication, int $userGroupId, ?Publication $basePublication = null)
+    public static function process(
+        object $data,
+        string $contactEmail,
+        int $submissionId,
+        Publication $publication,
+        int $userGroupId,
+        ?Publication $basePublication = null
+    ): void
     {
-        // @review I think I didn't see this cloneAuthorsFromBasePublication() on the processMultiLocale
         if (empty($data->authors) && !is_null($basePublication)) {
-            // @review All self:: can be replaced by static::, but a big deal, but in general, that's the expected behavior (call a possible extended implementation instead of a fixed one)
             static::cloneAuthorsFromBasePublication($basePublication, $publication, $submissionId);
             return;
         }
@@ -33,47 +38,20 @@ class AuthorsProcessor
         $authorsString = array_map('trim', explode(';', $data->authors));
 
         foreach ($authorsString as $index => $authorString) {
-            // @review Not needed to initialize the variables here, they will be overwritten later
-            $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
-            $authorParts = array_map('trim', explode(',', $authorString));
-            $givenName = $authorParts[0] ?? '';
-            $familyName = $authorParts[1] ?? '';
-            // @review As the email is important, maybe it makes sense to validate it too
-            $emailAddress = $authorParts[2] ?? '';
-            $orcid = $authorParts[3] ?? '';
-            $affiliation = $authorParts[4] ?? '';
-
-            if (empty($emailAddress)) {
-                $emailAddress = $contactEmail;
-            }
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
 
             $author = Repo::author()->newDataObject();
 
             $author->setSubmissionId($submissionId);
             $author->setUserGroupId($userGroupId);
-            $author->setGivenName($givenName, $data->locale);
-            $author->setFamilyName($familyName, $data->locale);
             $author->setEmail($emailAddress);
             $author->setData('publicationId', $publication->getId());
 
-            $normalizedOrcid = static::normalizeOrcid($orcid);
-            if (!empty($normalizedOrcid)) {
-                $author->setOrcid($normalizedOrcid);
-            }
-
-            if ($affiliation) {
-                $affiliationEntity = Repo::affiliation()->newDataObject();
-                $affiliationEntity->setName((string) $affiliation, $data->locale);
-
-                $author->addAffiliation($affiliationEntity);
-            }
-
+            static::updateAuthorFromCsv($author, $givenName, $familyName, $orcid, $affiliation, $data->locale, false);
 
             $authorId = Repo::author()->add($author);
 
             if ($index === 0) {
-                // @review This is not present on the multilocale variant, anyway, I think it should be removed from here and also from the codebase (the source of truth is the publication)
-                Repo::author()->edit($author, ['primaryContact' => true]);
                 PublicationProcessor::updatePrimaryContactId($publication, $authorId);
             }
         }
@@ -88,13 +66,28 @@ class AuthorsProcessor
         int $submissionId
     ): void
     {
-        $authors = $basePublication->getData('authors') ?: []; // @review In case it can be empty... Then the checks can be simplified below
+        $authors = $basePublication->getData('authors') ?: [];
+        if (empty($authors)) {
+            return;
+        }
+
         foreach ($authors as $author) {
-            // @review This would be nice, but given the clone doesn't clone sub-objects, we might have problems (e.g. $author->subObjectThatShouldNotBeReusedOnTheNewAuthor), like changing entitites/references of the cloned object
-            $newAuthor = clone $author;
-            $newAuthor->setData('id', null);
-            $newAuthor->setData('publicationId', $newPublication->getId());
+            $newAuthor = Repo::author()->newDataObject();
             $newAuthor->setSubmissionId($submissionId);
+            $newAuthor->setUserGroupId($author->getUserGroupId());
+            $newAuthor->setGivenName($author->getGivenName(null), null);
+            $newAuthor->setFamilyName($author->getFamilyName(null), null);
+            $newAuthor->setEmail($author->getEmail());
+            $newAuthor->setData('publicationId', $newPublication->getId());
+            $newAuthor->setOrcid($author->getOrcid());
+
+            foreach ($author->getAffiliations() as $affiliation) {
+                $newAffiliation = Repo::affiliation()->newDataObject();
+                $newAffiliation->setRor($affiliation->getRor());
+                $newAffiliation->setName($affiliation->getName());
+                $newAuthor->addAffiliation($newAffiliation);
+            }
+
             $newAuthorId = Repo::author()->add($newAuthor);
 
             if ($author->getId() === $basePublication->getData('primaryContactId')) {
@@ -147,17 +140,7 @@ class AuthorsProcessor
         }
 
         foreach ($authorsString as $authorString) {
-            $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
-            $authorParts = array_map('trim', explode(',', $authorString));
-            $givenName = $authorParts[0] ?? '';
-            $familyName = $authorParts[1] ?? '';
-            $emailAddress = $authorParts[2] ?? '';
-            $orcid = $authorParts[3] ?? '';
-            $affiliation = $authorParts[4] ?? '';
-
-            if (empty($emailAddress)) {
-                $emailAddress = $contactEmail;
-            }
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
 
             $existingAuthor = null;
             foreach ($existingAuthors as $author) {
@@ -166,61 +149,85 @@ class AuthorsProcessor
                     break;
                 }
             }
-            /* @review We can check if the "$existingAuthor" wasn't found and create one
-            if (!$existingAuthor) {
-                $author = Repo::author()->newDataObject();
-            }
-
-            Then the code should be basically the same, and we can remove the duplicated pieces...
-            At the end it's just needed to do a small check to update errr: `if ($existingAuthor) Repo::author()->dao->update($author); else Repo::author()->add($author);`
-            */
-            if ($existingAuthor) {
-                $existingAuthor->setGivenName($givenName, $data->locale);
-                $existingAuthor->setFamilyName($familyName, $data->locale);
-
-                $normalizedOrcid = static::normalizeOrcid($orcid);
-                if (!empty($normalizedOrcid)) {
-                    $existingAuthor->setOrcid($normalizedOrcid);
-                }
-
-                if ($affiliation) {
-                    $existingAffiliations = $existingAuthor->getAffiliations();
-
-                    if (!empty($existingAffiliations)) {
-                        $firstAffiliation = reset($existingAffiliations);
-                        if ($firstAffiliation) {
-                            $firstAffiliation->setName((string) $affiliation, $data->locale);
-                        }
-                    } else {
-                        $affiliationEntity = Repo::affiliation()->newDataObject();
-                        $affiliationEntity->setName((string) $affiliation, $data->locale);
-                        $existingAuthor->addAffiliation($affiliationEntity);
-                    }
-                }
-
-                Repo::author()->dao->update($existingAuthor);
-            } else {
-                // Create new author if not found (shouldn't happen often in multi-locale imports)
+            $author = $existingAuthor;
+            if (!$author) {
                 $author = Repo::author()->newDataObject();
                 $author->setSubmissionId($submissionId);
                 $author->setUserGroupId($userGroupId);
-                $author->setGivenName($givenName, $data->locale);
-                $author->setFamilyName($familyName, $data->locale);
-                $author->setEmail($emailAddress);
                 $author->setData('publicationId', $publication->getId());
+                $author->setEmail($emailAddress);
+            }
 
-                $normalizedOrcidNew = static::normalizeOrcid($orcid);
-                if (!empty($normalizedOrcidNew)) {
-                    $author->setOrcid($normalizedOrcidNew);
+            static::updateAuthorFromCsv(
+                $author,
+                $givenName,
+                $familyName,
+                $orcid,
+                $affiliation,
+                $data->locale,
+                $existingAuthor !== null
+            );
+
+            $existingAuthor
+                ? Repo::author()->dao->update($author)
+                : Repo::author()->add($author);
+        }
+    }
+
+    /**
+     * Parse author string components
+     */
+    private static function parseAuthorString(string $authorString, string $contactEmail): array
+    {
+        $authorParts = array_map('trim', explode(',', $authorString));
+        $givenName = $authorParts[0] ?? '';
+        $familyName = $authorParts[1] ?? '';
+        $emailAddress = $authorParts[2] ?? '';
+        $orcid = $authorParts[3] ?? '';
+        $affiliation = $authorParts[4] ?? '';
+
+        if (empty($emailAddress)) {
+            $emailAddress = $contactEmail;
+        }
+
+        return [$givenName, $familyName, $emailAddress, $orcid, $affiliation];
+    }
+
+    /**
+     * Update author object with parsed data
+     */
+    private static function updateAuthorFromCsv(
+        object $author,
+        string $givenName,
+        string $familyName,
+        string $orcid,
+        string $affiliation,
+        string $locale,
+        bool $isExistingAuthor
+    ): void {
+        if (!$isExistingAuthor || !empty($givenName)) {
+            $author->setGivenName($givenName, $locale);
+        }
+        if (!$isExistingAuthor || !empty($familyName)) {
+            $author->setFamilyName($familyName, $locale);
+        }
+
+        $normalizedOrcid = static::normalizeOrcid($orcid);
+        if (!empty($normalizedOrcid)) {
+            $author->setOrcid($normalizedOrcid);
+        }
+
+        if ($affiliation) {
+            $existingAffiliations = $author->getAffiliations();
+            if (!empty($existingAffiliations)) {
+                $firstAffiliation = reset($existingAffiliations);
+                if ($firstAffiliation) {
+                    $firstAffiliation->setName((string) $affiliation, $locale);
                 }
-
-                if ($affiliation) {
-                    $affiliationEntity = Repo::affiliation()->newDataObject();
-                    $affiliationEntity->setName((string) $affiliation, $data->locale);
-                    $author->addAffiliation($affiliationEntity);
-                }
-
-                Repo::author()->add($author);
+            } else {
+                $affiliationEntity = Repo::affiliation()->newDataObject();
+                $affiliationEntity->setName((string) $affiliation, $locale);
+                $author->addAffiliation($affiliationEntity);
             }
         }
     }

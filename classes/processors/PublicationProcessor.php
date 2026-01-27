@@ -17,13 +17,15 @@
 namespace APP\plugins\importexport\csv\classes\processors;
 
 use APP\facades\Repo;
-use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\publication\Publication;
 use APP\server\Server;
 use APP\server\ServerDAO;
 use APP\submission\Submission;
+use APP\file\PublicFileManager;
+use PKP\file\FileManager;
 use PKP\db\DAORegistry;
+use Exception;
 
 class PublicationProcessor
 {
@@ -65,29 +67,86 @@ class PublicationProcessor
         }
 
         if (!empty($data->references)) {
-            $referencesString = self::getReferencesContent($data->references, $sourceDir);
+            $referencesString = static::getReferencesContent($data->references, $sourceDir);
 
             if (!empty($referencesString)) {
                 $submissionPublication->setData('citationsRaw', $referencesString);
             }
         }
 
+        $copyrightHolder = $data->copyrightHolder
+            ?? $submission->_getContextLicenseFieldValue(null, Submission::PERMISSIONS_FIELD_COPYRIGHT_HOLDER, $submissionPublication);
+        $copyrightYear = $data->copyrightYear ?? $submission->_getContextLicenseFieldValue(
+            null,
+            Submission::PERMISSIONS_FIELD_COPYRIGHT_YEAR,
+            $submissionPublication
+        );
+        $licenseUrl = $data->licenseUrl ?? $submission->_getContextLicenseFieldValue(
+            null,
+            Submission::PERMISSIONS_FIELD_LICENSE_URL,
+            $submissionPublication
+        );
+
+        $submissionPublication->setData('copyrightHolder', $copyrightHolder, $data->locale);
+        $submissionPublication->setData('copyrightYear', $copyrightYear);
+        $submissionPublication->setData('licenseUrl', $licenseUrl);
+
         $oldPublication = Repo::publication()->get($submissionPublication->getId());
         Repo::publication()->dao->update($submissionPublication, $oldPublication);
 
-        self::setCopyrightFromSystem($submission, $submissionPublication, $data);
-
-        return $submissionPublication;
+        return Repo::publication()->get($submissionPublication->getId());
     }
 
     public static function updatePrimaryContactId(Publication $publication, int $authorId)
     {
-        self::updatePublicationAttribute($publication, 'primaryContactId', $authorId);
+        $publication->setData('primaryContactId', $authorId);
+        Repo::publication()->dao->update($publication);
     }
 
     public static function updateCoverage(Publication $publication, string $coverage, string $locale)
     {
-        self::updatePublicationAttribute($publication, 'coverage', $coverage, $locale);
+        $publication->setData('coverage', $coverage, $locale);
+    }
+
+    public static function setCoverImage(Publication $publication, array $coverImageData, string $locale): void
+    {
+        $publication->setData('coverImage', $coverImageData, $locale);
+    }
+
+    /**
+     * Process and upload the cover image
+     *
+     * @throws Exception
+     */
+    public static function uploadCoverImage(
+        object $data,
+        int $serverId,
+        string $sourceDir,
+        PublicFileManager $publicFileManager,
+        FileManager $fileManager
+    ): string {
+        $reason = InvalidRowValidations::validateCoverImageIsValid($data->coverImageFilename, $sourceDir);
+        if (!is_null($reason)) {
+            throw new Exception($reason);
+        }
+
+        $sanitizedCoverImageName = str_replace([' ', '_', ':'], '-', mb_strtolower($data->coverImageFilename));
+        $sanitizedCoverImageName = preg_replace('/[^a-z0-9\.\-]+/', '', $sanitizedCoverImageName);
+
+        // Use a secure 48-character random alphanumeric string as a prefix to avoid overwriting user files
+        $randomPrefix = bin2hex(random_bytes(24));
+        $sanitizedFileName = basename($sanitizedCoverImageName);
+        $coverImageUploadName = $randomPrefix . '-' . $sanitizedFileName;
+        $destFilePath = $publicFileManager->getContextFilesPath($serverId) . '/' . $coverImageUploadName;
+        $srcFilePath = "{$sourceDir}/{$data->coverImageFilename}";
+
+        $bookCoverImageSaved = $fileManager->copyFile($srcFilePath, $destFilePath);
+
+        if (!$bookCoverImageSaved) {
+            throw new Exception(__('plugin.importexport.csv.erroWhileSavingBookCoverImage'));
+        }
+
+        return $coverImageUploadName;
     }
 
     public static function updateCoverImage(Publication $publication, object $data, string $uploadName)
@@ -98,52 +157,12 @@ class PublicationProcessor
             'altText' => $data->coverImageAltText ?? '',
         ];
 
-        $localizedCoverImage = [];
-        $localizedCoverImage['coverImage'] = [];
-        $localizedCoverImage['coverImage'][$data->locale] = $coverImage;
-
-        $newPublication = Repo::publication()->newDataObject(array_merge($publication->_data, $localizedCoverImage));
-        $newPublication->stampModified();
-        Repo::publication()->dao->update($newPublication, $publication);
+        $publication->setData('coverImage', $coverImage, $data->locale);
     }
 
     public static function updateSectionId(Publication $publication, int $sectionId)
     {
-        self::updatePublicationAttribute($publication, 'sectionId', $sectionId);
-    }
-
-    static function updatePublicationAttribute(Publication $publication, string $attribute, mixed $data, ?string $locale = null)
-    {
-        // @review I think it's not needed to check if the locale is null, the default value of the $locale argument, when it's not passed, is also null
-        $publication->setData($attribute, $data);
-        // @review Better to call the method below after updating all fields, if I'm not mistaken, there's a place in the code with multiple calls to this method
-        Repo::publication()->dao->update($publication);
-    }
-
-    private static function setCopyrightFromSystem(
-        Submission $submission,
-        Publication &$publication,
-        object $data
-    ): void
-    {
-        $copyrightHolder = $data->copyrightHolder
-            ?? $submission->_getContextLicenseFieldValue(null, Submission::PERMISSIONS_FIELD_COPYRIGHT_HOLDER, $publication
-        );
-        self::updatePublicationAttribute($publication, 'copyrightHolder', $copyrightHolder, $data->locale);
-
-        $copyrightYear = $data->copyrightYear ?? $submission->_getContextLicenseFieldValue(
-            null,
-            Submission::PERMISSIONS_FIELD_COPYRIGHT_YEAR,
-            $publication
-        );
-        self::updatePublicationAttribute($publication, 'copyrightYear', $copyrightYear);
-
-        $licenseUrl = $data->licenseUrl ?? $submission->_getContextLicenseFieldValue(
-            null,
-            Submission::PERMISSIONS_FIELD_LICENSE_URL,
-            $publication
-        );
-        self::updatePublicationAttribute($publication, 'licenseUrl', $licenseUrl);
+        $publication->setData('sectionId', $sectionId);
     }
 
     /**
@@ -158,11 +177,11 @@ class PublicationProcessor
         string $sourceDir
     ): Publication {
         // Update version and status
-        self::updatePublicationAttribute($publication, 'version', (int)$data->version);
-        self::updatePublicationAttribute($publication, 'status', Submission::STATUS_PUBLISHED);
+        $publication->setData('version', (int) $data->version);
+        $publication->setData('status', Submission::STATUS_PUBLISHED);
 
         $datePosted = !empty($data->datePosted) ? $data->datePosted : $basePublication->getData('datePublished');
-        self::updatePublicationAttribute($publication, 'datePublished', $datePosted);
+        $publication->setData('datePublished', $datePosted);
 
         $localizedFields = [
             'title' => 'preprintTitle',
@@ -175,34 +194,33 @@ class PublicationProcessor
 
         foreach ($localizedFields as $field => $csvField) {
             if (!empty($data->{$csvField})) {
-                self::updatePublicationAttribute($publication, $field, $data->{$csvField}, $data->locale);
+                $publication->setData($field, $data->{$csvField}, $data->locale);
             } elseif ($basePublication->getLocalizedData($field, $data->locale)) {
-                self::updatePublicationAttribute($publication, $field, $basePublication->getLocalizedData($field, $data->locale), $data->locale);
+                $publication->setData($field, $basePublication->getLocalizedData($field, $data->locale), $data->locale);
             }
         }
 
         $nonLocalizedFields = ['copyrightYear', 'licenseUrl'];
-
         foreach($nonLocalizedFields as $field) {
             if (!empty($data->{$field})) {
-                self::updatePublicationAttribute($publication, $field, $data->{$field});
+                $publication->setData($field, $data->{$field});
             } elseif ($basePublication->getData($field)) {
-                self::updatePublicationAttribute($publication, $field, $basePublication->getData($field));
+                $publication->setData($field, $basePublication->getData($field));
             }
         }
 
         if (!empty($data->doi)) {
-            self::updatePublicationAttribute($publication, 'pub-id::doi', $data->doi);
+            $publication->setData('pub-id::doi', $data->doi);
         }
 
         if (!empty($data->references)) {
-            $referencesString = self::getReferencesContent($data->references, $sourceDir);
+            $referencesString = static::getReferencesContent($data->references, $sourceDir);
 
             if (!empty($referencesString)) {
                 $publication->setData('citationsRaw', $referencesString);
             }
         } elseif (!empty($basePublication->getData('citationsRaw'))) {
-            $citationsRaw = (string)$basePublication->getData('citationsRaw');
+            $citationsRaw = (string) $basePublication->getData('citationsRaw');
             $publication->setData('citationsRaw', $citationsRaw);
         }
 
@@ -216,48 +234,45 @@ class PublicationProcessor
      * Create a new publication version manually to avoid CLI context dependency
      * This is a simplified version of Repo::publication()->version() without context dependencies
      */
-    public static function createPublicationVersion(Publication $basePublication, object $data): Publication
+    public static function createPublicationVersion(Publication $basePublication, object $data, Server $server): Publication
     {
-        // @review The same comment I left about the "clone $author"
-        $newPublication = clone $basePublication;
-        $newPublication->setData('id', null);
-        $newPublication->setData('datePublished', null);
-        $newPublication->setData('status', Submission::STATUS_PUBLISHED);
+        $newPublication = Repo::publication()->newDataObject();
+        $newPublication->setData('submissionId', $basePublication->getData('submissionId'));
         $newPublication->setData('version', (int)$data->version);
-        $newPublication->stampModified();
-
-        $publicationId = Repo::publication()->dao->insert($newPublication);
-        $newPublication = Repo::publication()->get($publicationId);
-
-        $authors = $basePublication->getData('authors');
-
-        if (empty($authors)) {
-            return $newPublication;
-        }
-
-        // @review Hmm, if we're going to reset anyway, then these attributes could be set before calling the "insert()", and further updates won't be needed
+        $newPublication->setData('status', Submission::STATUS_PUBLISHED);
+        $newPublication->setData('datePublished', null);
+        $newPublication->setData('copyrightNotice', $server->getLocalizedData('copyrightNotice', $data->locale));
         $newPublication->setData('authors', []);
         $newPublication->setData('primaryContactId', null);
-        Repo::publication()->dao->update($newPublication);
+        $newPublication->stampModified();
 
-        $citationsRaw = $basePublication->getData('citationsRaw');
-        if (!empty($citationsRaw)) {
-            $newPublication->setData('citationsRaw', (string)$citationsRaw);
-            $oldPublication = Repo::publication()->get($publicationId);
-
-            Repo::publication()->dao->update($newPublication, $oldPublication);
-
-            $newPublication = Repo::publication()->get($publicationId);
+        $localeFields = ['title', 'subtitle', 'abstract', 'prefix', 'copyrightHolder'];
+        foreach ($localeFields as $localeField) {
+            if ($basePubValue = $basePublication->getData($localeField, $data->locale)) {
+                $newPublication->setData($localeField, $basePubValue, $data->locale);
+            }
         }
 
-        return $newPublication;
+        $nonLocaleFields = ['copyrightYear', 'licenseUrl'];
+        foreach ($nonLocaleFields as $nonLocaleField) {
+            if ($basePubValue = $basePublication->getData($nonLocaleField)) {
+                $newPublication->setData($nonLocaleField, $basePubValue);
+            }
+        }
+
+        if ($citationsRaw = $basePublication->getData('citationsRaw')) {
+            $newPublication->setData('citationsRaw', (string) $citationsRaw);
+        }
+
+        $publicationId = Repo::publication()->dao->insert($newPublication);
+        return Repo::publication()->get($publicationId);
     }
 
     /**
      * Process multi-locale publication data (adds new locale to existing publication)
      * This method updates an existing publication with data in a new locale
      */
-    public static function processMultiLocalePublication(Publication $publication, object $data): Publication
+    public static function processMultiLocalePublication(Publication $publication, object $data, Server $server): Publication
     {
         $localizedFields = [
             'title' => 'preprintTitle',
@@ -270,16 +285,13 @@ class PublicationProcessor
 
         foreach ($localizedFields as $field => $csvField) {
             if (!empty($data->{$csvField})) {
-                self::updatePublicationAttribute($publication, $field, $data->{$csvField}, $data->locale);
+                $publication->setData($field, $data->{$csvField}, $data->locale);
             }
         }
 
-        $serverDao = DAORegistry::getDAO('ServerDAO'); /** @var ServerDAO $serverDao */
-        $server = $serverDao->getById($publication->getData('contextId'));
-        if ($server) {
-            $publication->setData('copyrightNotice', $server->getLocalizedData('copyrightNotice', $data->locale));
-            Repo::publication()->dao->update($publication);
-        }
+        $publication->setData('copyrightNotice', $server->getLocalizedData('copyrightNotice', $data->locale));
+
+        Repo::publication()->dao->update($publication);
 
         return $publication;
     }
@@ -302,27 +314,23 @@ class PublicationProcessor
     {
         $normalizedDoi = InvalidRowValidations::normalizeVorDoi($vorDoi);
 
-        self::updatePublicationAttribute($publication, 'vorDoi', $normalizedDoi);
-        self::updatePublicationAttribute($publication, 'relationStatus', Publication::PUBLICATION_RELATION_PUBLISHED);
+        $publication->setData('vorDoi', $normalizedDoi);
+        $publication->setData('relationStatus', Publication::PUBLICATION_RELATION_PUBLISHED);
+        Repo::publication()->dao->update($publication);
     }
 
     /**
      * Process supporting agencies for a new publication or new version
      */
-    public static function processSupportingAgencies(object $data, int $publicationId, ?Publication $basePublication = null): void
+    public static function processSupportingAgencies(object $data, Publication $publication, ?Publication $basePublication = null): void
     {
         if (empty($data->supportingAgencies) && !is_null($basePublication)) {
             $baseSupportingAgencies = $basePublication->getData('supportingAgencies');
-
             if (empty($baseSupportingAgencies)) {
                 return;
             }
 
-            $publication = Repo::publication()->get($publicationId);
-            if ($publication) {
-                Repo::publication()->edit($publication, ['supportingAgencies' => $baseSupportingAgencies]);
-            }
-
+            Repo::publication()->edit($publication, ['supportingAgencies' => $baseSupportingAgencies]);
             return;
         }
 
@@ -331,14 +339,7 @@ class PublicationProcessor
         }
 
         $agenciesList = [$data->locale => array_map('trim', explode(';', $data->supportingAgencies))];
-
         if (empty($agenciesList[$data->locale])) {
-            return;
-        }
-
-        $publication = Repo::publication()->get($publicationId);
-
-        if (!$publication) {
             return;
         }
 
@@ -348,14 +349,9 @@ class PublicationProcessor
     /**
      * Process supporting agencies for multi-locale import (adds agencies in new locale)
      */
-    public static function processSupportingAgenciesMultiLocale(object $data, int $publicationId): void
+    public static function processSupportingAgenciesMultiLocale(object $data, Publication $publication): void
     {
         if (empty($data->supportingAgencies)) {
-            return;
-        }
-
-        $publication = Repo::publication()->get($publicationId);
-        if (!$publication) {
             return;
         }
 

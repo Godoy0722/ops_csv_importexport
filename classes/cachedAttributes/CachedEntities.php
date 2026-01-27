@@ -43,6 +43,9 @@ class CachedEntities
     /** @var array<string,int|null> */
     static array $genreIds = [];
 
+    /** @var array<int,int|null> */
+    static array $supplementaryGenreIds = [];
+
     /** @var array<string,Category|null> */
     static array $categories = [];
 
@@ -140,6 +143,19 @@ class CachedEntities
     {
         $genreDao = DAORegistry::getDAO('GenreDAO'); /** @var GenreDAO $genreDao */
         return static::$genreIds[$genreName] ??= $genreDao->getByKey($genreName, $serverId)->getId();
+    }
+
+    /** Retrieves a cached supplementary genre ID by serverId. Returns null if none found. */
+    static function getCachedSupplementaryGenreId(int $serverId): ?int
+    {
+        if (array_key_exists($serverId, static::$supplementaryGenreIds)) {
+            return static::$supplementaryGenreIds[$serverId];
+        }
+
+        $genreDao = DAORegistry::getDAO('GenreDAO'); /** @var GenreDAO $genreDao */
+        $supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $serverId)->toArray();
+
+        return static::$supplementaryGenreIds[$serverId] = !empty($supplementaryGenres) ? $supplementaryGenres[0]->getId() : null;
     }
 
     /** Retrieves a cached Category by categoryName and serverId. Returns null if an error occurs. */

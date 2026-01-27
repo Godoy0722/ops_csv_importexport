@@ -57,17 +57,17 @@ This plugin allows administrators to import users and preprints with their assoc
 To import users from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin users [username] [pathToFolderWithCsvFiles] [sendWelcomeEmail]
+php tools/importExport.php CSVImportExportPlugin users [username] [pathToFolderWithCsvFiles] [--sendWelcomeEmail]
 ```
 
 Parameters:
 - `username`: The username of a valid Preprint Manager. This username is used to validate that the command is running by a valid user as a security step.
 - `pathToFolderWithCsvFiles`: Path to the CSV file containing user data. Can be absolute or relative to the OPS root directory.
-- `sendWelcomeEmail`: (Optional) Set to `true` to send welcome emails to imported users. If set to true, the sender email will be the user retrieved by the username on the CLI command.
+- `--sendWelcomeEmail`: (Optional) If provided, welcome emails will be sent to imported users. The sender email will be the user retrieved by the username on the CLI command.
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_with_csv_user_files true
+php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_with_csv_user_files --sendWelcomeEmail
 ```
 
 ### Importing Preprints

@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/UsersProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class UsersProcessor
@@ -24,7 +24,7 @@ use PKP\user\User;
 
 class UsersProcessor
 {
-	public static function process(object $data, string $locale): User
+    public static function process(object $data, string $locale): User
     {
         $user = Repo::user()->newDataObject();
 
@@ -33,7 +33,7 @@ class UsersProcessor
         $user->setAffiliation($data->affiliation, $locale);
         $user->setEmail($data->email);
         $user->setCountry($data->country);
-        $user->setUsername($data->username ?? self::getValidUsername($data->firstname, $data->lastname));
+        $user->setUsername($data->username ?? static::getValidUsername($data->firstname, $data->lastname));
         $user->setPassword(Validation::encryptCredentials($data->username, $data->tempPassword));
         $user->setMustChangePassword(true);
         $user->setDateRegistered(Core::getCurrentDate());
@@ -48,7 +48,7 @@ class UsersProcessor
         $userId = Repo::user()->add($user);
 
         return Repo::user()->get($userId);
-	}
+    }
 
     public static function getValidUsername(string $firstname, string $lastname): string
     {

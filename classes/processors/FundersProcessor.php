@@ -20,7 +20,6 @@ use APP\plugins\generic\funding\classes\Funder;
 use APP\plugins\generic\funding\classes\FunderAward;
 use APP\plugins\generic\funding\classes\FunderAwardDAO;
 use APP\plugins\generic\funding\classes\FunderDAO;
-use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
 use APP\publication\Publication;
 use APP\submission\Submission;
 use PKP\db\DAOResultFactory;
@@ -194,7 +193,6 @@ class FundersProcessor
         $baseFunders = static::$funderDao->getBySubmissionId($baseSubmissionId);
 
         /** @var Funder $baseFunder */
-        // @review You can use the toIterator() to avoid using the next(), then it will decrease the amount of work in case this plugin gets updates to not use the "DAO" stuff
         foreach ($baseFunders->toIterator() as $baseFunder) {
             $newFunder = static::$funderDao->newDataObject();
             $newFunder->setContextId($contextId);
@@ -204,15 +202,16 @@ class FundersProcessor
 
             $newFunderId = static::$funderDao->insertObject($newFunder);
 
-            // @review This isn't expected to fail, so an ID should be always available
-            /** @var DAOResultFactory<FunderAward> */
-            $baseAwards = static::$funderAwardDao->getByFunderId($baseFunder->getId());
-            /** @var FunderAward $baseAward */
-            foreach ($baseAwards->toIterator() as $baseAward) {
-                $newAward = static::$funderAwardDao->newDataObject();
-                $newAward->setFunderId($newFunderId);
-                $newAward->setFunderAwardNumber($baseAward->getFunderAwardNumber());
-                static::$funderAwardDao->insertObject($newAward);
+            if ($newFunderId) {
+                /** @var DAOResultFactory<FunderAward> */
+                $baseAwards = static::$funderAwardDao->getByFunderId($baseFunder->getId());
+                /** @var FunderAward $baseAward */
+                foreach ($baseAwards->toIterator() as $baseAward) {
+                    $newAward = static::$funderAwardDao->newDataObject();
+                    $newAward->setFunderId($newFunderId);
+                    $newAward->setFunderAwardNumber($baseAward->getFunderAwardNumber());
+                    static::$funderAwardDao->insertObject($newAward);
+                }
             }
         }
     }

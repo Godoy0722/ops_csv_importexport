@@ -21,6 +21,8 @@ use APP\facades\Repo;
 use APP\file\PublicFileManager;
 use APP\publication\Publication;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
+use APP\plugins\importexport\csv\classes\exceptions\FileNotSavedException;
+use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
 use APP\plugins\importexport\csv\classes\handlers\CsvFileHandler;
 use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
@@ -132,13 +134,7 @@ class PreprintCommand
                 continue;
             }
 
-            $basename = $fileInfo->getBasename();
-            // @review I think the file should be created just if something goes wrong, then it won't be needed to delete the file at the end
-            $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
-
-            if (is_null($invalidCsvFile)) {
-                continue;
-            }
+            $invalidCsvFile = null;
 
             $this->processedRows = 0;
             $this->failedRows = 0;
@@ -150,399 +146,284 @@ class PreprintCommand
 
                 ++$this->processedRows;
 
-                $reason = InvalidRowValidations::validateRowContainAllFields($fields, $this->expectedRowSize);
-                if (!is_null($reason)) {
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
+                try {
+                    InvalidRowValidations::validateRowContainAllFields($fields, $this->expectedRowSize);
 
-                $data = (object) array_combine(
-                    RequiredPreprintHeaders::$preprintHeaders,
-                    array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
-                );
-
-                $reason = InvalidRowValidations::validateRowHasAllRequiredFields($data, fn($row)
-                    => RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints));
-
-                if (!is_null($reason)) {
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
-
-                $reason = InvalidRowValidations::validatePreprintVersioningFields($data);
-                if (!is_null($reason)) {
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
-
-                if (!empty($data->versionIdentifier)) {
-                    $reason = InvalidRowValidations::validateNoDuplicateVersion($data, $this->processedPreprints);
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                $fieldsList = array_pad($fields, $this->expectedRowSize, null);
-
-                if ($data->galleyFilenames) {
-                    $reason = InvalidRowValidations::validatePreprintGalleys(
-                        $data->galleyFilenames,
-                        $data->galleyLabels,
-                        $this->sourceDir
+                    $data = (object) array_combine(
+                        RequiredPreprintHeaders::$preprintHeaders,
+                        array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                     );
 
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                if ($data->suppFilenames) {
-                    $reason = InvalidRowValidations::validateSupplementaryFiles(
-                        $data->suppFilenames,
-                        $data->suppLabels,
-                        $this->sourceDir
+                    InvalidRowValidations::validateRowHasAllRequiredFields(
+                        $data,
+                        fn($row) => RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints)
                     );
+                    InvalidRowValidations::validatePreprintVersioningFields($data);
 
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                if ($data->suppFilenames && $data->suppLabels && !empty($data->suppDescriptions)) {
-                    $reason = InvalidRowValidations::validateSupplementaryDescriptions(
-                        $data->suppFilenames,
-                        $data->suppLabels,
-                        $data->suppDescriptions
-                    );
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                if ($data->references) {
-                    $reason = InvalidRowValidations::validateReferencesFile($data->references, $this->sourceDir);
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                if ($data->vorDoi) {
-                    $reason = InvalidRowValidations::validateVorDoi($data->vorDoi);
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                if ($data->funders) {
-                    $reason = InvalidRowValidations::validateFunders($data->funders);
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                $fileUploadUser = $this->user;
-                $usedDefaultUser = false;
-                if (!empty($data->username)) {
-                    $csvUser = CachedEntities::getCachedUserByUsername($data->username, true);
-                    $csvUser ? $fileUploadUser = $csvUser : $usedDefaultUser = true;
-                }
-
-                $server = CachedEntities::getCachedServer($data->serverPath);
-
-                $reason = InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
-                if (!is_null($reason)) {
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
-
-                $reason = InvalidRowValidations::validateServerLocale($server, $data->locale);
-                if (!is_null($reason)) {
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
-
-                // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
-                $genreName = 'SUBMISSION';
-                $genreId = CachedEntities::getCachedGenreId($genreName, $server->getId());
-
-                $reason = InvalidRowValidations::validateGenreIdValid($genreId, $genreName);
-                if (!is_null($reason)) {
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
-
-                $userGroupId = CachedEntities::getCachedAuthorUserGroupId($data->serverPath, $server->getId());
-
-                $reason = InvalidRowValidations::validateUserGroupId($userGroupId, $data->serverPath);
-                if (!is_null($reason)) {
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
-
-                // Validate Funding plugin is enabled if funders data is provided
-                if ($data->funders) {
-                    $reason = InvalidRowValidations::validateFundingPluginEnabled($data->funders, $server->getId());
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
+                    if (!empty($data->versionIdentifier)) {
+                        InvalidRowValidations::validateNoDuplicateVersion($data, $this->processedPreprints);
                     }
 
-                    // Validate funders are from Crossref registry (only when enableGrantIdValidation is enabled)
-                    $reason = InvalidRowValidations::validateFundersCrossrefRegistry($data->funders, $server->getId());
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-                }
-
-                // @review Maybe this logic can be moved into another method
-                $coverImageUploadName = null;
-                if ($data->coverImageFilename) {
-                    $reason = InvalidRowValidations::validateCoverImageIsValid($data->coverImageFilename, $this->sourceDir);
-                    if (!is_null($reason)) {
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-                        continue;
-                    }
-
-                    $sanitizedCoverImageName = str_replace([' ', '_', ':'], '-', mb_strtolower($data->coverImageFilename));
-                    $sanitizedCoverImageName = preg_replace('/[^a-z0-9\.\-]+/', '', $sanitizedCoverImageName);
-                    $coverImageUploadName = uniqid() . '-' . basename($sanitizedCoverImageName);
-
-                    $destFilePath = $this->publicFileManager->getContextFilesPath($server->getId()) . '/' . $coverImageUploadName;
-                    $srcFilePath = "{$this->sourceDir}/{$data->coverImageFilename}";
-
-                    // Use a secure 48-character random alphanumeric string as a prefix to avoid overwriting user files
-                    $randomPrefix = bin2hex(random_bytes(24)); // 48 hex characters
-                    $sanitizedFileName = basename($sanitizedCoverImageName);
-                    $coverImageUploadName = $randomPrefix . '-' . $sanitizedFileName;
-                    $destFilePath = $this->publicFileManager->getContextFilesPath($server->getId()) . '/' . $coverImageUploadName;
-                    $bookCoverImageSaved = $this->fileManager->copyFile($srcFilePath, $destFilePath);
-
-                    if (!$bookCoverImageSaved) {
-                        $reason = __('plugin.importexport.csv.erroWhileSavingBookCoverImage');
-                        // @review Generic comment: instead of passing many arguments, maybe you can pass $this or do a `$csvFileHandler = new CSVFileHandler(things that can be re-used)`
-                        CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $reason, $this->failedRows);
-
-                        continue;
-                    }
-                }
-
-                /** @var null|Submission */
-                $existingSubmission = null;
-                /** @var null|Publication */
-                $basePublication = null;
-                $isMultiLocaleImport = false;
-
-                if (!empty($data->versionIdentifier)) {
-                    if (InvalidRowValidations::versionExistsInAnyLocale($data, $this->processedPreprints)) {
-                        $version = (int)$data->version;
-                        $versionData = $this->processedPreprints[$data->versionIdentifier][$version];
-
-                        $firstLocaleData = reset($versionData);
-                        $existingSubmission = $firstLocaleData['submission'];
-                        $basePublication = $firstLocaleData['publication'];
-
-                        $isMultiLocaleImport = !isset($versionData[$data->locale]);
-                    } elseif (isset($this->processedPreprints[$data->versionIdentifier])) {
-                        // Handle new version (not multi-locale)
-                        $versions = $this->processedPreprints[$data->versionIdentifier];
-                        $lastVersion = end($versions);
-                        $lastVersionData = reset($lastVersion);
-                        $existingSubmission = $lastVersionData['submission'];
-                        $basePublication = $lastVersionData['publication'];
-                    }
-                }
-
-                if ($isMultiLocaleImport) {
-                    $submission = $existingSubmission;
-                    $publication = $basePublication;
-
-                    $publication = PublicationProcessor::processMultiLocalePublication($publication, $data);
-                } elseif ($existingSubmission && $basePublication) {
-                    // New version import
-                    $submission = $existingSubmission;
-                    $publication = PublicationProcessor::createPublicationVersion($basePublication, $data);
-
-                    $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->sourceDir);
-                } else {
-                    // New submission import
-                    $initialPublication = PublicationProcessor::createInitialPublication($data);
-                    $submission = SubmissionProcessor::process($data, $initialPublication, $server);
-                    $publication = PublicationProcessor::process($submission, $data, $server, $this->sourceDir);
-                }
-
-                if (!$publication) {
-                    $reason = __('plugins.importexport.csv.errorWhileCreatingPublication');
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
-                    continue;
-                }
-
-                // @review As most of the logic is separated into other methods, I think this piece can also be moved to another method
-                // Array to store each galley ID to its respective galley file
-                $galleyIds = [];
-                if ($data->galleyFilenames) {
-                    foreach (array_map('trim', explode(';', $data->galleyFilenames)) as $galleyFile) {
-                        $galleyFileId = $this->saveSubmissionFile(
-                            $galleyFile,
-                            $server->getId(),
-                            $submission,
-                            $invalidCsvFile,
-                            __('plugins.importexport.csv.errorWhileSavingSubmissionGalley', ['galley' => $galleyFile]),
-                            $fieldsList
+                    if ($data->galleyFilenames) {
+                        InvalidRowValidations::validatePreprintGalleys(
+                            $data->galleyFilenames,
+                            $data->galleyLabels,
+                            $this->sourceDir
                         );
+                    }
 
-                        if (is_null($galleyFileId)) {
-                            foreach($galleyIds as $galleyItem) {
-                                $this->fileService->delete($galleyItem['id']);
-                            }
+                    if ($data->suppFilenames) {
+                        InvalidRowValidations::validateSupplementaryFiles(
+                            $data->suppFilenames,
+                            $data->suppLabels,
+                            $this->sourceDir
+                        );
+                    }
 
-                            continue;
+                    if ($data->suppFilenames && $data->suppLabels && !empty($data->suppDescriptions)) {
+                        InvalidRowValidations::validateSupplementaryDescriptions(
+                            $data->suppFilenames,
+                            $data->suppLabels,
+                            $data->suppDescriptions
+                        );
+                    }
+
+                    if ($data->references) {
+                        InvalidRowValidations::validateReferencesFile($data->references, $this->sourceDir);
+                    }
+
+                    if ($data->vorDoi) {
+                        InvalidRowValidations::validateVorDoi($data->vorDoi);
+                    }
+
+                    if ($data->funders) {
+                        InvalidRowValidations::validateFunders($data->funders);
+                    }
+
+                    if (!empty($data->authors)) {
+                        $authorsString = array_map('trim', explode(';', $data->authors));
+                        foreach ($authorsString as $authorString) {
+                            $authorParts = array_map('trim', explode(',', $authorString));
+                            $emailAddress = $authorParts[2] ?? '';
+
+                            InvalidRowValidations::validateEmail($emailAddress);
                         }
-
-                        $galleyIds[] = ['file' => $galleyFile, 'id' => $galleyFileId];
                     }
 
-                    $galleyLabelsArray = array_map('trim', explode(';', $data->galleyLabels));
-                    for($i = 0; $i < count($galleyLabelsArray); $i++) {
-                        $galleyItem = $galleyIds[$i];
-                        $galleyLabel = $galleyLabelsArray[$i];
-
-                        $this->handleGalley(
-                            $galleyItem,
-                            $data,
-                            $submission->getId(),
-                            $genreId,
-                            $galleyLabel,
-                            $publication->getId(),
-                            $fileUploadUser
-                        );
+                    $fileUploadUser = $this->user;
+                    $usedDefaultUser = false;
+                    if (!empty($data->username)) {
+                        $csvUser = CachedEntities::getCachedUserByUsername($data->username, true);
+                        $csvUser ? $fileUploadUser = $csvUser : $usedDefaultUser = true;
                     }
-                }
 
-                // Process supplementary files
-                if ($data->suppFilenames) {
-                    // Get supplementary genre for supplementary files
-                    $genreDao = DAORegistry::getDAO('GenreDAO'); /** @var GenreDAO $genreDao */
-                    // @review I think this can be cached as well
-                    $supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $server->getId())->toArray();
-                    $suppGenreId = !empty($supplementaryGenres) ? $supplementaryGenres[0]->getId() : $genreId;
-                    $suppIds = [];
+                    $server = CachedEntities::getCachedServer($data->serverPath);
 
-                    foreach (array_map('trim', explode(';', $data->suppFilenames)) as $suppFile) {
-                        $suppFileId = $this->saveSubmissionFile(
-                            $suppFile,
-                            $server->getId(),
-                            $submission,
-                            $invalidCsvFile,
-                            __('plugins.importexport.csv.errorWhileSavingSupplementaryFile', ['file' => $suppFile]),
-                            $fieldsList
-                        );
+                    InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
+                    InvalidRowValidations::validateServerLocale($server, $data->locale);
 
-                        // @review I understand that if one fail, then we'll remove all galleys and end up using a bad ID below at `$suppIds[] = ['file' => $suppFile, 'id' => $suppFileId]`
-                        if (is_null($suppFileId)) {
-                            foreach($galleyIds as $galleyItem) {
-                                $this->fileService->delete($galleyItem['id']);
-                            }
+                    // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
+                    $genreName = 'SUBMISSION';
+                    $genreId = CachedEntities::getCachedGenreId($genreName, $server->getId());
+                    InvalidRowValidations::validateGenreIdValid($genreId, $genreName);
 
-                            foreach($suppIds as $suppItem) {
-                                $this->fileService->delete($suppItem['id']);
-                            }
+                    $userGroupId = CachedEntities::getCachedAuthorUserGroupId($data->serverPath, $server->getId());
+                    InvalidRowValidations::validateUserGroupId($userGroupId, $data->serverPath);
 
-                            continue;
+                    // Validate Funding plugin is enabled if funders data is provided
+                    if ($data->funders) {
+                        InvalidRowValidations::validateFundingPluginEnabled($data->funders, $server->getId());
+                        InvalidRowValidations::validateFundersCrossrefRegistry($data->funders, $server->getId());
+                    }
+
+                    $coverImageUploadName = null;
+                    if ($data->coverImageFilename) {
+                        try {
+                            $coverImageUploadName = PublicationProcessor::uploadCoverImage(
+                                $data,
+                                $server->getId(),
+                                $this->sourceDir,
+                                $this->publicFileManager,
+                                $this->fileManager
+                            );
+                        } catch (\Exception $e) {
+                            throw new RowValidationException($e->getMessage());
                         }
-
-                        $suppIds[] = ['file' => $suppFile, 'id' => $suppFileId];
                     }
 
-                    $suppLabelsArray = array_map('trim', explode(';', $data->suppLabels));
-                    $suppDescriptionsArray = !empty($data->suppDescriptions)
-                        ? array_map('trim', explode(';', $data->suppDescriptions))
-                        : [];
+                    /** @var null|Submission */
+                    $existingSubmission = null;
+                    /** @var null|Publication */
+                    $basePublication = null;
+                    $isMultiLocaleImport = false;
 
-                    for($i = 0; $i < count($suppLabelsArray); $i++) {
-                        $suppItem = $suppIds[$i];
-                        $suppLabel = $suppLabelsArray[$i];
-                        $suppDescription = $suppDescriptionsArray[$i] ?? null;
+                    if (!empty($data->versionIdentifier)) {
+                        if (InvalidRowValidations::versionExistsInAnyLocale($data, $this->processedPreprints)) {
+                            $version = (int)$data->version;
+                            $versionData = $this->processedPreprints[$data->versionIdentifier][$version];
 
-                        $this->handleGalley(
-                            $suppItem,
-                            $data,
-                            $submission->getId(),
-                            $suppGenreId,
-                            $suppLabel,
-                            $publication->getId(),
-                            $fileUploadUser,
-                            $suppDescription
-                        );
+                            $firstLocaleData = reset($versionData);
+                            $existingSubmission = $firstLocaleData['submission'];
+                            $basePublication = $firstLocaleData['publication'];
+
+                            $isMultiLocaleImport = !isset($versionData[$data->locale]);
+                        } elseif (isset($this->processedPreprints[$data->versionIdentifier])) {
+                            // Handle new version (not multi-locale)
+                            $versions = $this->processedPreprints[$data->versionIdentifier];
+                            $lastVersion = end($versions);
+                            $lastVersionData = reset($lastVersion);
+                            $existingSubmission = $lastVersionData['submission'];
+                            $basePublication = $lastVersionData['publication'];
+                        }
                     }
-                }
 
-                // @review Generic comment: After watching these processMultiLocale() vs process() I see a lot of duplicated code, so I think they can be unified
-                if ($isMultiLocaleImport) {
-                    // For multi-locale imports, update existing publication with new locale data
-                    AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
-                    KeywordsProcessor::processMultiLocale($data, $publication->getId());
-                    SubjectsProcessor::processMultiLocale($data, $publication->getId());
-                    FundersProcessor::processMultiLocale($data, $submission, $server->getId());
-                    PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication->getId());
-                } else {
-                    // For new submissions or versions, use the regular process
-                    AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
-                    KeywordsProcessor::process($data, $publication->getId(), $basePublication);
-                    SubjectsProcessor::process($data, $publication->getId(), $basePublication);
-                    FundersProcessor::process($data, $submission, $server->getId(), $basePublication);
-                    PublicationProcessor::processSupportingAgencies($data, $publication->getId(), $basePublication);
-                }
-
-                if (!empty($data->vorDoi)) {
-                    PublicationProcessor::updateVorDoi($publication, $data->vorDoi);
-                }
-
-                if ((empty($data->version) || (int)$data->version === 1) && !empty($data->coverage)) {
-                    PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
-                }
-
-                $section = SectionsProcessor::process($data, $server->getId(), $basePublication);
-                PublicationProcessor::updateSectionId($publication, $section->getId());
-
-                if ($data->coverImageFilename) {
-                    PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
-                } elseif ($basePublication && $basePublication->getLocalizedData('coverImage', $data->locale)) {
-                    PublicationProcessor::updatePublicationAttribute($publication, 'coverImage', $basePublication->getData('coverImage'));
-                }
-
-                $publication = Repo::publication()->get($publication->getId());
-
-                if ($data->categories || $basePublication) {
                     if ($isMultiLocaleImport) {
-                        CategoriesProcessor::processMultiLocale($data->categories, $data->locale, $server->getId(), $publication->getId());
+                        $submission = $existingSubmission;
+                        $publication = $basePublication;
+
+                        $publication = PublicationProcessor::processMultiLocalePublication($publication, $data, $server);
                     } elseif ($existingSubmission && $basePublication) {
-                        CategoriesProcessor::processForVersion($data->categories, $data->locale, $server->getId(), $publication->getId(), $basePublication);
+                        // New version import
+                        $submission = $existingSubmission;
+                        $publication = PublicationProcessor::createPublicationVersion($basePublication, $data, $server);
+                        $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->sourceDir);
                     } else {
-                        CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
+                        // New submission import
+                        $initialPublication = PublicationProcessor::createInitialPublication($data);
+                        $submission = SubmissionProcessor::process($data, $initialPublication, $server);
+                        $publication = PublicationProcessor::process($submission, $data, $server, $this->sourceDir);
                     }
 
-                    // Reload publication to populate categoryIds property after assignment
+                    InvalidRowValidations::validatePublicationWasSuccessfullyCreated($publication);
+
+                    $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+
+                    // Process supplementary files
+                    if ($data->suppFilenames) {
+                        // Get supplementary genre for supplementary files
+                        $suppGenreId = CachedEntities::getCachedSupplementaryGenreId($server->getId()) ?? $genreId;
+                        $suppIds = [];
+
+                        foreach (array_map('trim', explode(';', $data->suppFilenames)) as $suppFile) {
+                            try {
+                                // @TODO: change the exception type here
+                                $suppFileId = $this->saveSubmissionFile(
+                                    $suppFile,
+                                    $server->getId(),
+                                    $submission,
+                                    __('plugins.importexport.csv.errorWhileSavingSupplementaryFile', ['file' => $suppFile])
+                                );
+                            } catch (FileNotSavedException $e) {
+                                // The submission is already deleted by saveSubmissionFile(), which cascades to delete
+                                // the linked galley files (galleyIds). We only need to manually delete the
+                                // supplementary files that were uploaded but not yet linked (suppIds).
+                                foreach($suppIds as $suppItem) {
+                                    $this->fileService->delete($suppItem['id']);
+                                }
+
+                                throw $e;
+                            }
+
+                            $suppIds[] = ['file' => $suppFile, 'id' => $suppFileId];
+                        }
+
+                        $suppLabelsArray = array_map('trim', explode(';', $data->suppLabels));
+                        $suppDescriptionsArray = !empty($data->suppDescriptions)
+                            ? array_map('trim', explode(';', $data->suppDescriptions))
+                            : [];
+
+                        for($i = 0; $i < count($suppLabelsArray); $i++) {
+                            $suppItem = $suppIds[$i];
+                            $suppLabel = $suppLabelsArray[$i];
+                            $suppDescription = $suppDescriptionsArray[$i] ?? null;
+
+                            $this->handleGalley(
+                                $suppItem,
+                                $data,
+                                $submission->getId(),
+                                $suppGenreId,
+                                $suppLabel,
+                                $publication->getId(),
+                                $fileUploadUser,
+                                $suppDescription
+                            );
+                        }
+                    }
+
+                    if ($isMultiLocaleImport) {
+                        // For multi-locale imports, update existing publication with new locale data
+                        AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
+                        KeywordsProcessor::processMultiLocale($data, $publication);
+                        SubjectsProcessor::processMultiLocale($data, $publication);
+                        FundersProcessor::processMultiLocale($data, $submission, $server->getId());
+                        PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication);
+                    } else {
+                        // For new submissions or versions, use the regular process
+                        AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
+                        KeywordsProcessor::process($data, $publication, $basePublication);
+                        SubjectsProcessor::process($data, $publication, $basePublication);
+                        FundersProcessor::process($data, $submission, $server->getId(), $basePublication);
+                        PublicationProcessor::processSupportingAgencies($data, $publication, $basePublication);
+                    }
+
+                    if (!empty($data->vorDoi)) {
+                        PublicationProcessor::updateVorDoi($publication, $data->vorDoi);
+                    }
+
+                    if ((empty($data->version) || (int)$data->version === 1) && !empty($data->coverage)) {
+                        PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
+                    }
+
+                    $section = SectionsProcessor::process($data, $server->getId(), $basePublication);
+                    PublicationProcessor::updateSectionId($publication, $section->getId());
+
+                    if ($data->coverImageFilename) {
+                        PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
+                    } elseif ($basePublication && $basePublication->getLocalizedData('coverImage', $data->locale)) {
+                        PublicationProcessor::setCoverImage(
+                            $publication,
+                            $basePublication->getLocalizedData('coverImage', $data->locale),
+                            $data->locale
+                        );
+                    }
+
+                    Repo::publication()->dao->update($publication);
                     $publication = Repo::publication()->get($publication->getId());
-                }
 
-                if (!empty($data->versionIdentifier)) {
-                    $this->trackProcessedPreprint($data, $submission, $publication);
-                }
+                    if ($data->categories || $basePublication) {
+                        if ($isMultiLocaleImport) {
+                            CategoriesProcessor::processMultiLocale($data->categories, $data->locale, $server->getId(), $publication->getId());
+                        } elseif ($existingSubmission && $basePublication) {
+                            CategoriesProcessor::processForVersion($data->categories, $data->locale, $server->getId(), $publication->getId(), $basePublication);
+                        } else {
+                            CategoriesProcessor::process($data->categories, $data->locale, $server->getId(), $publication->getId());
+                        }
 
-                if ($usedDefaultUser) {
-                    echo __('plugins.importexport.csv.usernameNotFoundUsingDefault', [
-                        'username' => $data->username,
-                        'submissionId' => $submission->getId(),
-                        'defaultUsername' => $this->user->getUsername()
-                    ]) . "\n";
+                        // Reload publication to populate categoryIds property after assignment
+                        $publication = Repo::publication()->get($publication->getId());
+                    }
+
+                    if (!empty($data->versionIdentifier)) {
+                        $this->trackProcessedPreprint($data, $submission, $publication);
+                    }
+
+                    if ($usedDefaultUser) {
+                        echo __('plugins.importexport.csv.usernameNotFoundUsingDefault', [
+                            'username' => $data->username,
+                            'submissionId' => $submission->getId(),
+                            'defaultUsername' => $this->user->getUsername()
+                        ]) . "\n";
+                    }
+
+                } catch (RowValidationException | FileNotSavedException $e) {
+                    if (is_null($invalidCsvFile)) {
+                        $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
+                        if (is_null($invalidCsvFile)) {
+                            continue 2;
+                        }
+                    }
+                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $e->getMessage(), $this->failedRows);
+                    continue;
                 }
             }
 
@@ -551,10 +432,6 @@ class PreprintCommand
                 'processedRows' => $this->processedRows,
                 'failedRows' => $this->failedRows,
             ]) . "\n";
-
-            if (!$this->failedRows) {
-                unlink($this->sourceDir . '/' . "invalid_{$basename}");
-            }
         }
 
         $this->syncCoverImagesForProcessedPreprints();
@@ -562,17 +439,70 @@ class PreprintCommand
     }
 
     /**
-     * Save a submission file. If an error occurred, the method will delete the submission already saved
-     * and return null.
+     * Process galley files and labels.
+     */
+    private function processGalleys(
+        object $data,
+        int $serverId,
+        Submission $submission,
+        int $genreId,
+        int $publicationId,
+        User $fileUploadUser
+    ): array
+    {
+        // Array to store each galley ID to its respective galley file
+        $galleyIds = [];
+        if ($data->galleyFilenames) {
+            foreach (array_map('trim', explode(';', $data->galleyFilenames)) as $galleyFile) {
+                try {
+                    $galleyFileId = $this->saveSubmissionFile(
+                        $galleyFile,
+                        $serverId,
+                        $submission,
+                        __('plugins.importexport.csv.errorWhileSavingSubmissionGalley', ['galley' => $galleyFile])
+                    );
+                } catch (FileNotSavedException $e) {
+                    foreach($galleyIds as $galleyItem) {
+                        $this->fileService->delete($galleyItem['id']);
+                    }
+
+                    throw $e;
+                }
+
+                $galleyIds[] = ['file' => $galleyFile, 'id' => $galleyFileId];
+            }
+
+            $galleyLabelsArray = array_map('trim', explode(';', $data->galleyLabels));
+            for($i = 0; $i < count($galleyLabelsArray); $i++) {
+                $galleyItem = $galleyIds[$i];
+                $galleyLabel = $galleyLabelsArray[$i];
+
+                $this->handleGalley(
+                    $galleyItem,
+                    $data,
+                    $submission->getId(),
+                    $genreId,
+                    $galleyLabel,
+                    $publicationId,
+                    $fileUploadUser
+                );
+            }
+        }
+
+        return $galleyIds;
+    }
+
+    /**
+     * Save a submission file. If an error occurred, the method will delete the submission already saved.
+     *
+     * @throws FileNotSavedException
      */
     private function saveSubmissionFile(
         string $filePath,
         int $serverId,
         Submission $submission,
-        \SplFileObject $invalidCsvFile,
-        string $reason,
-        array $fieldsList
-    ): ?int
+        string $errorMessage
+    ): int
     {
         try {
             $extension = $this->fileManager->parseFileExtension($filePath);
@@ -581,11 +511,9 @@ class PreprintCommand
 
             return $this->fileService->add($completePath, $submissionDir . '/' . uniqid() . '.' . $extension);
         } catch (\Exception $e) {
-            CsvFileHandler::processFailedRow($invalidCsvFile, $fieldsList, $this->expectedRowSize, $reason, $this->failedRows);
-
             Repo::submission()->delete($submission);
 
-            return null;
+            throw new FileNotSavedException($errorMessage . ' (' . $e->getMessage() . ')');
         }
     }
 
@@ -703,7 +631,8 @@ class PreprintCommand
 
                     $reloadedPublication = Repo::publication()->get($publicationId);
                     if ($reloadedPublication) {
-                        PublicationProcessor::updatePublicationAttribute($reloadedPublication, 'coverImage', $sourceCoverImage, $locale);
+                        PublicationProcessor::setCoverImage($reloadedPublication, $sourceCoverImage, $locale);
+                        Repo::publication()->dao->update($publication);
                     }
                 }
             }

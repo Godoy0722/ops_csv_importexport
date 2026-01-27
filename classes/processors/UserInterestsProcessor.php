@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/UserInterestsProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class UserInterestsProcessor
@@ -20,7 +20,7 @@ use APP\facades\Repo;
 
 class UserInterestsProcessor
 {
-	public static function process(array $reviewInterests, int $userId)
+    public static function process(array $reviewInterests, int $userId)
     {
         if (!empty($reviewInterests)) {
             $user = Repo::user()->get($userId);
@@ -28,5 +28,5 @@ class UserInterestsProcessor
                 Repo::userInterest()->setInterestsForUser($user, $reviewInterests);
             }
         }
-	}
+    }
 }

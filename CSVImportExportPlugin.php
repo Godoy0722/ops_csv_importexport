@@ -98,10 +98,18 @@ class CSVImportExportPlugin extends ImportExportPlugin
     public function executeCLI($scriptName, &$args): void
     {
         $startTime = microtime(true);
+        $this->sendWelcomeEmail = false;
+
+        $key = array_search('--sendWelcomeEmail', $args);
+        if ($key !== false) {
+            $this->sendWelcomeEmail = true;
+            unset($args[$key]);
+            $args = array_values($args);
+        }
+
         $this->command = array_shift($args);
         $this->username = array_shift($args);
         $this->sourceDir = array_shift($args);
-        $this->sendWelcomeEmail = array_shift($args) === 'true' ?? false; // @review I think it's better to check against a value or just use a flag "--sendWelcomeEmail"
 
         if (! in_array($this->command, ['preprints', 'users']) || !$this->sourceDir || !$this->username) {
             $this->usage($scriptName);

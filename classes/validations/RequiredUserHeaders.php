@@ -42,12 +42,12 @@ class RequiredUserHeaders
 
     public static function validateRowHasAllFields(array $row): bool
     {
-        return count($row) === count(self::$userHeaders);
+        return count($row) === count(static::$userHeaders);
     }
 
     public static function validateRowHasAllRequiredFields(object $row): bool
     {
-        foreach(self::$userRequiredHeaders as $requiredHeader) {
+        foreach(static::$userRequiredHeaders as $requiredHeader) {
             if (!$row->{$requiredHeader}) {
                 return false;
             }

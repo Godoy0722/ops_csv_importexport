@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/SubjectsProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class SubjectsProcessor
@@ -21,7 +21,7 @@ use APP\publication\Publication;
 
 class SubjectsProcessor
 {
-	public static function process(object $data, int $publicationId, ?Publication $basePublication = null)
+	public static function process(object $data, Publication $publication, ?Publication $basePublication = null)
     {
         if (empty($data->subjects) && !is_null($basePublication)) {
             $baseSubjects = $basePublication->getData('subjects');
@@ -30,11 +30,7 @@ class SubjectsProcessor
                 return;
             }
 
-            $publication = Repo::publication()->get($publicationId);
-            if ($publication) {
-                Repo::publication()->edit($publication, ['subjects' => $baseSubjects]);
-            }
-
+            Repo::publication()->edit($publication, ['subjects' => $baseSubjects]);
             return;
         }
 
@@ -44,27 +40,16 @@ class SubjectsProcessor
             return;
         }
 
-        $publication = Repo::publication()->get($publicationId);
-
-        if (!$publication) {
-            return;
-        }
-
         Repo::publication()->edit($publication, ['subjects' => $subjectsList]);
 	}
 
     /**
      * Process subjects for multi-locale import (adds subjects in new locale)
      */
-    public static function processMultiLocale(object $data, int $publicationId): void
+    public static function processMultiLocale(object $data, Publication $publication): void
     {
         if (empty($data->subjects)) {
             return; // No new subjects to add
-        }
-
-        $publication = Repo::publication()->get($publicationId);
-        if (!$publication) {
-            return;
         }
 
         $existingSubjects = $publication->getData('subjects') ?? [];

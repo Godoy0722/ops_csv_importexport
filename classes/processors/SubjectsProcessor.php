@@ -24,13 +24,19 @@ class SubjectsProcessor
 	public static function process(object $data, Publication $publication, ?Publication $basePublication = null)
     {
         if (empty($data->subjects) && !is_null($basePublication)) {
-            $baseSubjects = $basePublication->getData('subjects');
+            $baseSubjects = $basePublication->getData('subjects', $data->locale);
+
+            // Filter out null/empty values
+            if (is_array($baseSubjects)) {
+                $baseSubjects = array_filter($baseSubjects, fn($subject) => !is_null($subject) && $subject !== '');
+            }
 
             if (empty($baseSubjects)) {
                 return;
             }
 
-            Repo::publication()->edit($publication, ['subjects' => $baseSubjects]);
+            // Wrap in locale array to match expected structure
+            Repo::publication()->edit($publication, ['subjects' => [$data->locale => array_values($baseSubjects)]]);
             return;
         }
 

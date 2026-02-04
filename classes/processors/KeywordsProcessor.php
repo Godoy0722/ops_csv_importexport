@@ -24,13 +24,19 @@ class KeywordsProcessor
     public static function process(object $data, Publication $publication, ?Publication $basePublication = null)
     {
         if (empty($data->keywords) && !is_null($basePublication)) {
-            $baseKeywords = $basePublication->getData('keywords');
+            $baseKeywords = $basePublication->getData('keywords', $data->locale);
+
+            // Filter out null/empty values
+            if (is_array($baseKeywords)) {
+                $baseKeywords = array_filter($baseKeywords, fn($keyword) => !is_null($keyword) && $keyword !== '');
+            }
 
             if (empty($baseKeywords)) {
                 return;
             }
 
-            Repo::publication()->edit($publication, ['keywords' => $baseKeywords]);
+            // Wrap in locale array to match expected structure
+            Repo::publication()->edit($publication, ['keywords' => [$data->locale => array_values($baseKeywords)]]);
             return;
         }
 

@@ -40,11 +40,13 @@ class KeywordsProcessor
             return;
         }
 
-		$keywordsList = [$data->locale => array_map('trim', explode(';', $data->keywords))];
+		$keywords = array_filter(array_map('trim', explode(';', $data->keywords)), fn($keyword) => $keyword !== '');
 
-        if (empty($keywordsList[$data->locale])) {
+        if (empty($keywords)) {
             return;
         }
+
+        $keywordsList = [$data->locale => array_values($keywords)];
 
         Repo::publication()->edit($publication, ['keywords' => $keywordsList]);
 	}
@@ -58,9 +60,14 @@ class KeywordsProcessor
             return; // No new keywords to add
         }
 
+        $newKeywords = array_filter(array_map('trim', explode(';', $data->keywords)), fn($keyword) => $keyword !== '');
+
+        if (empty($newKeywords)) {
+            return;
+        }
+
         $existingKeywords = $publication->getData('keywords') ?? [];
-        $newKeywords = array_map('trim', explode(';', $data->keywords));
-        $existingKeywords[$data->locale] = $newKeywords;
+        $existingKeywords[$data->locale] = array_values($newKeywords);
 
         Repo::publication()->edit($publication, ['keywords' => $existingKeywords]);
     }

@@ -40,11 +40,13 @@ class SubjectsProcessor
             return;
         }
 
-		$subjectsList = [$data->locale => array_map('trim', explode(';', $data->subjects))];
+		$subjects = array_filter(array_map('trim', explode(';', $data->subjects)), fn($subject) => $subject !== '');
 
-		if (empty($subjectsList[$data->locale])) {
+		if (empty($subjects)) {
             return;
         }
+
+        $subjectsList = [$data->locale => array_values($subjects)];
 
         Repo::publication()->edit($publication, ['subjects' => $subjectsList]);
 	}
@@ -58,10 +60,14 @@ class SubjectsProcessor
             return; // No new subjects to add
         }
 
-        $existingSubjects = $publication->getData('subjects') ?? [];
+        $newSubjects = array_filter(array_map('trim', explode(';', $data->subjects)), fn($subject) => $subject !== '');
 
-        $newSubjects = array_map('trim', explode(';', $data->subjects));
-        $existingSubjects[$data->locale] = $newSubjects;
+        if (empty($newSubjects)) {
+            return;
+        }
+
+        $existingSubjects = $publication->getData('subjects') ?? [];
+        $existingSubjects[$data->locale] = array_values($newSubjects);
 
         Repo::publication()->edit($publication, ['subjects' => $existingSubjects]);
     }

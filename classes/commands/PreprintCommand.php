@@ -159,6 +159,7 @@ class PreprintCommand
                         fn($row) => RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints)
                     );
                     InvalidRowValidations::validatePreprintVersioningFields($data);
+                    InvalidRowValidations::validateSectionFields($data);
 
                     if (!empty($data->versionIdentifier)) {
                         InvalidRowValidations::validateNoDuplicateVersion($data, $this->processedPreprints);
@@ -374,8 +375,9 @@ class PreprintCommand
                         PublicationProcessor::updateCoverage($publication, $data->coverage, $data->locale);
                     }
 
-                    $section = SectionsProcessor::process($data, $server->getId(), $basePublication);
-                    PublicationProcessor::updateSectionId($publication, $section->getId());
+                    !is_null($basePublication)
+                        ? PublicationProcessor::updateSectionId($publication, $basePublication->getData('sectionId'))
+                        : SectionsProcessor::process($data, $server, $publication);
 
                     if ($data->coverImageFilename) {
                         PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);

@@ -599,4 +599,17 @@ class InvalidRowValidations
             throw new RowValidationException(__('plugins.importexport.csv.errorWhileCreatingPublication'));
         }
     }
+
+    /**
+     * Validates that section fields are either both filled or both empty.
+     * If one is provided, both must be provided.
+     *
+     * @throws RowValidationException
+     */
+    public static function validateSectionFields(object $data): void
+    {
+        if (empty($data->sectionTitle) xor empty($data->sectionAbbrev)) {
+            throw new RowValidationException(__('plugins.importexport.csv.incompleteSectionFields'));
+        }
+    }
 }

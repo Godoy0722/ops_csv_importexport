@@ -186,3 +186,6 @@ msgstr "Executed in: {$seconds} seconds.\n"
 
 msgid "plugins.importexport.csv.couldNotWriteFile"
 msgstr "Could not write to file \"{$filename}\"."
+
+msgid "plugins.importexport.csv.incompleteSectionFields"
+msgstr "Both sectionTitle and sectionAbbrev must be provided together. If one is filled, the other must also be filled."

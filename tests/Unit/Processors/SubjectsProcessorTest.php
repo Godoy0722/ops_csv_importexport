@@ -9,7 +9,7 @@
  *
  * @class SubjectsProcessorTest
  *
- * @brief Tests for SubjectsProcessor class - testing subject parsing logic
+ * @brief Tests for SubjectsProcessor class - testing subject parsing and processing logic
  */
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
@@ -17,6 +17,7 @@ namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 use APP\plugins\importexport\csv\classes\processors\SubjectsProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
+use APP\publication\Publication;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 #[CoversClass(SubjectsProcessor::class)]
@@ -126,5 +127,271 @@ class SubjectsProcessorTest extends BaseTestCase
         $this->assertArrayHasKey('pt_BR', $subjectsData);
         $this->assertCount(2, $subjectsData['en']);
         $this->assertCount(2, $subjectsData['pt_BR']);
+    }
+
+    // ==================== process() Integration Tests ====================
+
+    public function testProcessSetsSubjectsForPublication(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'subjects' => 'Computer Science;Mathematics;Physics',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication);
+
+        $this->assertEquals(['en' => ['Computer Science', 'Mathematics', 'Physics']], $editParams['subjects']);
+    }
+
+    public function testProcessReturnsEarlyWhenEmptyAndNoBase(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'subjects' => '',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessCopiesBaseSubjectsWhenEmpty(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('subjects', ['Computer Science', 'AI'], 'en');
+
+        $data = (object) [
+            'subjects' => '',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication, $basePublication);
+
+        $this->assertEquals(['en' => ['Computer Science', 'AI']], $editParams['subjects']);
+    }
+
+    public function testProcessReturnsEarlyWhenBaseSubjectsEmpty(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('subjects', [], 'en');
+
+        $data = (object) [
+            'subjects' => '',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication, $basePublication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessFiltersEmptySubjects(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'subjects' => 'Computer Science;;AI;',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication);
+
+        $this->assertEquals(['en' => ['Computer Science', 'AI']], $editParams['subjects']);
+    }
+
+    public function testProcessReturnsEarlyWhenAllSubjectsFilteredOut(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'subjects' => ';;',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessCopiesBaseSubjectsFilteringNulls(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('subjects', ['Computer Science', null, '', 'AI'], 'en');
+
+        $data = (object) [
+            'subjects' => '',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication, $basePublication);
+
+        $this->assertEquals(['en' => ['Computer Science', 'AI']], $editParams['subjects']);
+    }
+
+    // ==================== processMultiLocale() Tests ====================
+
+    public function testProcessMultiLocaleMergesSubjects(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+        $publication->setData('subjects', ['en' => ['Computer Science', 'AI']]);
+
+        $data = (object) [
+            'subjects' => 'Ciência da Computação;IA',
+            'locale' => 'pt_BR',
+        ];
+
+        SubjectsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals([
+            'en' => ['Computer Science', 'AI'],
+            'pt_BR' => ['Ciência da Computação', 'IA'],
+        ], $editParams['subjects']);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWhenEmpty(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'subjects' => '',
+            'locale' => 'pt_BR',
+        ];
+
+        SubjectsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessMultiLocaleFiltersEmptySubjects(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+        $publication->setData('subjects', ['en' => ['AI']]);
+
+        $data = (object) [
+            'subjects' => 'IA;;Computação;',
+            'locale' => 'pt_BR',
+        ];
+
+        SubjectsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals([
+            'en' => ['AI'],
+            'pt_BR' => ['IA', 'Computação'],
+        ], $editParams['subjects']);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWhenAllFilteredOut(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'subjects' => ';;',
+            'locale' => 'pt_BR',
+        ];
+
+        SubjectsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
     }
 }

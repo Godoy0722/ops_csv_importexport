@@ -14,9 +14,13 @@
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 
+use APP\author\Author;
 use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
+use APP\plugins\importexport\csv\classes\processors\PublicationProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
+use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
+use APP\publication\Publication;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionClass;
@@ -267,5 +271,310 @@ class AuthorsProcessorTest extends BaseTestCase
 
         // Index 0 should be the primary author
         $this->assertEquals(0, array_key_first($authors));
+    }
+
+    // ==================== process() Integration Tests ====================
+
+    /**
+     * Helper to get access to private parseAuthorString method
+     */
+    private function getParseAuthorStringMethod(): \ReflectionMethod
+    {
+        $reflection = new ReflectionClass(AuthorsProcessor::class);
+        $method = $reflection->getMethod('parseAuthorString');
+        $method->setAccessible(true);
+        return $method;
+    }
+
+    /**
+     * Helper to get access to private updateAuthorFromCsv method
+     */
+    private function getUpdateAuthorFromCsvMethod(): \ReflectionMethod
+    {
+        $reflection = new ReflectionClass(AuthorsProcessor::class);
+        $method = $reflection->getMethod('updateAuthorFromCsv');
+        $method->setAccessible(true);
+        return $method;
+    }
+
+    public function testParseAuthorStringWithAllFields(): void
+    {
+        $method = $this->getParseAuthorStringMethod();
+        $result = $method->invoke(null, 'John,Doe,john@example.com,0000-0002-1825-0097,MIT', 'contact@example.com');
+
+        $this->assertEquals('John', $result[0]);
+        $this->assertEquals('Doe', $result[1]);
+        $this->assertEquals('john@example.com', $result[2]);
+        $this->assertEquals('0000-0002-1825-0097', $result[3]);
+        $this->assertEquals('MIT', $result[4]);
+    }
+
+    public function testParseAuthorStringFallsBackToContactEmail(): void
+    {
+        $method = $this->getParseAuthorStringMethod();
+        $result = $method->invoke(null, 'John,Doe,,,MIT', 'contact@example.com');
+
+        $this->assertEquals('contact@example.com', $result[2]);
+    }
+
+    public function testParseAuthorStringWithMinimalData(): void
+    {
+        $method = $this->getParseAuthorStringMethod();
+        $result = $method->invoke(null, 'John,Doe', 'fallback@example.com');
+
+        $this->assertEquals('John', $result[0]);
+        $this->assertEquals('Doe', $result[1]);
+        $this->assertEquals('fallback@example.com', $result[2]);
+        $this->assertEquals('', $result[3]);
+        $this->assertEquals('', $result[4]);
+    }
+
+    public function testUpdateAuthorFromCsvSetsNames(): void
+    {
+        $this->mockAffiliationRepository();
+        $method = $this->getUpdateAuthorFromCsvMethod();
+        $author = new Author();
+
+        $method->invoke(null, $author, 'John', 'Doe', '', '', 'en', false);
+
+        $this->assertEquals('John', $author->getGivenName('en'));
+        $this->assertEquals('Doe', $author->getFamilyName('en'));
+    }
+
+    public function testUpdateAuthorFromCsvSkipsEmptyNamesForExistingAuthor(): void
+    {
+        $this->mockAffiliationRepository();
+        $method = $this->getUpdateAuthorFromCsvMethod();
+        $author = new Author();
+        $author->setGivenName('Existing', 'en');
+        $author->setFamilyName('Author', 'en');
+
+        $method->invoke(null, $author, '', '', '', '', 'en', true);
+
+        $this->assertEquals('Existing', $author->getGivenName('en'));
+        $this->assertEquals('Author', $author->getFamilyName('en'));
+    }
+
+    public function testUpdateAuthorFromCsvSetsOrcidWhenValid(): void
+    {
+        $this->mockAffiliationRepository();
+        $method = $this->getUpdateAuthorFromCsvMethod();
+        $author = new Author();
+
+        $method->invoke(null, $author, 'John', 'Doe', '0000-0002-1825-0097', '', 'en', false);
+
+        $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $author->getOrcid());
+    }
+
+    public function testUpdateAuthorFromCsvIgnoresInvalidOrcid(): void
+    {
+        $this->mockAffiliationRepository();
+        $method = $this->getUpdateAuthorFromCsvMethod();
+        $author = new Author();
+
+        $method->invoke(null, $author, 'John', 'Doe', 'invalid-orcid', '', 'en', false);
+
+        $this->assertEmpty($author->getOrcid());
+    }
+
+    public function testUpdateAuthorFromCsvSetsAffiliationForNewAuthor(): void
+    {
+        $this->mockAffiliationRepository();
+        $method = $this->getUpdateAuthorFromCsvMethod();
+        $author = new Author();
+
+        $method->invoke(null, $author, 'John', 'Doe', '', 'MIT', 'en', false);
+
+        $affiliations = $author->getAffiliations();
+        $this->assertNotEmpty($affiliations);
+    }
+
+    public function testProcessCreatesSingleAuthor(): void
+    {
+        $addCallCount = 0;
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockPublicationRepository();
+        $this->mockAffiliationRepository();
+
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'authors' => 'John,Doe,john@example.com,,MIT',
+            'locale' => 'en',
+        ];
+
+        AuthorsProcessor::process($data, 'contact@example.com', 1, $publication, 1);
+
+        $this->assertEquals(1, $addCallCount);
+    }
+
+    public function testProcessCreatesMultipleAuthors(): void
+    {
+        $addCallCount = 0;
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockPublicationRepository();
+        $this->mockAffiliationRepository();
+
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'authors' => 'John,Doe,john@example.com,,MIT;Jane,Smith,jane@example.com,,Harvard',
+            'locale' => 'en',
+        ];
+
+        AuthorsProcessor::process($data, 'contact@example.com', 1, $publication, 1);
+
+        $this->assertEquals(2, $addCallCount);
+    }
+
+    public function testProcessSetsFirstAuthorAsPrimaryContact(): void
+    {
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockPublicationRepository();
+        $this->mockAffiliationRepository();
+
+        $addCallCount = 0;
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'authors' => 'John,Doe,john@example.com,,MIT;Jane,Smith,jane@example.com,,Harvard',
+            'locale' => 'en',
+        ];
+
+        AuthorsProcessor::process($data, 'contact@example.com', 1, $publication, 1);
+
+        // Primary contact should be set to first author ID (1)
+        $this->assertEquals(1, $publication->getData('primaryContactId'));
+    }
+
+    public function testProcessMultiLocaleUpdatesExistingAuthorByEmail(): void
+    {
+        $addCallCount = 0;
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockAffiliationRepository();
+
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        $existingAuthor = new Author();
+        $existingAuthor->setId(1);
+        $existingAuthor->setGivenName('John', 'en');
+        $existingAuthor->setFamilyName('Doe', 'en');
+        $existingAuthor->setEmail('john@example.com');
+
+        $publication = MockFactory::publication()
+            ->withAuthors([$existingAuthor])
+            ->build();
+
+        $data = (object) [
+            'authors' => 'João,Silva,john@example.com,,MIT',
+            'locale' => 'pt_BR',
+        ];
+
+        AuthorsProcessor::processMultiLocale($data, 'contact@example.com', 1, $publication, 1);
+
+        // Should update existing author, not create new one
+        $this->assertEquals(0, $addCallCount);
+        // The existing author should now have pt_BR locale data
+        $this->assertEquals('João', $existingAuthor->getGivenName('pt_BR'));
+        $this->assertEquals('Silva', $existingAuthor->getFamilyName('pt_BR'));
+    }
+
+    public function testProcessMultiLocaleCreatesNewAuthorWhenNoEmailMatch(): void
+    {
+        $addCallCount = 0;
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockAffiliationRepository();
+
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        $existingAuthor = new Author();
+        $existingAuthor->setId(1);
+        $existingAuthor->setEmail('john@example.com');
+
+        $publication = MockFactory::publication()
+            ->withAuthors([$existingAuthor])
+            ->build();
+
+        $data = (object) [
+            'authors' => 'Maria,Santos,maria@example.com,,USP',
+            'locale' => 'pt_BR',
+        ];
+
+        AuthorsProcessor::processMultiLocale($data, 'contact@example.com', 1, $publication, 1);
+
+        $this->assertEquals(1, $addCallCount);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWithEmptyAuthors(): void
+    {
+        $addCallCount = 0;
+        $authorRepoMock = $this->mockAuthorRepository();
+
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'authors' => '',
+            'locale' => 'pt_BR',
+        ];
+
+        AuthorsProcessor::processMultiLocale($data, 'contact@example.com', 1, $publication, 1);
+
+        $this->assertEquals(0, $addCallCount);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWithNoExistingAuthors(): void
+    {
+        $addCallCount = 0;
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockAffiliationRepository();
+
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        // Use plain Publication (getData('authors') returns null → empty check triggers early return)
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'authors' => 'John,Doe,john@example.com,,MIT',
+            'locale' => 'pt_BR',
+        ];
+
+        AuthorsProcessor::processMultiLocale($data, 'contact@example.com', 1, $publication, 1);
+
+        // Should return early since no existing authors (null/empty array)
+        $this->assertEquals(0, $addCallCount);
     }
 }

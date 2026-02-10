@@ -33,12 +33,12 @@ use PKP\controlledVocab\Repository as ControlledVocabRepository;
 use PKP\galley\DAO as GalleyDAO;
 use PKP\galley\Galley;
 use PKP\galley\Repository as GalleyRepository;
+use APP\publication\Repository as PublicationRepository;
 use PKP\publication\DAO as PublicationDAO;
-use PKP\publication\Repository as PublicationRepository;
 use PKP\submission\DAO as SubmissionDAO;
-use PKP\submission\Repository as SubmissionRepository;
+use APP\submission\Repository as SubmissionRepository;
 use PKP\submissionFile\DAO as SubmissionFileDAO;
-use PKP\submissionFile\Repository as SubmissionFileRepository;
+use APP\submissionFile\Repository as SubmissionFileRepository;
 use PKP\submissionFile\SubmissionFile;
 use PKP\tests\PKPTestCase;
 use PKP\user\DAO as UserDAO;
@@ -46,6 +46,9 @@ use PKP\user\Repository as UserRepository;
 use PKP\user\User;
 use PKP\userGroup\Repository as UserGroupRepository;
 use PKP\userGroup\UserGroup;
+use PKP\user\interest\Repository as UserInterestRepository;
+use PKP\emailTemplate\Repository as EmailTemplateRepository;
+use PKP\emailTemplate\EmailTemplate;
 
 abstract class BaseTestCase extends PKPTestCase
 {
@@ -53,11 +56,6 @@ abstract class BaseTestCase extends PKPTestCase
      * @var array Backup of CachedEntities static properties
      */
     protected array $cachedEntitiesBackup = [];
-
-    /**
-     * @var array Backup of CachedDaos static properties
-     */
-    protected array $cachedDaosBackup = [];
 
     /**
      * @var array Store container instances to restore later
@@ -106,12 +104,11 @@ abstract class BaseTestCase extends PKPTestCase
     }
 
     /**
-     * Backup static properties from CachedEntities and CachedDaos
+     * Backup static properties from CachedEntities
      */
     protected function backupCachedStatics(): void
     {
         $cachedEntitiesClass = \APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities::class;
-        $cachedDaosClass = \APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos::class;
 
         // Backup CachedEntities
         $this->cachedEntitiesBackup = [
@@ -119,14 +116,11 @@ abstract class BaseTestCase extends PKPTestCase
             'userGroupIds' => $cachedEntitiesClass::$userGroupIds,
             'userGroups' => $cachedEntitiesClass::$userGroups,
             'genreIds' => $cachedEntitiesClass::$genreIds,
+            'supplementaryGenreIds' => $cachedEntitiesClass::$supplementaryGenreIds,
             'categories' => $cachedEntitiesClass::$categories,
             'sections' => $cachedEntitiesClass::$sections,
             'users' => $cachedEntitiesClass::$users,
-        ];
-
-        // Backup CachedDaos
-        $this->cachedDaosBackup = [
-            'cachedDaos' => $cachedDaosClass::$cachedDaos,
+            'subscriptionTypes' => $cachedEntitiesClass::$subscriptionTypes,
         ];
 
         // Clear the caches for clean tests
@@ -134,31 +128,30 @@ abstract class BaseTestCase extends PKPTestCase
         $cachedEntitiesClass::$userGroupIds = [];
         $cachedEntitiesClass::$userGroups = [];
         $cachedEntitiesClass::$genreIds = [];
+        $cachedEntitiesClass::$supplementaryGenreIds = [];
         $cachedEntitiesClass::$categories = [];
         $cachedEntitiesClass::$sections = [];
         $cachedEntitiesClass::$users = [];
-        $cachedDaosClass::$cachedDaos = [];
+        $cachedEntitiesClass::$subscriptionTypes = [];
     }
 
     /**
-     * Restore static properties to CachedEntities and CachedDaos
+     * Restore static properties to CachedEntities
      */
     protected function restoreCachedStatics(): void
     {
         $cachedEntitiesClass = \APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities::class;
-        $cachedDaosClass = \APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos::class;
 
         // Restore CachedEntities
         $cachedEntitiesClass::$servers = $this->cachedEntitiesBackup['servers'] ?? [];
         $cachedEntitiesClass::$userGroupIds = $this->cachedEntitiesBackup['userGroupIds'] ?? [];
         $cachedEntitiesClass::$userGroups = $this->cachedEntitiesBackup['userGroups'] ?? [];
         $cachedEntitiesClass::$genreIds = $this->cachedEntitiesBackup['genreIds'] ?? [];
+        $cachedEntitiesClass::$supplementaryGenreIds = $this->cachedEntitiesBackup['supplementaryGenreIds'] ?? [];
         $cachedEntitiesClass::$categories = $this->cachedEntitiesBackup['categories'] ?? [];
         $cachedEntitiesClass::$sections = $this->cachedEntitiesBackup['sections'] ?? [];
         $cachedEntitiesClass::$users = $this->cachedEntitiesBackup['users'] ?? [];
-
-        // Restore CachedDaos
-        $cachedDaosClass::$cachedDaos = $this->cachedDaosBackup['cachedDaos'] ?? [];
+        $cachedEntitiesClass::$subscriptionTypes = $this->cachedEntitiesBackup['subscriptionTypes'] ?? [];
     }
 
     // ==================== Repository Mock Helpers ====================
@@ -175,7 +168,7 @@ abstract class BaseTestCase extends PKPTestCase
 
         $mock = Mockery::mock(AuthorRepository::class)->makePartial();
         $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new Author());
-        $mock->shouldReceive('add')->andReturn(1);
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
         $mock->shouldReceive('edit')->andReturn(true);
         $mock->dao = $authorDaoMock;
 
@@ -212,8 +205,11 @@ abstract class BaseTestCase extends PKPTestCase
 
         $mock = Mockery::mock(UserRepository::class)->makePartial();
         $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new User());
-        $mock->shouldReceive('add')->andReturn(1);
-        $mock->shouldReceive('edit')->andReturn(true);
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
+        $mock->shouldReceive('get')->andReturn(null)->byDefault();
+        $mock->shouldReceive('getByUsername')->andReturn(null)->byDefault();
+        $mock->shouldReceive('getByEmail')->andReturn(null)->byDefault();
+        $mock->shouldReceive('edit')->andReturn(true)->byDefault();
         $mock->dao = $userDaoMock;
 
         app()->instance(UserRepository::class, $mock);
@@ -229,11 +225,14 @@ abstract class BaseTestCase extends PKPTestCase
 
         $publicationDaoMock = Mockery::mock(PublicationDAO::class)->makePartial();
         $publicationDaoMock->shouldReceive('update')->andReturn(true);
+        $publicationDaoMock->shouldReceive('insert')->andReturn(1)->byDefault();
 
         $mock = Mockery::mock(PublicationRepository::class)->makePartial();
         $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new Publication());
-        $mock->shouldReceive('add')->andReturn(1);
-        $mock->shouldReceive('edit')->andReturn(true);
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
+        $mock->shouldReceive('get')->andReturn(null)->byDefault();
+        $mock->shouldReceive('edit')->andReturnUsing(fn($pub) => $pub)->byDefault();
+        $mock->shouldReceive('assignCategoriesToPublication')->andReturnNull()->byDefault();
         $mock->dao = $publicationDaoMock;
 
         app()->instance(PublicationRepository::class, $mock);
@@ -252,8 +251,9 @@ abstract class BaseTestCase extends PKPTestCase
 
         $mock = Mockery::mock(SubmissionRepository::class)->makePartial();
         $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new Submission());
-        $mock->shouldReceive('add')->andReturn(1);
-        $mock->shouldReceive('edit')->andReturn(true);
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
+        $mock->shouldReceive('get')->andReturn(null)->byDefault();
+        $mock->shouldReceive('edit')->andReturnNull()->byDefault();
         $mock->dao = $submissionDaoMock;
 
         app()->instance(SubmissionRepository::class, $mock);
@@ -269,10 +269,11 @@ abstract class BaseTestCase extends PKPTestCase
 
         $categoryDaoMock = Mockery::mock(CategoryDAO::class)->makePartial();
         $categoryDaoMock->shouldReceive('insertObject')->andReturn(1);
+        $categoryDaoMock->shouldReceive('update')->andReturn(true);
 
         $mock = Mockery::mock(CategoryRepository::class)->makePartial();
         $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new Category());
-        $mock->shouldReceive('add')->andReturn(1);
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
         $mock->dao = $categoryDaoMock;
 
         app()->instance(CategoryRepository::class, $mock);
@@ -291,11 +292,45 @@ abstract class BaseTestCase extends PKPTestCase
 
         $mock = Mockery::mock(GalleyRepository::class)->makePartial();
         $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new Galley());
-        $mock->shouldReceive('add')->andReturn(1);
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
         $mock->dao = $galleyDaoMock;
 
         app()->instance(GalleyRepository::class, $mock);
         return $mock;
+    }
+
+    /**
+     * Create and register a mock Section Repository
+     */
+    protected function mockSectionRepository(): MockInterface
+    {
+        $sectionRepoClass = \APP\section\Repository::class;
+        $this->backupContainerInstance($sectionRepoClass);
+
+        $sectionDaoMock = Mockery::mock(\APP\section\DAO::class)->makePartial();
+        $sectionDaoMock->shouldReceive('insert')->andReturn(1);
+        $sectionDaoMock->shouldReceive('update')->andReturn(true);
+
+        $mock = Mockery::mock($sectionRepoClass)->makePartial();
+        $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new Section());
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
+        $mock->shouldReceive('get')->andReturn(null)->byDefault();
+        $mock->dao = $sectionDaoMock;
+
+        app()->instance($sectionRepoClass, $mock);
+        return $mock;
+    }
+
+    /**
+     * Create a mock Section Collector that returns the given sections
+     */
+    protected function createMockSectionCollector(array $sections = []): MockInterface
+    {
+        $collection = new \Illuminate\Support\LazyCollection($sections);
+        $collector = Mockery::mock(\PKP\section\Collector::class);
+        $collector->shouldReceive('filterByContextIds')->andReturnSelf();
+        $collector->shouldReceive('getMany')->andReturn($collection);
+        return $collector;
     }
 
     /**
@@ -310,8 +345,9 @@ abstract class BaseTestCase extends PKPTestCase
 
         $mock = Mockery::mock(SubmissionFileRepository::class)->makePartial();
         $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new SubmissionFile());
-        $mock->shouldReceive('add')->andReturn(1);
-        $mock->shouldReceive('edit')->andReturn(true);
+        $mock->shouldReceive('add')->andReturn(1)->byDefault();
+        $mock->shouldReceive('get')->andReturn(null)->byDefault();
+        $mock->shouldReceive('edit')->andReturnNull()->byDefault();
         $mock->dao = $submissionFileDaoMock;
 
         app()->instance(SubmissionFileRepository::class, $mock);
@@ -326,8 +362,8 @@ abstract class BaseTestCase extends PKPTestCase
         $this->backupContainerInstance(UserGroupRepository::class);
 
         $mock = Mockery::mock(UserGroupRepository::class)->makePartial();
-        $mock->shouldReceive('assignUserToGroup')->andReturn(null);
-        $mock->shouldReceive('userInGroup')->andReturn(false);
+        $mock->shouldReceive('assignUserToGroup')->andReturn(null)->byDefault();
+        $mock->shouldReceive('userInGroup')->andReturn(false)->byDefault();
 
         app()->instance(UserGroupRepository::class, $mock);
         return $mock;
@@ -345,6 +381,34 @@ abstract class BaseTestCase extends PKPTestCase
         $mock->shouldReceive('getBySymbolic')->andReturn([]);
 
         app()->instance(ControlledVocabRepository::class, $mock);
+        return $mock;
+    }
+
+    /**
+     * Create and register a mock UserInterest Repository
+     */
+    protected function mockUserInterestRepository(): MockInterface
+    {
+        $this->backupContainerInstance(UserInterestRepository::class);
+
+        $mock = Mockery::mock(UserInterestRepository::class)->makePartial();
+        $mock->shouldReceive('setInterestsForUser')->andReturnNull()->byDefault();
+
+        app()->instance(UserInterestRepository::class, $mock);
+        return $mock;
+    }
+
+    /**
+     * Create and register a mock EmailTemplate Repository
+     */
+    protected function mockEmailTemplateRepository(): MockInterface
+    {
+        $this->backupContainerInstance(EmailTemplateRepository::class);
+
+        $mock = Mockery::mock(EmailTemplateRepository::class)->makePartial();
+        $mock->shouldReceive('getByKey')->andReturn(null)->byDefault();
+
+        app()->instance(EmailTemplateRepository::class, $mock);
         return $mock;
     }
 
@@ -488,6 +552,7 @@ abstract class BaseTestCase extends PKPTestCase
         $section->setContextId($data['contextId'] ?? 1);
         $section->setTitle($data['title'] ?? 'Test Section', $data['locale'] ?? 'en');
         $section->setAbbrev($data['abbrev'] ?? 'TS', $data['locale'] ?? 'en');
+        $section->setIsInactive($data['isInactive'] ?? false);
 
         return $section;
     }
@@ -536,6 +601,27 @@ abstract class BaseTestCase extends PKPTestCase
         }
 
         return $galley;
+    }
+
+    // ==================== Database Helpers ====================
+
+    /**
+     * Begin a database transaction for Eloquent model tests.
+     * Disables FK checks and starts a transaction so no real data is affected.
+     */
+    protected function beginDatabaseTransaction(): void
+    {
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        \Illuminate\Support\Facades\DB::beginTransaction();
+    }
+
+    /**
+     * Roll back the database transaction after Eloquent model tests.
+     */
+    protected function rollbackDatabaseTransaction(): void
+    {
+        \Illuminate\Support\Facades\DB::rollBack();
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     // ==================== File System Helpers ====================

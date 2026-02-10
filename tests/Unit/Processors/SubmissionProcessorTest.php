@@ -17,6 +17,7 @@ namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 use APP\plugins\importexport\csv\classes\processors\SubmissionProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
+use APP\publication\Publication;
 use APP\submission\Submission;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -61,7 +62,6 @@ class SubmissionProcessorTest extends BaseTestCase
             ->withDateSubmitted('')
             ->buildObject();
 
-        // When dateSubmitted is empty, datePosted should be used as fallback
         $dateSubmitted = !empty($data->dateSubmitted) ? $data->dateSubmitted : $data->datePosted;
 
         $this->assertEquals('2024-01-15', $dateSubmitted);
@@ -87,13 +87,6 @@ class SubmissionProcessorTest extends BaseTestCase
         $this->assertEquals(3, $status);
     }
 
-    public function testSubmissionProgressZero(): void
-    {
-        $progress = '0';
-
-        $this->assertEquals('0', $progress);
-    }
-
     // ==================== Stage ID Tests ====================
 
     public function testWorkflowStageIdProduction(): void
@@ -103,56 +96,121 @@ class SubmissionProcessorTest extends BaseTestCase
         $this->assertEquals(5, $stageId);
     }
 
-    // ==================== Abstract Handling Tests ====================
+    // ==================== process() Integration Tests ====================
 
-    public function testAbstractFromData(): void
+    public function testProcessCreatesAndReturnsSubmission(): void
     {
+        $submissionRepoMock = $this->mockSubmissionRepository();
+
+        $returnedSubmission = new Submission();
+        $returnedSubmission->setId(42);
+        $returnedSubmission->setData('contextId', 1);
+
+        $submissionRepoMock->shouldReceive('add')->once()->andReturn(42);
+        $submissionRepoMock->shouldReceive('get')->with(42)->andReturn($returnedSubmission);
+
         $data = CsvTestDataBuilder::preprint()
-            ->withAbstract('This is the test abstract with important content.')
+            ->withLocale('en')
+            ->withAbstract('Test abstract')
+            ->withDatePosted('2024-01-15')
+            ->withDateSubmitted('2024-01-10')
             ->buildObject();
 
-        $this->assertEquals('This is the test abstract with important content.', $data->preprintAbstract);
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $server = $this->createMockServer(['id' => 1]);
+
+        $result = SubmissionProcessor::process($data, $publication, $server);
+
+        $this->assertInstanceOf(Submission::class, $result);
+        $this->assertEquals(42, $result->getId());
     }
 
-    public function testEmptyAbstract(): void
+    public function testProcessSetsCorrectSubmissionData(): void
     {
+        $capturedSubmission = null;
+        $submissionRepoMock = $this->mockSubmissionRepository();
+
+        $submissionRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($submission, $publication, $server) use (&$capturedSubmission) {
+                $capturedSubmission = $submission;
+                return 1;
+            });
+
+        $returnedSubmission = new Submission();
+        $returnedSubmission->setId(1);
+        $submissionRepoMock->shouldReceive('get')->with(1)->andReturn($returnedSubmission);
+
         $data = CsvTestDataBuilder::preprint()
-            ->withAbstract('')
+            ->withLocale('en')
+            ->withAbstract('My test abstract')
+            ->withDatePosted('2024-01-15')
+            ->withDateSubmitted('2024-01-10')
             ->buildObject();
 
-        $this->assertTrue(empty($data->preprintAbstract));
+        $publication = new Publication();
+        $publication->setId(1);
+        $server = $this->createMockServer(['id' => 5]);
+
+        SubmissionProcessor::process($data, $publication, $server);
+
+        $this->assertNotNull($capturedSubmission);
+        $this->assertEquals(5, $capturedSubmission->getData('contextId'));
+        $this->assertEquals(Submission::STATUS_PUBLISHED, $capturedSubmission->getData('status'));
+        $this->assertEquals('en', $capturedSubmission->getData('locale'));
+        $this->assertEquals(WORKFLOW_STAGE_ID_PRODUCTION, $capturedSubmission->getData('stageId'));
+        $this->assertEquals('', $capturedSubmission->getData('submissionProgress'));
+        $this->assertEquals('My test abstract', $capturedSubmission->getData('abstract', 'en'));
+        $this->assertEquals('2024-01-10', $capturedSubmission->getData('dateSubmitted'));
     }
 
-    public function testLongAbstract(): void
+    public function testProcessFallsBackToDatePostedWhenNoDateSubmitted(): void
     {
-        $longAbstract = str_repeat('This is a test abstract. ', 100);
+        $capturedSubmission = null;
+        $submissionRepoMock = $this->mockSubmissionRepository();
+
+        $submissionRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($submission) use (&$capturedSubmission) {
+                $capturedSubmission = $submission;
+                return 1;
+            });
+
+        $returnedSubmission = new Submission();
+        $returnedSubmission->setId(1);
+        $submissionRepoMock->shouldReceive('get')->with(1)->andReturn($returnedSubmission);
+
         $data = CsvTestDataBuilder::preprint()
-            ->withAbstract($longAbstract)
+            ->withLocale('en')
+            ->withDatePosted('2024-01-15')
+            ->withDateSubmitted(null)
             ->buildObject();
 
-        $this->assertEquals($longAbstract, $data->preprintAbstract);
-        $this->assertGreaterThan(2000, strlen($data->preprintAbstract));
+        $publication = new Publication();
+        $publication->setId(1);
+        $server = $this->createMockServer(['id' => 1]);
+
+        SubmissionProcessor::process($data, $publication, $server);
+
+        $this->assertEquals('2024-01-15', $capturedSubmission->getData('dateSubmitted'));
     }
 
-    // ==================== Unicode Abstract Tests ====================
+    // ==================== setCurrentPublicationId() Integration Tests ====================
 
-    public function testUnicodeAbstract(): void
+    public function testSetCurrentPublicationIdCallsEdit(): void
     {
-        $unicodeAbstract = 'Este é um resumo em português. 这是中文摘要。 これは日本語の要約です。';
-        $data = CsvTestDataBuilder::preprint()
-            ->withAbstract($unicodeAbstract)
-            ->buildObject();
+        $editParams = null;
+        $submissionRepoMock = $this->mockSubmissionRepository();
+        $submissionRepoMock->shouldReceive('edit')
+            ->andReturnUsing(function ($submission, $params) use (&$editParams) {
+                $editParams = $params;
+            });
 
-        $this->assertEquals($unicodeAbstract, $data->preprintAbstract);
-    }
+        $submission = new Submission();
+        $submission->setId(1);
 
-    // ==================== Context ID Tests ====================
+        SubmissionProcessor::setCurrentPublicationId($submission, 99);
 
-    public function testContextIdIsInteger(): void
-    {
-        $contextId = 1;
-
-        $this->assertIsInt($contextId);
-        $this->assertGreaterThan(0, $contextId);
+        $this->assertEquals(['currentPublicationId' => 99], $editParams);
     }
 }

@@ -14,6 +14,7 @@
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 
+use APP\core\Application;
 use APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use PKP\submissionFile\SubmissionFile;
@@ -58,21 +59,6 @@ class SubmissionFileProcessorTest extends BaseTestCase
         $this->assertEquals('pdf', $extension);
     }
 
-    public function testFileExists(): void
-    {
-        $filePath = $this->tempDir . '/test.pdf';
-        $this->createTestFile($this->tempDir, 'test.pdf', 'fake content');
-
-        $this->assertTrue(file_exists($filePath));
-    }
-
-    public function testFileNotExists(): void
-    {
-        $filePath = $this->tempDir . '/nonexistent.pdf';
-
-        $this->assertFalse(file_exists($filePath));
-    }
-
     // ==================== File Stage Tests ====================
 
     public function testFileStageProof(): void
@@ -82,102 +68,125 @@ class SubmissionFileProcessorTest extends BaseTestCase
         $this->assertIsInt($fileStage);
     }
 
-    // ==================== Supplementary Files Parsing Tests ====================
+    // ==================== process() Integration Tests ====================
 
-    public function testParsesSingleSupplementaryFile(): void
+    public function testProcessCreatesAndReturnsSubmissionFile(): void
     {
-        $suppFilenames = 'data.xlsx';
-        $suppLabels = 'Dataset';
+        $subFileRepoMock = $this->mockSubmissionFileRepository();
 
-        $files = array_map('trim', explode(';', $suppFilenames));
-        $labels = array_map('trim', explode(';', $suppLabels));
+        $returnedFile = new SubmissionFile();
+        $returnedFile->setId(10);
+        $returnedFile->setData('submissionId', 1);
 
-        $this->assertCount(1, $files);
-        $this->assertCount(1, $labels);
+        $subFileRepoMock->shouldReceive('add')->once()->andReturn(10);
+        $subFileRepoMock->shouldReceive('get')->with(10)->andReturn($returnedFile);
+
+        $filePath = $this->createTestFile($this->tempDir, 'test-paper.pdf', '%PDF-1.4 fake content');
+
+        $result = SubmissionFileProcessor::process(
+            'en',
+            5,
+            1,
+            $filePath,
+            2,
+            100
+        );
+
+        $this->assertInstanceOf(SubmissionFile::class, $result);
+        $this->assertEquals(10, $result->getId());
     }
 
-    public function testParsesMultipleSupplementaryFiles(): void
+    public function testProcessSetsCorrectData(): void
     {
-        $suppFilenames = 'data.xlsx;supplement.pdf;appendix.docx';
-        $suppLabels = 'Dataset;Supplement;Appendix';
+        $capturedFile = null;
+        $subFileRepoMock = $this->mockSubmissionFileRepository();
 
-        $files = array_map('trim', explode(';', $suppFilenames));
-        $labels = array_map('trim', explode(';', $suppLabels));
+        $subFileRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($submissionFile) use (&$capturedFile) {
+                $capturedFile = $submissionFile;
+                return 10;
+            });
 
-        $this->assertCount(3, $files);
-        $this->assertCount(3, $labels);
+        $returnedFile = new SubmissionFile();
+        $returnedFile->setId(10);
+        $subFileRepoMock->shouldReceive('get')->with(10)->andReturn($returnedFile);
+
+        $filePath = $this->createTestFile($this->tempDir, 'my-research.pdf', '%PDF-1.4 test');
+
+        SubmissionFileProcessor::process('en', 5, 42, $filePath, 3, 200);
+
+        $this->assertNotNull($capturedFile);
+        $this->assertEquals(42, $capturedFile->getData('submissionId'));
+        $this->assertEquals(5, $capturedFile->getData('uploaderUserId'));
+        $this->assertEquals(200, $capturedFile->getData('fileId'));
+        $this->assertEquals(3, $capturedFile->getData('genreId'));
+        $this->assertEquals(SubmissionFile::SUBMISSION_FILE_PROOF, $capturedFile->getData('fileStage'));
+        $this->assertEquals('en', $capturedFile->getData('locale'));
+        $this->assertEquals('my-research', $capturedFile->getData('name', 'en'));
     }
 
-    public function testSupplementaryFilesAndLabelsCountMatch(): void
+    public function testProcessWithDescription(): void
     {
-        $suppFilenames = 'data.xlsx;supplement.pdf';
-        $suppLabels = 'Dataset;Supplement';
+        $capturedFile = null;
+        $subFileRepoMock = $this->mockSubmissionFileRepository();
 
-        $files = array_map('trim', explode(';', $suppFilenames));
-        $labels = array_map('trim', explode(';', $suppLabels));
+        $subFileRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($submissionFile) use (&$capturedFile) {
+                $capturedFile = $submissionFile;
+                return 10;
+            });
 
-        $this->assertEquals(count($files), count($labels));
+        $returnedFile = new SubmissionFile();
+        $returnedFile->setId(10);
+        $subFileRepoMock->shouldReceive('get')->with(10)->andReturn($returnedFile);
+
+        $filePath = $this->createTestFile($this->tempDir, 'supplement.xlsx', 'fake xlsx');
+
+        SubmissionFileProcessor::process('en', 5, 1, $filePath, 2, 100, 'Supplementary data');
+
+        $this->assertEquals('Supplementary data', $capturedFile->getData('description', 'en'));
     }
 
-    // ==================== Supplementary Descriptions Tests ====================
-
-    public function testSupplementaryDescriptionsParsing(): void
+    public function testProcessWithoutDescription(): void
     {
-        $descriptions = 'This is the dataset description;This is the supplement description';
-        $parsed = array_map('trim', explode(';', $descriptions));
+        $capturedFile = null;
+        $subFileRepoMock = $this->mockSubmissionFileRepository();
 
-        $this->assertCount(2, $parsed);
-        $this->assertEquals('This is the dataset description', $parsed[0]);
-        $this->assertEquals('This is the supplement description', $parsed[1]);
+        $subFileRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($submissionFile) use (&$capturedFile) {
+                $capturedFile = $submissionFile;
+                return 10;
+            });
+
+        $returnedFile = new SubmissionFile();
+        $returnedFile->setId(10);
+        $subFileRepoMock->shouldReceive('get')->with(10)->andReturn($returnedFile);
+
+        $filePath = $this->createTestFile($this->tempDir, 'paper.pdf', 'fake pdf');
+
+        SubmissionFileProcessor::process('en', 5, 1, $filePath, 2, 100);
+
+        $this->assertNull($capturedFile->getData('description', 'en'));
     }
 
-    public function testEmptyDescriptions(): void
+    // ==================== updateAssocInfo() Integration Tests ====================
+
+    public function testUpdateAssocInfoCallsEdit(): void
     {
-        $descriptions = '';
-        $parsed = array_filter(array_map('trim', explode(';', $descriptions)));
+        $editParams = null;
+        $subFileRepoMock = $this->mockSubmissionFileRepository();
 
-        $this->assertEmpty($parsed);
-    }
+        $subFileRepoMock->shouldReceive('edit')
+            ->andReturnUsing(function ($submissionFile, $params) use (&$editParams) {
+                $editParams = $params;
+            });
 
-    // ==================== Sales Type Tests ====================
+        $submissionFile = new SubmissionFile();
+        $submissionFile->setId(1);
 
-    public function testSalesTypeOpenAccess(): void
-    {
-        $salesType = 'openAccess';
+        SubmissionFileProcessor::updateAssocInfo($submissionFile, 99);
 
-        $this->assertEquals('openAccess', $salesType);
-    }
-
-    public function testDirectSalesPriceZero(): void
-    {
-        $price = 0;
-
-        $this->assertEquals(0, $price);
-    }
-
-    // ==================== File Name Handling Tests ====================
-
-    public function testFileNameFromPath(): void
-    {
-        $path = '/path/to/my-document.pdf';
-        $name = pathinfo($path, PATHINFO_FILENAME);
-
-        $this->assertEquals('my-document', $name);
-    }
-
-    public function testFileNameWithSpaces(): void
-    {
-        $path = '/path/to/my research paper.pdf';
-        $name = pathinfo($path, PATHINFO_FILENAME);
-
-        $this->assertEquals('my research paper', $name);
-    }
-
-    public function testFileNameWithUnicode(): void
-    {
-        $path = '/path/to/artigo-científico.pdf';
-        $name = pathinfo($path, PATHINFO_FILENAME);
-
-        $this->assertEquals('artigo-científico', $name);
+        $this->assertEquals(Application::ASSOC_TYPE_REPRESENTATION, $editParams['assocType']);
+        $this->assertEquals(99, $editParams['assocId']);
     }
 }

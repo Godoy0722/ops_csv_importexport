@@ -272,7 +272,7 @@ class PreprintDataBuilder
         return $this;
     }
 
-    public function withDateSubmitted(string $date): self
+    public function withDateSubmitted(?string $date): self
     {
         $this->data['dateSubmitted'] = $date;
         return $this;

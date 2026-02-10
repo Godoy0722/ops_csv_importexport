@@ -17,8 +17,12 @@ namespace APP\plugins\importexport\csv\tests\Unit\Handlers;
 use APP\plugins\importexport\csv\classes\handlers\WelcomeEmailHandler;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
+use Illuminate\Support\Facades\Mail;
+use Mockery;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PKP\emailTemplate\EmailTemplate;
 use PKP\mail\mailables\UserCreated;
+use Symfony\Component\Mailer\Exception\TransportException;
 
 #[CoversClass(WelcomeEmailHandler::class)]
 class WelcomeEmailHandlerTest extends BaseTestCase
@@ -168,5 +172,94 @@ class WelcomeEmailHandlerTest extends BaseTestCase
         $fullName = $givenName . ' ' . $familyName;
 
         $this->assertEquals('José María García López', $fullName);
+    }
+
+    // ==================== sendWelcomeEmail() Integration Tests ====================
+
+    public function testSendWelcomeEmailSendsMailSuccessfully(): void
+    {
+        $emailTemplateRepoMock = $this->mockEmailTemplateRepository();
+
+        $template = Mockery::mock(EmailTemplate::class);
+        $template->shouldReceive('getLocalizedData')->with('body')->andReturn('Welcome body');
+        $template->shouldReceive('getLocalizedData')->with('subject')->andReturn('Welcome subject');
+
+        $emailTemplateRepoMock->shouldReceive('getByKey')
+            ->once()
+            ->andReturn($template);
+
+        $server = $this->createMockServer([
+            'id' => 1,
+            'path' => 'testserver',
+            'contactEmail' => 'server@example.com',
+        ]);
+        $server->setData('contactEmail', 'server@example.com');
+        $server->setData('contactName', 'Test Server Admin');
+
+        $recipient = $this->createMockUser([
+            'id' => 10,
+            'email' => 'recipient@example.com',
+            'givenName' => 'John',
+            'familyName' => 'Doe',
+        ]);
+
+        $sender = $this->createMockUser([
+            'id' => 20,
+            'email' => 'admin@example.com',
+            'givenName' => 'Admin',
+            'familyName' => 'User',
+        ]);
+
+        Mail::shouldReceive('send')->once();
+
+        WelcomeEmailHandler::sendWelcomeEmail($server, $recipient, $sender, 'temppass123');
+
+        $this->assertTrue(true);
+    }
+
+    public function testSendWelcomeEmailHandlesTransportException(): void
+    {
+        $emailTemplateRepoMock = $this->mockEmailTemplateRepository();
+
+        $template = Mockery::mock(EmailTemplate::class);
+        $template->shouldReceive('getLocalizedData')->with('body')->andReturn('Welcome body');
+        $template->shouldReceive('getLocalizedData')->with('subject')->andReturn('Welcome subject');
+
+        $emailTemplateRepoMock->shouldReceive('getByKey')
+            ->once()
+            ->andReturn($template);
+
+        $server = $this->createMockServer([
+            'id' => 1,
+            'path' => 'testserver',
+            'contactEmail' => 'server@example.com',
+        ]);
+        $server->setData('contactEmail', 'server@example.com');
+        $server->setData('contactName', 'Test Server Admin');
+
+        $recipient = $this->createMockUser([
+            'id' => 10,
+            'email' => 'recipient@example.com',
+            'givenName' => 'John',
+            'familyName' => 'Doe',
+        ]);
+
+        $sender = $this->createMockUser([
+            'id' => 20,
+            'email' => 'admin@example.com',
+            'givenName' => 'Admin',
+            'familyName' => 'User',
+        ]);
+
+        Mail::shouldReceive('send')
+            ->once()
+            ->andThrow(new TransportException('SMTP connection failed'));
+
+        $mockNotificationMgr = Mockery::mock('overload:APP\notification\NotificationManager');
+        $mockNotificationMgr->shouldReceive('createTrivialNotification')->once();
+
+        $this->expectOutputString('SMTP connection failed');
+
+        WelcomeEmailHandler::sendWelcomeEmail($server, $recipient, $sender, 'temppass123');
     }
 }

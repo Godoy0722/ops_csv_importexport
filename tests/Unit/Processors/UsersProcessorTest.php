@@ -14,10 +14,13 @@
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 
+use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\processors\UsersProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
+use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PKP\user\User;
 
 #[CoversClass(UsersProcessor::class)]
 class UsersProcessorTest extends BaseTestCase
@@ -252,6 +255,41 @@ class UsersProcessorTest extends BaseTestCase
         $this->assertEquals('Universidade de São Paulo', $data->affiliation);
     }
 
+    // ==================== getValidUsername Collision Avoidance Tests ====================
+
+    public function testGetValidUsernameAvoidsExistingUsernames(): void
+    {
+        // Pre-populate cache with a user that would match first attempt pattern
+        // The method generates: first_letter + lastname + 3 random letters
+        // We can't predict exact random letters, but we can verify collision avoidance
+        $user1 = MockFactory::user()->withUsername('jdoeabc')->build();
+        CachedEntities::$users['jdoeabc'] = $user1;
+
+        $username = UsersProcessor::getValidUsername('John', 'Doe');
+
+        // The generated username should NOT be 'jdoeabc' (the existing one)
+        $this->assertNotEquals('jdoeabc', $username);
+        $this->assertStringStartsWith('j', $username);
+        $this->assertStringContainsString('doe', $username);
+    }
+
+    public function testGetValidUsernameAlwaysReturnsNonEmptyString(): void
+    {
+        for ($i = 0; $i < 10; $i++) {
+            $username = UsersProcessor::getValidUsername('Test', 'User');
+            $this->assertNotEmpty($username);
+            $this->assertIsString($username);
+        }
+    }
+
+    public function testGetValidUsernameWithMultibyteFirstChar(): void
+    {
+        $username = UsersProcessor::getValidUsername('Ação', 'Teste');
+
+        $this->assertStringContainsString('teste', $username);
+        $this->assertGreaterThanOrEqual(5, mb_strlen($username));
+    }
+
     // ==================== Complete User Data Tests ====================
 
     public function testCompleteUserDataObject(): void
@@ -281,5 +319,251 @@ class UsersProcessorTest extends BaseTestCase
         $this->assertEquals('Author;Reader', $data->roles);
         $this->assertEquals('machine learning;AI', $data->reviewInterests);
         $this->assertEquals('0000-0002-1825-0097', $data->orcid);
+    }
+
+    // ==================== process() Integration Tests ====================
+
+    public function testProcessCreatesAndReturnsUser(): void
+    {
+        $userRepoMock = $this->mockUserRepository();
+
+        $returnedUser = $this->createMockUser(['id' => 42]);
+        $userRepoMock->shouldReceive('add')->once()->andReturn(42);
+        $userRepoMock->shouldReceive('get')->with(42)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'firstname' => 'John',
+            'lastname' => 'Doe',
+            'email' => 'john@example.com',
+            'username' => 'jdoe',
+            'tempPassword' => 'password123',
+        ]);
+
+        $result = UsersProcessor::process($data, 'en');
+
+        $this->assertInstanceOf(User::class, $result);
+        $this->assertEquals(42, $result->getId());
+    }
+
+    public function testProcessSetsCorrectUserData(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'firstname' => 'Jane',
+            'lastname' => 'Smith',
+            'email' => 'jane@example.com',
+            'affiliation' => 'MIT',
+            'country' => 'US',
+            'username' => 'jsmith',
+            'tempPassword' => 'secret123',
+            'orcid' => '',
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertNotNull($capturedUser);
+        $this->assertEquals('Jane', $capturedUser->getGivenName('en'));
+        $this->assertEquals('Smith', $capturedUser->getFamilyName('en'));
+        $this->assertEquals('MIT', $capturedUser->getAffiliation('en'));
+        $this->assertEquals('jane@example.com', $capturedUser->getEmail());
+        $this->assertEquals('US', $capturedUser->getCountry());
+        $this->assertEquals('jsmith', $capturedUser->getUsername());
+        $this->assertTrue($capturedUser->getMustChangePassword());
+        $this->assertNotEmpty($capturedUser->getDateRegistered());
+    }
+
+    public function testProcessEncryptsPassword(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'username' => 'testuser',
+            'tempPassword' => 'mypassword',
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertTrue(password_verify('mypassword', $capturedUser->getPassword()));
+    }
+
+    public function testProcessSetsOrcidWhenValid(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'orcid' => '0000-0002-1825-0097',
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $capturedUser->getOrcid());
+    }
+
+    public function testProcessSetsOrcidWhenFullUrl(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'orcid' => 'https://orcid.org/0000-0002-1825-0097',
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $capturedUser->getOrcid());
+    }
+
+    public function testProcessSkipsOrcidWhenEmpty(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'orcid' => '',
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertEmpty($capturedUser->getOrcid());
+    }
+
+    public function testProcessSkipsOrcidWhenInvalid(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'orcid' => 'invalid-orcid-format',
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertEmpty($capturedUser->getOrcid());
+    }
+
+    public function testProcessUsesProvidedUsername(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'username' => 'customuser',
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertEquals('customuser', $capturedUser->getUsername());
+    }
+
+    public function testProcessFallsBackToGeneratedUsername(): void
+    {
+        $capturedUser = null;
+        $userRepoMock = $this->mockUserRepository();
+
+        $userRepoMock->shouldReceive('add')
+            ->andReturnUsing(function ($user) use (&$capturedUser) {
+                $capturedUser = $user;
+                return 1;
+            });
+
+        $returnedUser = $this->createMockUser(['id' => 1]);
+        $userRepoMock->shouldReceive('get')->with(1)->andReturn($returnedUser);
+
+        $data = $this->createUserDataObject([
+            'firstname' => 'John',
+            'lastname' => 'Doe',
+            'username' => null,
+        ]);
+
+        UsersProcessor::process($data, 'en');
+
+        $this->assertMatchesRegularExpression('/^jdoe[a-z]{3}$/', $capturedUser->getUsername());
+    }
+
+    // ==================== getValidUsername() with Mocked Repo Tests ====================
+
+    public function testGetValidUsernameRetriesOnCollision(): void
+    {
+        $existingUser = $this->createMockUser(['id' => 1, 'email' => 'existing@example.com']);
+        $callCount = 0;
+
+        $userRepoMock = $this->mockUserRepository();
+        $userRepoMock->shouldReceive('getByUsername')
+            ->andReturnUsing(function () use ($existingUser, &$callCount) {
+                $callCount++;
+                return $callCount === 1 ? $existingUser : null;
+            });
+
+        $username = UsersProcessor::getValidUsername('John', 'Doe');
+
+        $this->assertMatchesRegularExpression('/^jdoe[a-z]{3}$/', $username);
+        $this->assertGreaterThanOrEqual(2, $callCount);
     }
 }

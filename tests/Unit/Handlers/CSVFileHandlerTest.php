@@ -51,12 +51,8 @@ class CSVFileHandlerTest extends BaseTestCase
     {
         $filePath = $this->tempDir . '/nonexistent.csv';
 
-        // Capture output since the method echoes error message
-        ob_start();
-        $result = CSVFileHandler::createReadableCSVFile($filePath);
-        ob_end_clean();
-
-        $this->assertNull($result);
+        $this->expectException(\Exception::class);
+        CSVFileHandler::createReadableCSVFile($filePath);
     }
 
     public function testCreateReadableCSVFileCanIterate(): void
@@ -213,5 +209,134 @@ class CSVFileHandlerTest extends BaseTestCase
 
         $this->assertCount(1, $rows);
         $this->assertEquals(['col1', 'col2', 'col3'], $rows[0]);
+    }
+
+    // ==================== processFailedRow Content Verification ====================
+
+    public function testProcessFailedRowWritesCorrectContent(): void
+    {
+        $filename = 'invalid_content_test.csv';
+        $headers = ['col1', 'col2', 'col3'];
+
+        $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->tempDir, $filename, $headers);
+        $fields = ['value1', 'value2', 'value3'];
+        $failedRows = 0;
+
+        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, 3, 'Missing field X', $failedRows);
+
+        // Close file and read content
+        $invalidCsvFile = null;
+
+        $content = file_get_contents($this->tempDir . '/' . $filename);
+        $this->assertStringContainsString('value1', $content);
+        $this->assertStringContainsString('value2', $content);
+        $this->assertStringContainsString('value3', $content);
+        $this->assertStringContainsString('Missing field X', $content);
+    }
+
+    public function testProcessFailedRowPadsShortRows(): void
+    {
+        $filename = 'invalid_pad_test.csv';
+        $headers = ['col1', 'col2', 'col3', 'col4'];
+
+        $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->tempDir, $filename, $headers);
+        $fields = ['only1', 'only2']; // Fewer fields than expected
+        $failedRows = 0;
+
+        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, 4, 'Too few fields', $failedRows);
+
+        $invalidCsvFile = null;
+
+        $content = file_get_contents($this->tempDir . '/' . $filename);
+        $this->assertStringContainsString('only1', $content);
+        $this->assertStringContainsString('Too few fields', $content);
+        $this->assertEquals(1, $failedRows);
+    }
+
+    public function testProcessFailedRowWithUnicodeContent(): void
+    {
+        $filename = 'invalid_unicode_test.csv';
+        $headers = ['name', 'value'];
+
+        $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->tempDir, $filename, $headers);
+        $fields = ['João', 'Descrição'];
+        $failedRows = 0;
+
+        CSVFileHandler::processFailedRow($invalidCsvFile, $fields, 2, 'Erro de validação', $failedRows);
+
+        $invalidCsvFile = null;
+
+        $content = file_get_contents($this->tempDir . '/' . $filename);
+        $this->assertStringContainsString('João', $content);
+        $this->assertStringContainsString('Descrição', $content);
+        $this->assertStringContainsString('Erro de validação', $content);
+    }
+
+    // ==================== createCSVFileInvalidRows Additional Tests ====================
+
+    public function testCreateCSVFileInvalidRowsWithEmptyHeaders(): void
+    {
+        $filename = 'invalid_empty_headers.csv';
+        $headers = [];
+
+        $result = CSVFileHandler::createCSVFileInvalidRows($this->tempDir, $filename, $headers);
+
+        $this->assertInstanceOf(\SplFileObject::class, $result);
+
+        $result = null;
+
+        $content = file_get_contents($this->tempDir . '/' . $filename);
+        $this->assertStringContainsString('error', $content);
+    }
+
+    public function testCreateCSVFileInvalidRowsAppendsToExistingFile(): void
+    {
+        $filename = 'invalid_append_test.csv';
+        $headers = ['col1', 'col2'];
+
+        // Create first time
+        $file1 = CSVFileHandler::createCSVFileInvalidRows($this->tempDir, $filename, $headers);
+        $file1 = null;
+
+        // Create second time - should append
+        $file2 = CSVFileHandler::createCSVFileInvalidRows($this->tempDir, $filename, $headers);
+        $file2 = null;
+
+        $content = file_get_contents($this->tempDir . '/' . $filename);
+        // Should have two header lines (since a+ mode appends)
+        $this->assertGreaterThan(strlen("col1,col2,error\n"), strlen($content));
+    }
+
+    // ==================== createReadableCSVFile with special formats ====================
+
+    public function testCreateReadableCSVFileWithNewlinesInQuotedFields(): void
+    {
+        $filePath = $this->tempDir . '/newline.csv';
+        file_put_contents($filePath, "name,bio\n\"John\",\"Line 1\nLine 2\"");
+
+        $file = CSVFileHandler::createReadableCSVFile($filePath);
+
+        $this->assertInstanceOf(\SplFileObject::class, $file);
+    }
+
+    public function testCreateReadableCSVFileWithLargeContent(): void
+    {
+        $filePath = $this->tempDir . '/large.csv';
+        $content = "col1,col2\n";
+        for ($i = 0; $i < 100; $i++) {
+            $content .= "row{$i}col1,row{$i}col2\n";
+        }
+        file_put_contents($filePath, $content);
+
+        $file = CSVFileHandler::createReadableCSVFile($filePath);
+
+        $rowCount = 0;
+        foreach ($file as $row) {
+            if (!empty(array_filter($row))) {
+                $rowCount++;
+            }
+        }
+
+        $this->assertEquals(101, $rowCount); // 1 header + 100 data rows
     }
 }

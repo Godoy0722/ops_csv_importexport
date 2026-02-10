@@ -9,14 +9,16 @@
  *
  * @class UserGroupsProcessorTest
  *
- * @brief Tests for UserGroupsProcessor class - testing role parsing logic
+ * @brief Tests for UserGroupsProcessor class - testing role parsing and assignment logic
  */
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 
+use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PKP\userGroup\UserGroup;
 
 #[CoversClass(UserGroupsProcessor::class)]
 class UserGroupsProcessorTest extends BaseTestCase
@@ -69,70 +71,100 @@ class UserGroupsProcessorTest extends BaseTestCase
         $this->assertEmpty($roles);
     }
 
-    // ==================== Role Name Case Sensitivity Tests ====================
+    // ==================== process() Integration Tests ====================
 
-    public function testRoleNameCaseSensitivity(): void
+    public function testProcessAssignsSingleMatchingRole(): void
     {
-        // Role names should be case-insensitive in matching
-        $roleName = 'AUTHOR';
-        $storedRoleName = 'Author';
+        $userGroupMock = $this->mockUserGroupRepository();
 
-        $this->assertTrue(
-            strcasecmp($roleName, $storedRoleName) === 0,
-            'Role names should match case-insensitively'
-        );
+        $authorGroup = $this->createMockUserGroup(['id' => 10, 'name' => ['en' => 'Author']]);
+        CachedEntities::$userGroups[1] = [10 => $authorGroup];
+
+        $userGroupMock->shouldReceive('assignUserToGroup')
+            ->once()
+            ->with(5, 10);
+
+        UserGroupsProcessor::process(['Author'], 5, 1, 'en');
+
+        $this->assertTrue(true);
     }
 
-    public function testRoleNameVariations(): void
+    public function testProcessAssignsMultipleMatchingRoles(): void
     {
-        $variations = ['Author', 'AUTHOR', 'author', 'AuThOr'];
+        $userGroupMock = $this->mockUserGroupRepository();
 
-        foreach ($variations as $variation) {
-            $this->assertTrue(
-                strcasecmp($variation, 'author') === 0,
-                "'{$variation}' should match 'author' case-insensitively"
-            );
-        }
+        $authorGroup = $this->createMockUserGroup(['id' => 10, 'name' => ['en' => 'Author']]);
+        $readerGroup = $this->createMockUserGroup(['id' => 11, 'name' => ['en' => 'Reader']]);
+        CachedEntities::$userGroups[1] = [10 => $authorGroup, 11 => $readerGroup];
+
+        $userGroupMock->shouldReceive('assignUserToGroup')
+            ->once()
+            ->with(5, 10);
+        $userGroupMock->shouldReceive('assignUserToGroup')
+            ->once()
+            ->with(5, 11);
+
+        UserGroupsProcessor::process(['Author', 'Reader'], 5, 1, 'en');
+
+        $this->assertTrue(true);
     }
 
-    // ==================== Common Role Names Tests ====================
-
-    public function testCommonRoleNames(): void
+    public function testProcessSkipsNonMatchingRoles(): void
     {
-        $commonRoles = [
-            'Author',
-            'Reader',
-            'Reviewer',
-            'Editor',
-            'Section Editor',
-            'Journal Manager',
-            'Server Manager',
-        ];
+        $userGroupMock = $this->mockUserGroupRepository();
 
-        foreach ($commonRoles as $role) {
-            $this->assertNotEmpty($role);
-            $this->assertIsString($role);
-        }
+        $authorGroup = $this->createMockUserGroup(['id' => 10, 'name' => ['en' => 'Author']]);
+        CachedEntities::$userGroups[1] = [10 => $authorGroup];
+
+        $userGroupMock->shouldReceive('assignUserToGroup')
+            ->never();
+
+        UserGroupsProcessor::process(['NonExistentRole'], 5, 1, 'en');
+
+        $this->assertTrue(true);
     }
 
-    // ==================== Role Array Handling Tests ====================
-
-    public function testRoleArrayFromString(): void
+    public function testProcessWithEmptyRolesArray(): void
     {
-        $rolesString = 'Author;Reader';
-        $rolesArray = explode(';', $rolesString);
+        $userGroupMock = $this->mockUserGroupRepository();
 
-        $this->assertIsArray($rolesArray);
-        $this->assertContains('Author', $rolesArray);
-        $this->assertContains('Reader', $rolesArray);
+        $userGroupMock->shouldReceive('assignUserToGroup')
+            ->never();
+
+        UserGroupsProcessor::process([], 5, 1, 'en');
+
+        $this->assertTrue(true);
     }
 
-    public function testEmptyRoleArrayHandling(): void
+    public function testProcessAssignsOnlyMatchingRolesFromMixedList(): void
     {
-        $roles = [];
+        $userGroupMock = $this->mockUserGroupRepository();
 
-        $this->assertIsArray($roles);
-        $this->assertCount(0, $roles);
-        $this->assertEmpty($roles);
+        $authorGroup = $this->createMockUserGroup(['id' => 10, 'name' => ['en' => 'Author']]);
+        CachedEntities::$userGroups[1] = [10 => $authorGroup];
+
+        $userGroupMock->shouldReceive('assignUserToGroup')
+            ->once()
+            ->with(5, 10);
+
+        UserGroupsProcessor::process(['Author', 'NonExistent', 'AlsoNonExistent'], 5, 1, 'en');
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessMatchesRolesCaseInsensitively(): void
+    {
+        $userGroupMock = $this->mockUserGroupRepository();
+
+        $authorGroup = $this->createMockUserGroup(['id' => 10, 'name' => ['en' => 'Author']]);
+        CachedEntities::$userGroups[1] = [10 => $authorGroup];
+
+        $userGroupMock->shouldReceive('assignUserToGroup')
+            ->once()
+            ->with(5, 10);
+
+        UserGroupsProcessor::process(['author'], 5, 1, 'en');
+
+        $this->assertTrue(true);
     }
 }

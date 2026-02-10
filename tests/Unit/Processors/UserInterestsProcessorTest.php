@@ -119,4 +119,64 @@ class UserInterestsProcessorTest extends BaseTestCase
         $this->assertIsArray($interests);
         $this->assertEmpty($interests);
     }
+
+    // ==================== process() Integration Tests ====================
+
+    public function testProcessSetsInterestsForExistingUser(): void
+    {
+        $userRepoMock = $this->mockUserRepository();
+        $user = $this->createMockUser(['id' => 5]);
+        $userRepoMock->shouldReceive('get')->with(5)->andReturn($user);
+
+        $userInterestMock = $this->mockUserInterestRepository();
+        $userInterestMock->shouldReceive('setInterestsForUser')
+            ->once()
+            ->with($user, ['machine learning', 'data science']);
+
+        UserInterestsProcessor::process(['machine learning', 'data science'], 5);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessWithSingleInterest(): void
+    {
+        $userRepoMock = $this->mockUserRepository();
+        $user = $this->createMockUser(['id' => 3]);
+        $userRepoMock->shouldReceive('get')->with(3)->andReturn($user);
+
+        $userInterestMock = $this->mockUserInterestRepository();
+        $userInterestMock->shouldReceive('setInterestsForUser')
+            ->once()
+            ->with($user, ['artificial intelligence']);
+
+        UserInterestsProcessor::process(['artificial intelligence'], 3);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessDoesNothingForEmptyInterests(): void
+    {
+        $userRepoMock = $this->mockUserRepository();
+        $userRepoMock->shouldReceive('get')->never();
+
+        $userInterestMock = $this->mockUserInterestRepository();
+        $userInterestMock->shouldReceive('setInterestsForUser')->never();
+
+        UserInterestsProcessor::process([], 5);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessDoesNothingWhenUserNotFound(): void
+    {
+        $userRepoMock = $this->mockUserRepository();
+        $userRepoMock->shouldReceive('get')->with(99)->andReturn(null);
+
+        $userInterestMock = $this->mockUserInterestRepository();
+        $userInterestMock->shouldReceive('setInterestsForUser')->never();
+
+        UserInterestsProcessor::process(['test interest'], 99);
+
+        $this->assertTrue(true);
+    }
 }

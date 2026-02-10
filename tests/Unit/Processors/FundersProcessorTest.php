@@ -9,19 +9,161 @@
  *
  * @class FundersProcessorTest
  *
- * @brief Tests for FundersProcessor class - testing funder data parsing logic
+ * @brief Tests for FundersProcessor class - testing funder data parsing and processing logic
  */
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 
+use APP\plugins\generic\funding\classes\Funder;
+use APP\plugins\generic\funding\classes\FunderAward;
+use APP\plugins\generic\funding\classes\FunderAwardDAO;
+use APP\plugins\generic\funding\classes\FunderDAO;
 use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
+use APP\publication\Publication;
+use APP\submission\Submission;
+use Mockery;
+use PKP\db\DAOResultFactory;
+use PKP\plugins\Plugin;
+use PKP\plugins\PluginRegistry;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 #[CoversClass(FundersProcessor::class)]
 class FundersProcessorTest extends BaseTestCase
 {
+    private ?array $pluginRegistryBackup = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->backupPluginRegistry();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->restorePluginRegistry();
+        $this->resetFunderDaoStatics();
+        parent::tearDown();
+    }
+
+    // ==================== PluginRegistry Helpers ====================
+
+    private function backupPluginRegistry(): void
+    {
+        $this->pluginRegistryBackup = PluginRegistry::getPlugins();
+        // Clear the registry for clean test state
+        $allPlugins = &PluginRegistry::getPlugins();
+        foreach (array_keys($allPlugins) as $key) {
+            unset($allPlugins[$key]);
+        }
+    }
+
+    private function restorePluginRegistry(): void
+    {
+        $allPlugins = &PluginRegistry::getPlugins();
+        foreach (array_keys($allPlugins) as $key) {
+            unset($allPlugins[$key]);
+        }
+        foreach ($this->pluginRegistryBackup as $key => $value) {
+            $allPlugins[$key] = $value;
+        }
+    }
+
+    private function registerMockFundingPlugin(bool $enabled = true, bool $crossrefValidation = false): void
+    {
+        $mockPlugin = Mockery::mock(Plugin::class);
+        $mockPlugin->shouldReceive('getEnabled')->andReturn($enabled);
+        $mockPlugin->shouldReceive('getSetting')
+            ->with(Mockery::any(), 'enableGrantIdValidation')
+            ->andReturn($crossrefValidation);
+
+        $allPlugins = &PluginRegistry::getPlugins();
+        $allPlugins['generic'] ??= [];
+        $allPlugins['generic']['FundingPlugin'] = $mockPlugin;
+    }
+
+    // ==================== FunderDAO Helpers ====================
+
+    private function setFunderDao(object $dao): void
+    {
+        $ref = new \ReflectionClass(FundersProcessor::class);
+        $prop = $ref->getProperty('funderDao');
+        $prop->setAccessible(true);
+        $prop->setValue(null, $dao);
+    }
+
+    private function setFunderAwardDao(object $dao): void
+    {
+        $ref = new \ReflectionClass(FundersProcessor::class);
+        $prop = $ref->getProperty('funderAwardDao');
+        $prop->setAccessible(true);
+        $prop->setValue(null, $dao);
+    }
+
+    private function resetFunderDaoStatics(): void
+    {
+        $ref = new \ReflectionClass(FundersProcessor::class);
+
+        $prop1 = $ref->getProperty('funderDao');
+        $prop1->setAccessible(true);
+        $prop1->setValue(null, null);
+
+        $prop2 = $ref->getProperty('funderAwardDao');
+        $prop2->setAccessible(true);
+        $prop2->setValue(null, null);
+    }
+
+    private function createMockFunderDao(): Mockery\MockInterface
+    {
+        $mock = Mockery::mock(FunderDAO::class);
+        $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new Funder());
+        $mock->shouldReceive('insertObject')->andReturn(1)->byDefault();
+        $mock->shouldReceive('getBySubmissionId')->andReturnUsing(function () {
+            return $this->createEmptyDAOResultFactory();
+        })->byDefault();
+
+        return $mock;
+    }
+
+    private function createMockFunderAwardDao(): Mockery\MockInterface
+    {
+        $mock = Mockery::mock(FunderAwardDAO::class);
+        $mock->shouldReceive('newDataObject')->andReturnUsing(fn() => new FunderAward());
+        $mock->shouldReceive('insertObject')->andReturn(1)->byDefault();
+        $mock->shouldReceive('getByFunderId')->andReturnUsing(function () {
+            return $this->createEmptyDAOResultFactory();
+        })->byDefault();
+
+        return $mock;
+    }
+
+    private function createEmptyDAOResultFactory(): Mockery\MockInterface
+    {
+        $mock = Mockery::mock(DAOResultFactory::class);
+        $mock->shouldReceive('next')->andReturn(null);
+        $mock->shouldReceive('toIterator')->andReturn(new \ArrayIterator([]));
+        return $mock;
+    }
+
+    private function createDAOResultFactoryWithItems(array $items): Mockery\MockInterface
+    {
+        $index = 0;
+        $mock = Mockery::mock(DAOResultFactory::class);
+        $mock->shouldReceive('next')->andReturnUsing(function () use (&$index, $items) {
+            return $items[$index++] ?? null;
+        });
+        $mock->shouldReceive('toIterator')->andReturn(new \ArrayIterator($items));
+        return $mock;
+    }
+
+    private function createMockSubmissionForFunders(int $id = 1): Submission
+    {
+        $submission = Mockery::mock(Submission::class)->makePartial();
+        $submission->shouldReceive('getId')->andReturn($id);
+        return $submission;
+    }
+
     // ==================== Funder String Parsing Tests ====================
 
     public function testParsesSingleFunderWithoutAwards(): void
@@ -42,7 +184,6 @@ class FundersProcessorTest extends BaseTestCase
         $parts = explode(',', $funderString);
 
         $this->assertEquals('NSF', $parts[0]);
-        $this->assertEquals('http://dx.doi.org/10.13039/100000001', $parts[1]);
         $this->assertEquals('NSF-2024-001', $parts[2]);
     }
 
@@ -53,157 +194,477 @@ class FundersProcessorTest extends BaseTestCase
         $parts = explode(',', $funderString);
         $awards = explode('|', $parts[2]);
 
-        $this->assertEquals('NIH', $parts[0]);
         $this->assertCount(3, $awards);
         $this->assertEquals('R01-AI-123456', $awards[0]);
-        $this->assertEquals('R21-AI-789012', $awards[1]);
-        $this->assertEquals('R33-AI-555555', $awards[2]);
     }
 
     public function testParsesMultipleFunders(): void
     {
-        $fundersString = 'NSF,http://dx.doi.org/10.13039/100000001,NSF-001;DOE,http://dx.doi.org/10.13039/100000015,DOE-002';
+        $fundersString = 'NSF,doi1,Award1;DOE,doi2,Award2';
 
         $funders = explode(';', $fundersString);
 
         $this->assertCount(2, $funders);
-
-        $funder1Parts = explode(',', $funders[0]);
-        $this->assertEquals('NSF', $funder1Parts[0]);
-
-        $funder2Parts = explode(',', $funders[1]);
-        $this->assertEquals('DOE', $funder2Parts[0]);
     }
 
-    // ==================== Funder Format Validation Tests ====================
+    // ==================== validateFundersFormat Tests ====================
 
-    public function testValidateFunderFormat(): void
+    public function testValidateFundersFormatWithValidSingleFunder(): void
     {
-        // Valid format: name,doi,awards
-        $validFunder = 'NSF,http://dx.doi.org/10.13039/100000001,Award1';
-        $parts = explode(',', $validFunder);
+        $result = FundersProcessor::validateFundersFormat('NSF,http://dx.doi.org/10.13039/100000001,Award1');
 
-        $this->assertCount(3, $parts);
-        $this->assertNotEmpty($parts[0]); // Name is required
+        $this->assertNull($result);
     }
 
-    public function testInvalidFunderFormatEmptyName(): void
+    public function testValidateFundersFormatWithMultipleFunders(): void
     {
-        $invalidFunder = ',http://dx.doi.org/10.13039/100000001,Award1';
-        $parts = explode(',', $invalidFunder);
+        $result = FundersProcessor::validateFundersFormat(
+            'NSF,http://dx.doi.org/10.13039/100000001,Award1;DOE,http://dx.doi.org/10.13039/100000015,Award2'
+        );
 
-        // Name is required
-        $this->assertTrue(empty($parts[0]));
+        $this->assertNull($result);
     }
 
-    // ==================== Funders from Data Object Tests ====================
-
-    public function testFundersFromDataObject(): void
+    public function testValidateFundersFormatWithEmptyString(): void
     {
-        $data = CsvTestDataBuilder::preprint()
-            ->withFunders('NSF,http://dx.doi.org/10.13039/100000001,Award1')
-            ->buildObject();
+        $result = FundersProcessor::validateFundersFormat('');
 
-        $this->assertEquals('NSF,http://dx.doi.org/10.13039/100000001,Award1', $data->funders);
+        $this->assertNull($result);
     }
 
-    public function testEmptyFundersFromDataObject(): void
+    public function testValidateFundersFormatWithNullValue(): void
     {
-        $data = CsvTestDataBuilder::preprint()
-            ->withFunders('')
-            ->buildObject();
+        $result = FundersProcessor::validateFundersFormat(null);
 
-        $this->assertTrue(empty($data->funders));
+        $this->assertNull($result);
     }
 
-    // ==================== Crossref DOI Format Tests ====================
-
-    public function testCrossrefFunderDoiFormat(): void
+    public function testValidateFundersFormatWithMissingFunderName(): void
     {
-        $doi = 'http://dx.doi.org/10.13039/100000001';
+        $result = FundersProcessor::validateFundersFormat(',http://dx.doi.org/10.13039/100000001,Award1');
 
-        $this->assertStringContainsString('10.13039', $doi);
-        $this->assertStringStartsWith('http', $doi);
+        $this->assertNotNull($result);
+        $this->assertIsString($result);
     }
 
-    public function testCrossrefFunderDoiWithHttps(): void
+    public function testValidateFundersFormatWithFunderNameOnly(): void
     {
-        $doi = 'https://doi.org/10.13039/100000001';
+        $result = FundersProcessor::validateFundersFormat('National Science Foundation');
 
-        $this->assertStringContainsString('10.13039', $doi);
-        $this->assertStringStartsWith('https', $doi);
+        $this->assertNull($result);
     }
 
-    // ==================== Award Number Parsing Tests ====================
-
-    public function testSingleAwardNumber(): void
+    public function testValidateFundersFormatWithEmptyFunderBetweenSemicolons(): void
     {
-        $awardsString = 'NSF-2024-001';
-        $awards = explode('|', $awardsString);
+        $result = FundersProcessor::validateFundersFormat('NSF,doi1,Award1;;DOE,doi2,Award2');
 
-        $this->assertCount(1, $awards);
-        $this->assertEquals('NSF-2024-001', $awards[0]);
+        $this->assertNull($result);
     }
 
-    public function testMultipleAwardNumbers(): void
+    public function testValidateFundersFormatWithWhitespace(): void
     {
-        $awardsString = 'Award1|Award2|Award3';
-        $awards = explode('|', $awardsString);
+        $result = FundersProcessor::validateFundersFormat('  NSF  , doi , Award1 ;  DOE  , doi2 , Award2 ');
 
-        $this->assertCount(3, $awards);
+        $this->assertNull($result);
     }
 
-    public function testEmptyAwardNumbers(): void
-    {
-        $awardsString = '';
-        $awards = array_filter(explode('|', $awardsString));
+    // ==================== isFundingPluginEnabled() Integration Tests ====================
 
-        $this->assertEmpty($awards);
+    public function testIsFundingPluginEnabledReturnsTrueWhenEnabled(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $result = FundersProcessor::isFundingPluginEnabled(1);
+
+        $this->assertTrue($result);
     }
 
-    // ==================== Funder Data Structure Tests ====================
-
-    public function testFunderDataStructure(): void
+    public function testIsFundingPluginEnabledReturnsFalseWhenDisabled(): void
     {
-        $funderData = [
-            'contextId' => 1,
-            'submissionId' => 1,
-            'funderName' => 'National Science Foundation',
-            'funderIdentification' => 'http://dx.doi.org/10.13039/100000001',
-        ];
+        $this->registerMockFundingPlugin(false);
 
-        $this->assertArrayHasKey('contextId', $funderData);
-        $this->assertArrayHasKey('submissionId', $funderData);
-        $this->assertArrayHasKey('funderName', $funderData);
-        $this->assertArrayHasKey('funderIdentification', $funderData);
+        $result = FundersProcessor::isFundingPluginEnabled(1);
+
+        $this->assertFalse($result);
     }
 
-    public function testFunderAwardDataStructure(): void
-    {
-        $awardData = [
-            'funderId' => 1,
-            'funderAwardNumber' => 'NSF-2024-001',
-        ];
+    // ==================== isCrossrefValidationEnabled() Integration Tests ====================
 
-        $this->assertArrayHasKey('funderId', $awardData);
-        $this->assertArrayHasKey('funderAwardNumber', $awardData);
+    public function testIsCrossrefValidationEnabledReturnsTrue(): void
+    {
+        $this->registerMockFundingPlugin(true, true);
+
+        $result = FundersProcessor::isCrossrefValidationEnabled(1);
+
+        $this->assertTrue($result);
     }
 
-    // ==================== Special Characters Tests ====================
-
-    public function testFunderNameWithSpecialCharacters(): void
+    public function testIsCrossrefValidationEnabledReturnsFalseWhenDisabled(): void
     {
-        $funderString = 'Fundação de Amparo à Pesquisa,http://dx.doi.org/10.13039/501100001807,2024/12345-6';
-        $parts = explode(',', $funderString);
+        $this->registerMockFundingPlugin(true, false);
 
-        $this->assertEquals('Fundação de Amparo à Pesquisa', $parts[0]);
+        $result = FundersProcessor::isCrossrefValidationEnabled(1);
+
+        $this->assertFalse($result);
     }
 
-    public function testFunderNameWithUnicode(): void
+    public function testIsCrossrefValidationEnabledReturnsFalseWhenPluginDisabled(): void
     {
-        $funderString = '日本学術振興会,http://dx.doi.org/10.13039/501100001691,JP12345678';
-        $parts = explode(',', $funderString);
+        $this->registerMockFundingPlugin(false);
 
-        $this->assertEquals('日本学術振興会', $parts[0]);
+        $result = FundersProcessor::isCrossrefValidationEnabled(1);
+
+        $this->assertFalse($result);
+    }
+
+    // ==================== process() Integration Tests ====================
+
+    public function testProcessReturnsEarlyWhenPluginDisabled(): void
+    {
+        $this->registerMockFundingPlugin(false);
+
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('getBySubmissionId')->never();
+        $this->setFunderDao($funderDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi,Award1'];
+
+        FundersProcessor::process($data, $submission, 1);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessReturnsEarlyWhenSubmissionHasFunders(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $existingFunder = new Funder();
+        $existingFunder->setId(1);
+
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('getBySubmissionId')
+            ->with(1)
+            ->andReturn($this->createDAOResultFactoryWithItems([$existingFunder]));
+        $funderDao->shouldReceive('insertObject')->never();
+        $this->setFunderDao($funderDao);
+
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi,Award1'];
+
+        FundersProcessor::process($data, $submission, 1);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessCreatesFunderFromString(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $capturedFunders = [];
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($funder) use (&$capturedFunders) {
+                $capturedFunders[] = $funder;
+                return count($capturedFunders);
+            });
+        $this->setFunderDao($funderDao);
+
+        $capturedAwards = [];
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $funderAwardDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($award) use (&$capturedAwards) {
+                $capturedAwards[] = $award;
+                return count($capturedAwards);
+            });
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,http://dx.doi.org/10.13039/100000001,Award-001|Award-002'];
+
+        FundersProcessor::process($data, $submission, 1);
+
+        $this->assertCount(1, $capturedFunders);
+        $this->assertEquals('NSF', $capturedFunders[0]->getFunderName());
+        $this->assertEquals('http://dx.doi.org/10.13039/100000001', $capturedFunders[0]->getFunderIdentification());
+        $this->assertEquals(1, $capturedFunders[0]->getContextId());
+        $this->assertEquals(1, $capturedFunders[0]->getSubmissionId());
+
+        $this->assertCount(2, $capturedAwards);
+        $this->assertEquals('Award-001', $capturedAwards[0]->getFunderAwardNumber());
+        $this->assertEquals('Award-002', $capturedAwards[1]->getFunderAwardNumber());
+    }
+
+    public function testProcessCreatesMultipleFunders(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $capturedFunders = [];
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($funder) use (&$capturedFunders) {
+                $capturedFunders[] = $funder;
+                return count($capturedFunders);
+            });
+        $this->setFunderDao($funderDao);
+
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi1,;DOE,doi2,'];
+
+        FundersProcessor::process($data, $submission, 1);
+
+        $this->assertCount(2, $capturedFunders);
+        $this->assertEquals('NSF', $capturedFunders[0]->getFunderName());
+        $this->assertEquals('DOE', $capturedFunders[1]->getFunderName());
+    }
+
+    public function testProcessSkipsEmptyFunderName(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $capturedFunders = [];
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($funder) use (&$capturedFunders) {
+                $capturedFunders[] = $funder;
+                return count($capturedFunders);
+            });
+        $this->setFunderDao($funderDao);
+
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => ',doi1,Award1;NSF,doi2,Award2'];
+
+        FundersProcessor::process($data, $submission, 1);
+
+        $this->assertCount(1, $capturedFunders);
+        $this->assertEquals('NSF', $capturedFunders[0]->getFunderName());
+    }
+
+    public function testProcessSkipsEmptyFunderEntries(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $capturedFunders = [];
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($funder) use (&$capturedFunders) {
+                $capturedFunders[] = $funder;
+                return count($capturedFunders);
+            });
+        $this->setFunderDao($funderDao);
+
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi1,Award1;;DOE,doi2,'];
+
+        FundersProcessor::process($data, $submission, 1);
+
+        $this->assertCount(2, $capturedFunders);
+    }
+
+    public function testProcessSkipsEmptyAwardNumbers(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('insertObject')->andReturn(1);
+        $this->setFunderDao($funderDao);
+
+        $capturedAwards = [];
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $funderAwardDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($award) use (&$capturedAwards) {
+                $capturedAwards[] = $award;
+                return count($capturedAwards);
+            });
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi1,Award1||Award2'];
+
+        FundersProcessor::process($data, $submission, 1);
+
+        $this->assertCount(2, $capturedAwards);
+        $this->assertEquals('Award1', $capturedAwards[0]->getFunderAwardNumber());
+        $this->assertEquals('Award2', $capturedAwards[1]->getFunderAwardNumber());
+    }
+
+    public function testProcessClonesFundersFromBaseSubmission(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $baseFunder = new Funder();
+        $baseFunder->setId(10);
+        $baseFunder->setFunderName('Original NSF');
+        $baseFunder->setFunderIdentification('doi-original');
+
+        $baseAward = new FunderAward();
+        $baseAward->setFunderAwardNumber('BASE-001');
+
+        $capturedFunders = [];
+        $funderDao = $this->createMockFunderDao();
+        // First call: check new submission has no funders
+        $funderDao->shouldReceive('getBySubmissionId')
+            ->with(2)
+            ->andReturn($this->createEmptyDAOResultFactory());
+        // For cloning: get base submission funders
+        $funderDao->shouldReceive('getBySubmissionId')
+            ->with(1)
+            ->andReturn($this->createDAOResultFactoryWithItems([$baseFunder]));
+        $funderDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($funder) use (&$capturedFunders) {
+                $capturedFunders[] = $funder;
+                return count($capturedFunders) + 100;
+            });
+        $this->setFunderDao($funderDao);
+
+        $capturedAwards = [];
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $funderAwardDao->shouldReceive('getByFunderId')
+            ->with(10)
+            ->andReturn($this->createDAOResultFactoryWithItems([$baseAward]));
+        $funderAwardDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($award) use (&$capturedAwards) {
+                $capturedAwards[] = $award;
+                return count($capturedAwards);
+            });
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('submissionId', 1);
+
+        $data = (object) ['funders' => ''];
+
+        FundersProcessor::process($data, $submission, 1, $basePublication);
+
+        $this->assertCount(1, $capturedFunders);
+        $this->assertEquals('Original NSF', $capturedFunders[0]->getFunderName());
+        $this->assertEquals('doi-original', $capturedFunders[0]->getFunderIdentification());
+        $this->assertEquals(2, $capturedFunders[0]->getSubmissionId());
+
+        $this->assertCount(1, $capturedAwards);
+        $this->assertEquals('BASE-001', $capturedAwards[0]->getFunderAwardNumber());
+    }
+
+    public function testProcessDoesNotCloneWhenSameSubmission(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('insertObject')->never();
+        $this->setFunderDao($funderDao);
+
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('submissionId', 1);
+
+        $data = (object) ['funders' => ''];
+
+        FundersProcessor::process($data, $submission, 1, $basePublication);
+
+        $this->assertTrue(true);
+    }
+
+    // ==================== processMultiLocale() Integration Tests ====================
+
+    public function testProcessMultiLocaleReturnsEarlyWhenPluginDisabled(): void
+    {
+        $this->registerMockFundingPlugin(false);
+
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('getBySubmissionId')->never();
+        $this->setFunderDao($funderDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi,Award1'];
+
+        FundersProcessor::processMultiLocale($data, $submission, 1);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWhenEmpty(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('getBySubmissionId')->never();
+        $this->setFunderDao($funderDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => ''];
+
+        FundersProcessor::processMultiLocale($data, $submission, 1);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWhenSubmissionHasFunders(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $existingFunder = new Funder();
+        $existingFunder->setId(1);
+
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('getBySubmissionId')
+            ->with(1)
+            ->andReturn($this->createDAOResultFactoryWithItems([$existingFunder]));
+        $funderDao->shouldReceive('insertObject')->never();
+        $this->setFunderDao($funderDao);
+
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi,Award1'];
+
+        FundersProcessor::processMultiLocale($data, $submission, 1);
+
+        $this->assertTrue(true);
+    }
+
+    public function testProcessMultiLocaleCreatesFundersWhenNoneExist(): void
+    {
+        $this->registerMockFundingPlugin(true);
+
+        $capturedFunders = [];
+        $funderDao = $this->createMockFunderDao();
+        $funderDao->shouldReceive('insertObject')
+            ->andReturnUsing(function ($funder) use (&$capturedFunders) {
+                $capturedFunders[] = $funder;
+                return count($capturedFunders);
+            });
+        $this->setFunderDao($funderDao);
+
+        $funderAwardDao = $this->createMockFunderAwardDao();
+        $this->setFunderAwardDao($funderAwardDao);
+
+        $submission = $this->createMockSubmissionForFunders(1);
+        $data = (object) ['funders' => 'NSF,doi1,Award1'];
+
+        FundersProcessor::processMultiLocale($data, $submission, 1);
+
+        $this->assertCount(1, $capturedFunders);
+        $this->assertEquals('NSF', $capturedFunders[0]->getFunderName());
     }
 }

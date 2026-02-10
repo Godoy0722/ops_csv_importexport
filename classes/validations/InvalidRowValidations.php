@@ -344,7 +344,10 @@ class InvalidRowValidations
             throw new RowValidationException(__('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]));
         }
 
-        $digits = preg_replace('/[^0-9X]/i', '', $normalizedOrcid);
+        // Extract just the ORCID ID from the URL before digit validation
+        // This prevents the 'x' in 'sandbox' from being counted as a digit
+        $orcidId = preg_replace('/^https?:\/\/(sandbox\.)?orcid\.org\//', '', $normalizedOrcid);
+        $digits = preg_replace('/[^0-9X]/i', '', $orcidId);
 
         if (strlen($digits) !== 16) {
             throw new RowValidationException(__('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]));

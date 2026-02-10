@@ -9,7 +9,7 @@
  *
  * @class KeywordsProcessorTest
  *
- * @brief Tests for KeywordsProcessor class - testing keyword parsing logic
+ * @brief Tests for KeywordsProcessor class - testing keyword parsing and processing logic
  */
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
@@ -17,6 +17,8 @@ namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 use APP\plugins\importexport\csv\classes\processors\KeywordsProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
+use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
+use APP\publication\Publication;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 #[CoversClass(KeywordsProcessor::class)]
@@ -139,5 +141,274 @@ class KeywordsProcessorTest extends BaseTestCase
         $this->assertEquals('C++', $keywords[0]);
         $this->assertEquals('.NET', $keywords[1]);
         $this->assertEquals('Node.js', $keywords[2]);
+    }
+
+    // ==================== process() Integration Tests ====================
+
+    public function testProcessSetsKeywordsForPublication(): void
+    {
+        $editCallCount = 0;
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editCallCount, &$editParams) {
+            $editCallCount++;
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'keywords' => 'machine learning;AI;deep learning',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication);
+
+        $this->assertEquals(1, $editCallCount);
+        $this->assertEquals(['en' => ['machine learning', 'AI', 'deep learning']], $editParams['keywords']);
+    }
+
+    public function testProcessReturnsEarlyWhenEmptyAndNoBase(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'keywords' => '',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessCopiesBaseKeywordsWhenEmpty(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('keywords', ['machine learning', 'AI'], 'en');
+
+        $data = (object) [
+            'keywords' => '',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication, $basePublication);
+
+        $this->assertEquals(['en' => ['machine learning', 'AI']], $editParams['keywords']);
+    }
+
+    public function testProcessReturnsEarlyWhenBaseKeywordsEmpty(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('keywords', [], 'en');
+
+        $data = (object) [
+            'keywords' => '',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication, $basePublication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessFiltersEmptyKeywords(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'keywords' => 'machine learning;;AI;',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication);
+
+        $this->assertEquals(['en' => ['machine learning', 'AI']], $editParams['keywords']);
+    }
+
+    public function testProcessReturnsEarlyWhenAllKeywordsFilteredOut(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'keywords' => ';;',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessCopiesBaseKeywordsFilteringNulls(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('keywords', ['machine learning', null, '', 'AI'], 'en');
+
+        $data = (object) [
+            'keywords' => '',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication, $basePublication);
+
+        $this->assertEquals(['en' => ['machine learning', 'AI']], $editParams['keywords']);
+    }
+
+    // ==================== processMultiLocale() Tests ====================
+
+    public function testProcessMultiLocaleMergesKeywords(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+        $publication->setData('keywords', ['en' => ['machine learning', 'AI']]);
+
+        $data = (object) [
+            'keywords' => 'aprendizado de máquina;IA',
+            'locale' => 'pt_BR',
+        ];
+
+        KeywordsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals([
+            'en' => ['machine learning', 'AI'],
+            'pt_BR' => ['aprendizado de máquina', 'IA'],
+        ], $editParams['keywords']);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWhenEmpty(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'keywords' => '',
+            'locale' => 'pt_BR',
+        ];
+
+        KeywordsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
+    }
+
+    public function testProcessMultiLocaleFiltersEmptyKeywords(): void
+    {
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editParams) {
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+        $publication->setData('keywords', ['en' => ['AI']]);
+
+        $data = (object) [
+            'keywords' => 'IA;;aprendizado;',
+            'locale' => 'pt_BR',
+        ];
+
+        KeywordsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals([
+            'en' => ['AI'],
+            'pt_BR' => ['IA', 'aprendizado'],
+        ], $editParams['keywords']);
+    }
+
+    public function testProcessMultiLocaleReturnsEarlyWhenAllFilteredOut(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'keywords' => ';;',
+            'locale' => 'pt_BR',
+        ];
+
+        KeywordsProcessor::processMultiLocale($data, $publication);
+
+        $this->assertEquals(0, $editCallCount);
     }
 }

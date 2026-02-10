@@ -14,9 +14,12 @@
 
 namespace APP\plugins\importexport\csv\tests\Unit\Processors;
 
+use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\processors\SectionsProcessor;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
+use APP\publication\Publication;
+use APP\section\Section;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 #[CoversClass(SectionsProcessor::class)]
@@ -165,5 +168,214 @@ class SectionsProcessorTest extends BaseTestCase
         $this->assertArrayHasKey('abbrev', $sectionData);
         $this->assertFalse($sectionData['editorRestricted']);
         $this->assertTrue($sectionData['metaIndexed']);
+    }
+
+    // ==================== getDefaultSection() Integration Tests ====================
+
+    public function testGetDefaultSectionReturnsActiveSection(): void
+    {
+        $sectionRepoMock = $this->mockSectionRepository();
+
+        $activeSection = $this->createMockSection(['id' => 1, 'title' => 'Preprints']);
+
+        $collector = $this->createMockSectionCollector([$activeSection]);
+        $sectionRepoMock->shouldReceive('getCollector')->andReturn($collector);
+
+        $result = SectionsProcessor::getDefaultSection(1);
+
+        $this->assertNotNull($result);
+        $this->assertEquals(1, $result->getId());
+    }
+
+    public function testGetDefaultSectionSkipsInactiveSections(): void
+    {
+        $sectionRepoMock = $this->mockSectionRepository();
+
+        $inactiveSection = $this->createMockSection(['id' => 1, 'title' => 'Inactive']);
+        $inactiveSection->setIsInactive(true);
+
+        $activeSection = $this->createMockSection(['id' => 2, 'title' => 'Active']);
+
+        $collector = $this->createMockSectionCollector([$inactiveSection, $activeSection]);
+        $sectionRepoMock->shouldReceive('getCollector')->andReturn($collector);
+
+        $result = SectionsProcessor::getDefaultSection(1);
+
+        $this->assertNotNull($result);
+        $this->assertEquals(2, $result->getId());
+    }
+
+    public function testGetDefaultSectionFallsBackToFirstWhenAllInactive(): void
+    {
+        $sectionRepoMock = $this->mockSectionRepository();
+
+        $inactiveSection1 = $this->createMockSection(['id' => 1, 'title' => 'Inactive 1']);
+        $inactiveSection1->setIsInactive(true);
+
+        $inactiveSection2 = $this->createMockSection(['id' => 2, 'title' => 'Inactive 2']);
+        $inactiveSection2->setIsInactive(true);
+
+        $collector = $this->createMockSectionCollector([$inactiveSection1, $inactiveSection2]);
+        $sectionRepoMock->shouldReceive('getCollector')->andReturn($collector);
+
+        $result = SectionsProcessor::getDefaultSection(1);
+
+        $this->assertNotNull($result);
+        $this->assertEquals(1, $result->getId());
+    }
+
+    public function testGetDefaultSectionReturnsNullWhenNoSections(): void
+    {
+        $sectionRepoMock = $this->mockSectionRepository();
+
+        $collector = $this->createMockSectionCollector([]);
+        $sectionRepoMock->shouldReceive('getCollector')->andReturn($collector);
+
+        $result = SectionsProcessor::getDefaultSection(1);
+
+        $this->assertNull($result);
+    }
+
+    // ==================== process() Integration Tests ====================
+
+    public function testProcessUsesDefaultSectionWhenTitleEmpty(): void
+    {
+        $this->mockPublicationRepository();
+
+        $defaultSection = $this->createMockSection(['id' => 10, 'title' => 'Preprints']);
+        CachedEntities::$sections['Preprints_PRE'] = $defaultSection;
+
+        $server = $this->createMockServer(['id' => 1, 'primaryLocale' => 'en']);
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'sectionTitle' => '',
+            'sectionAbbrev' => '',
+            'locale' => 'en',
+        ];
+
+        SectionsProcessor::process($data, $server, $publication);
+
+        $this->assertEquals(10, $publication->getData('sectionId'));
+    }
+
+    public function testProcessUsesCachedSectionWhenFound(): void
+    {
+        $this->mockPublicationRepository();
+
+        $cachedSection = $this->createMockSection(['id' => 20, 'title' => 'Research', 'abbrev' => 'RES']);
+        CachedEntities::$sections['Research_RES'] = $cachedSection;
+
+        $server = $this->createMockServer(['id' => 1]);
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'sectionTitle' => 'Research',
+            'sectionAbbrev' => 'RES',
+            'locale' => 'en',
+        ];
+
+        SectionsProcessor::process($data, $server, $publication);
+
+        $this->assertEquals(20, $publication->getData('sectionId'));
+    }
+
+    public function testProcessCreatesNewSectionWhenNotCached(): void
+    {
+        $this->mockPublicationRepository();
+
+        $capturedSection = null;
+        $sectionRepoMock = $this->mockSectionRepository();
+        $sectionRepoMock->shouldReceive('add')->andReturnUsing(function ($section) use (&$capturedSection) {
+            $capturedSection = $section;
+            return 30;
+        });
+
+        $createdSection = $this->createMockSection(['id' => 30, 'title' => 'Custom Section', 'abbrev' => 'CUS']);
+        $sectionRepoMock->shouldReceive('get')->with(30, 1)->andReturn($createdSection);
+
+        $server = $this->createMockServer(['id' => 1]);
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'sectionTitle' => 'Custom Section',
+            'sectionAbbrev' => 'cus',
+            'locale' => 'en',
+        ];
+
+        SectionsProcessor::process($data, $server, $publication);
+
+        $this->assertEquals(30, $publication->getData('sectionId'));
+        $this->assertNotNull($capturedSection);
+        $this->assertEquals(1, $capturedSection->getContextId());
+        $this->assertEquals('Custom Section', $capturedSection->getTitle('en'));
+        $this->assertEquals('CUS', $capturedSection->getAbbrev('en'));
+        $this->assertEquals('cus', $capturedSection->getPath());
+        $this->assertEquals(REALLY_BIG_NUMBER, $capturedSection->getSequence());
+        $this->assertFalse($capturedSection->getEditorRestricted());
+        $this->assertTrue($capturedSection->getMetaIndexed());
+        $this->assertTrue($capturedSection->getMetaReviewed());
+        $this->assertFalse($capturedSection->getAbstractsNotRequired());
+        $this->assertEquals(REALLY_BIG_NUMBER, $capturedSection->getAbstractWordCount());
+        $this->assertFalse($capturedSection->getHideTitle());
+        $this->assertFalse($capturedSection->getHideAuthor());
+        $this->assertFalse($capturedSection->getIsInactive());
+    }
+
+    public function testProcessCachesNewlyCreatedSection(): void
+    {
+        $this->mockPublicationRepository();
+
+        $sectionRepoMock = $this->mockSectionRepository();
+        $sectionRepoMock->shouldReceive('add')->andReturn(30);
+
+        $createdSection = $this->createMockSection(['id' => 30, 'title' => 'Custom', 'abbrev' => 'CUS']);
+        $sectionRepoMock->shouldReceive('get')->with(30, 1)->andReturn($createdSection);
+
+        $server = $this->createMockServer(['id' => 1]);
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'sectionTitle' => 'Custom',
+            'sectionAbbrev' => 'cus',
+            'locale' => 'en',
+        ];
+
+        SectionsProcessor::process($data, $server, $publication);
+
+        $this->assertArrayHasKey('Custom_CUS', CachedEntities::$sections);
+        $this->assertEquals($createdSection, CachedEntities::$sections['Custom_CUS']);
+    }
+
+    public function testProcessSetsIdentifyTypeAndPolicy(): void
+    {
+        $this->mockPublicationRepository();
+
+        $capturedSection = null;
+        $sectionRepoMock = $this->mockSectionRepository();
+        $sectionRepoMock->shouldReceive('add')->andReturnUsing(function ($section) use (&$capturedSection) {
+            $capturedSection = $section;
+            return 30;
+        });
+        $sectionRepoMock->shouldReceive('get')->andReturn($this->createMockSection(['id' => 30]));
+
+        $server = $this->createMockServer(['id' => 1]);
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'sectionTitle' => 'New Section',
+            'sectionAbbrev' => 'NEW',
+            'locale' => 'en',
+        ];
+
+        SectionsProcessor::process($data, $server, $publication);
+
+        $this->assertEquals('', $capturedSection->getIdentifyType('en'));
+        $this->assertEquals('', $capturedSection->getPolicy('en'));
     }
 }

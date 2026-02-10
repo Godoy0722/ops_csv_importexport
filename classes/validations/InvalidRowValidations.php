@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/validations/InvalidRowValidations.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class InvalidRowValidations
@@ -17,8 +17,11 @@
 namespace APP\plugins\importexport\csv\classes\validations;
 
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
+use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
 use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
 use APP\server\Server;
+use APP\core\Application;
+use APP\publication\Publication;
 
 class InvalidRowValidations
 {
@@ -27,116 +30,138 @@ class InvalidRowValidations
     static array $coverImageAllowedTypes = ['gif', 'jpg', 'png', 'webp'];
 
     /**
-     * Validates whether the CSV row contains all fields. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates whether the email is valid.
+     *
+     * @throws RowValidationException
      */
-    public static function validateRowContainAllFields(array $fields, int $expectedSize): ?string
+    public static function validateEmail(string $email): void
     {
-        return count($fields) < $expectedSize
-            ? __('plugins.importexport.csv.rowDoesntContainAllFields')
-            : null;
+        if (empty($email)) {
+            return;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new RowValidationException(__('plugins.importexport.csv.invalidEmail', ['email' => $email]));
+        }
     }
 
     /**
-     * Validates whether the CSV row contains all required fields. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates whether the CSV row contains all fields.
+     *
+     * @throws RowValidationException
      */
-    public static function validateRowHasAllRequiredFields(object $data, callable $requiredFieldsValidation): ?string
+    public static function validateRowContainAllFields(array $fields, int $expectedSize): void
     {
-        return !$requiredFieldsValidation($data)
-            ? __('plugins.importexport.csv.verifyRequiredFieldsForThisRow')
-            : null;
-    }
+        $fieldCount = count($fields);
 
+        if ($fieldCount < $expectedSize) {
+            throw new RowValidationException(__('plugins.importexport.csv.rowDoesntContainAllFields'));
+        }
 
-    /**
-     * Validates whether the preprint file exists and is readable. Returns the reason if an error occurred,
-     * or null if everything is correct.
-     */
-    public static function validatePreprintFileIsValid(string $coverImageFilename, string $sourceDir): ?string
-    {
-        $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
-
-        return !is_readable($preprintCoverImagePath)
-            ? __('plugins.importexport.csv.invalidPreprintFile')
-            : null;
+        if ($fieldCount > $expectedSize) {
+            throw new RowValidationException(__('plugins.importexport.csv.rowContainsTooManyFields'));
+        }
     }
 
     /**
-     * Validates the preprint cover image. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates whether the CSV row contains all required fields.
+     *
+     * @throws RowValidationException
      */
-    public static function validateCoverImageIsValid(string $coverImageFilename, string $sourceDir): ?string
+    public static function validateRowHasAllRequiredFields(object $data, callable $requiredFieldsValidation): void
+    {
+        if (!$requiredFieldsValidation($data)) {
+            throw new RowValidationException(__('plugins.importexport.csv.verifyRequiredFieldsForThisRow'));
+        }
+    }
+
+    /**
+     * Validates whether the preprint file exists and is readable.
+     *
+     * @throws RowValidationException
+     */
+    public static function validatePreprintFileIsValid(string $coverImageFilename, string $sourceDir): void
     {
         $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
 
         if (!is_readable($preprintCoverImagePath)) {
-            return __('plugins.importexport.csv.invalidBookCoverImage');
+            throw new RowValidationException(__('plugins.importexport.csv.invalidPreprintFile'));
         }
-
-        $coverImgExtension = pathinfo(mb_strtolower($coverImageFilename), PATHINFO_EXTENSION);
-
-        if (!in_array($coverImgExtension, self::$coverImageAllowedTypes)) {
-            return __('plugins.importexport.csv.invalidFileExtension');
-        }
-
-        return null;
     }
 
     /**
-     * Perform all necessary validations for preprint galleys. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates the preprint cover image.
+     *
+     * @throws RowValidationException
      */
-    public static function validatePreprintGalleys(string $galleyFilenames, string $galleyLabels, string $sourceDir): ?string
+    public static function validateCoverImageIsValid(string $coverImageFilename, string $sourceDir): void
+    {
+        $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
+
+        if (!is_readable($preprintCoverImagePath)) {
+            throw new RowValidationException(__('plugins.importexport.csv.invalidPreprintCoverImage'));
+        }
+
+        $coverImgExtension = mb_strtolower(pathinfo($coverImageFilename, PATHINFO_EXTENSION));
+
+        if (!in_array($coverImgExtension, static::$coverImageAllowedTypes)) {
+            throw new RowValidationException(__('plugins.importexport.csv.invalidFileExtension'));
+        }
+    }
+
+    /**
+     * Perform all necessary validations for preprint galleys.
+     *
+     * @throws RowValidationException
+     */
+    public static function validatePreprintGalleys(string $galleyFilenames, string $galleyLabels, string $sourceDir): void
     {
         $galleyFilenamesArray = explode(';', $galleyFilenames);
         $galleyLabelsArray = explode(';', $galleyLabels);
 
         if (count($galleyFilenamesArray) !== count($galleyLabelsArray)) {
-            return __('plugins.importexport.csv.invalidNumberOfLabelsAndGalleys');
+            throw new RowValidationException(__('plugins.importexport.csv.invalidNumberOfLabelsAndGalleys'));
         }
 
         foreach($galleyFilenamesArray as $galleyFilename) {
             $galleyPath = "{$sourceDir}/{$galleyFilename}";
             if (!is_readable($galleyPath)) {
-                return __('plugins.importexport.csv.invalidGalleyFile', ['filename' => $galleyFilename]);
+                throw new RowValidationException(__('plugins.importexport.csv.invalidGalleyFile', ['filename' => $galleyFilename]));
             }
         }
-
-        return null;
     }
 
     /**
-     * Perform all necessary validations for supplementary files. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Perform all necessary validations for supplementary files.
+     *
+     * @throws RowValidationException
      */
-    public static function validateSupplementaryFiles(string $suppFilenames, string $suppLabels, string $sourceDir): ?string
+    public static function validateSupplementaryFiles(string $suppFilenames, string $suppLabels, string $sourceDir): void
     {
         $suppFilenamesArray = array_map('trim', explode(';', $suppFilenames));
         $suppLabelsArray = array_map('trim', explode(';', $suppLabels));
 
         if (count($suppFilenamesArray) !== count($suppLabelsArray)) {
-            return __('plugins.importexport.csv.invalidNumberOfLabelsAndSupplementaryFiles');
+            throw new RowValidationException(__('plugins.importexport.csv.invalidNumberOfLabelsAndSupplementaryFiles'));
         }
 
         foreach($suppFilenamesArray as $suppFilename) {
             $suppPath = "{$sourceDir}/{$suppFilename}";
             if (!is_readable($suppPath)) {
-                return __('plugins.importexport.csv.invalidSupplementaryFile', ['filename' => $suppFilename]);
+                throw new RowValidationException(__('plugins.importexport.csv.invalidSupplementaryFile', ['filename' => $suppFilename]));
             }
         }
-
-        return null;
     }
 
     /**
-     * Validates the supplementary descriptions count. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates the supplementary descriptions count.
+     *
+     * @throws RowValidationException
      */
-    public static function validateSupplementaryDescriptions(string $suppFilenames, string $suppLabels, ?string $suppDescriptions): ?string
+    public static function validateSupplementaryDescriptions(string $suppFilenames, string $suppLabels, ?string $suppDescriptions): void
     {
         if (empty($suppDescriptions)) {
-            return null; // descriptions are optional
+            return; // descriptions are optional
         }
 
         $suppFilenamesArray = array_map('trim', explode(';', $suppFilenames));
@@ -147,112 +172,119 @@ class InvalidRowValidations
             count($suppDescriptionsArray) !== count($suppFilenamesArray) ||
             count($suppDescriptionsArray) !== count($suppLabelsArray)
         ) {
-            return __('plugins.importexport.csv.invalidNumberOfDescriptionsAndSupplementaryFiles');
+            throw new RowValidationException(__('plugins.importexport.csv.invalidNumberOfDescriptionsAndSupplementaryFiles'));
         }
-
-        return null;
     }
 
     /**
-     * Validates whether the server is valid for the CSV row. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates whether the server is valid for the CSV row.
+     *
+     * @throws RowValidationException
      */
-    public static function validateServerIsValid(?Server $server, string $serverPath): ?string
+    public static function validateServerIsValid(?Server $server, string $serverPath): void
     {
-        return !$server ? __('plugins.importexport.csv.unknownServer', ['serverPath' => $serverPath]) : null;
+        if (!$server) {
+            throw new RowValidationException(__('plugins.importexport.csv.unknownServer', ['serverPath' => $serverPath]));
+        }
     }
 
     /**
-     * Validates if the server supports the locale provided in the CSV row. Returns the reason if an error occurred
-     * or null if everything is correct.
+     * Validates if the server supports the locale provided in the CSV row.
+     *
+     * @throws RowValidationException
      */
-    public static function validateServerLocale(Server $server, string $locale): ?string
+    public static function validateServerLocale(Server $server, string $locale): void
     {
         $supportedLocales = $server->getSupportedSubmissionLocales();
         if (!is_array($supportedLocales) || count($supportedLocales) < 1) {
             $supportedLocales = [$server->getPrimaryLocale()];
         }
-
-        return !in_array($locale, $supportedLocales)
-            ? __('plugins.importexport.csv.unknownLocale', ['locale' => $locale])
-            : null;
+        if (!in_array($locale, $supportedLocales)) {
+            throw new RowValidationException(__('plugins.importexport.csv.unknownLocale', ['locale' => $locale, 'supportedLocales' => implode(', ', $supportedLocales)]));
+        }
     }
 
     /**
-     * Validates if a genre exists for the name provided in the CSV row. Returns the reason if an error occurred
-     * or null if everything is correct.
+     * Validates if a genre exists for the name provided in the CSV row.
+     *
+     * @throws RowValidationException
      */
-    public static function validateGenreIdValid(?int $genreId, string $genreName): ?string
+    public static function validateGenreIdValid(?int $genreId, string $genreName): void
     {
-        return !$genreId ? __('plugins.importexport.csv.noGenre', ['genreName' => $genreName]) : null;
+        if (!$genreId) {
+            throw new RowValidationException(__('plugins.importexport.csv.noGenre', ['genreName' => $genreName]));
+        }
     }
 
     /**
-     * Validates if the user group ID is valid. Returns the reason if an error occurred
-     * or null if everything is correct.
+     * Validates if the user group ID is valid.
+     *
+     * @throws RowValidationException
      */
-    public static function validateUserGroupId(?int $userGroupId, string $serverPath): ?string
+    public static function validateUserGroupId(?int $userGroupId, string $serverPath): void
     {
-        return !$userGroupId
-            ? __('plugins.importexport.csv.noAuthorGroup', ['journal' => $serverPath])
-            : null;
+        if (!$userGroupId) {
+            throw new RowValidationException(__('plugins.importexport.csv.noAuthorGroup', ['server' => $serverPath]));
+        }
     }
 
     /**
-     * Validates if all user groups are valid. Returns the reason if an error occurred
-     * or null if everything is correct.
+     * Validates if all user groups are valid.
+     *
+     * @throws RowValidationException
      */
-    public static function validateAllUserGroupsAreValid(array $roles, int $serverId, string $locale): ?string
+    public static function validateAllUserGroupsAreValid(array $roles, int $serverId, string $locale): void
     {
         $userGroups = CachedEntities::getCachedUserGroupsByServerId($serverId);
 
         $allDbRoles = 0;
         foreach ($roles as $role) {
-            $matchingGroups = array_filter($userGroups, function($userGroup) use ($role, $locale) {
-                return mb_strtolower($userGroup->name[$locale]) === mb_strtolower($role);
-            });
+            $matchingGroups = array_filter($userGroups, fn($userGroup) => mb_strtolower($userGroup->name[$locale]) === mb_strtolower($role));
             $allDbRoles += count($matchingGroups);
         }
 
-        return $allDbRoles !== count($roles)
-            ? __('plugins.importexport.csv.roleDoesntExist', ['role' => $role])
-            : null;
+        if ($allDbRoles !== count($roles)) {
+            throw new RowValidationException(__('plugins.importexport.csv.roleDoesntExist', ['role' => $role]));
+        }
     }
 
-    public static function validatePreprintVersioningFields(object $data): ?string
+    /**
+     * Validates preprint versioning fields.
+     *
+     * @throws RowValidationException
+     */
+    public static function validatePreprintVersioningFields(object $data): void
     {
         if (!empty($data->versionIdentifier) && empty($data->version)) {
-            return __('plugins.importexport.csv.versionRequiredWhenIdentifierProvided');
+            throw new RowValidationException(__('plugins.importexport.csv.versionRequiredWhenIdentifierProvided'));
         }
 
         if (!empty($data->version)) {
             if (!is_numeric($data->version) || (int)$data->version < 1) {
-                return __('plugins.importexport.csv.versionMustBePositiveInteger');
+                throw new RowValidationException(__('plugins.importexport.csv.versionMustBePositiveInteger'));
             }
         }
-
-        return null;
     }
 
      /**
      * Validates that no duplicate version exists for the same preprint identifier,
      * version, and locale combination in the current import session
+     *
+     * @throws RowValidationException
      */
-    public static function validateNoDuplicateVersion(object $data, array $processedPreprints): ?string
+    public static function validateNoDuplicateVersion(object $data, array $processedPreprints): void
     {
         $identifier = $data->versionIdentifier;
         $version = (int)$data->version;
         $locale = $data->locale;
 
         if (isset($processedPreprints[$identifier][$version][$locale])) {
-            return __('plugins.importexport.csv.duplicatePreprintVersionLocaleFound', [
+            throw new RowValidationException(__('plugins.importexport.csv.duplicatePreprintVersionLocaleFound', [
                 'identifier' => $identifier,
                 'version' => $version,
                 'locale' => $locale
-            ]);
+            ]));
         }
-
-        return null;
     }
 
     /**
@@ -263,67 +295,64 @@ class InvalidRowValidations
         $identifier = $data->versionIdentifier;
         $version = (int)$data->version;
 
-        return isset($processedPreprints[$identifier][$version]) &&
-               !empty($processedPreprints[$identifier][$version]);
+        return !empty($processedPreprints[$identifier][$version]);
     }
 
     /**
-     * Validates the references file. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates the references file.
+     *
+     * @throws RowValidationException
      */
-    public static function validateReferencesFile(?string $referencesFilename, string $sourceDir): ?string
+    public static function validateReferencesFile(?string $referencesFilename, string $sourceDir): void
     {
         if (empty($referencesFilename)) {
-            return null; // References file is optional
+            return; // References file is optional
         }
 
         $referencesFilePath = "{$sourceDir}/{$referencesFilename}";
 
         if (!is_readable($referencesFilePath)) {
-            return __('plugins.importexport.csv.invalidReferencesFile', ['filename' => $referencesFilename]);
+            throw new RowValidationException(__('plugins.importexport.csv.invalidReferencesFile', ['filename' => $referencesFilename]));
         }
 
         $extension = pathinfo(mb_strtolower($referencesFilename), PATHINFO_EXTENSION);
         if ($extension !== 'txt') {
-            return __('plugins.importexport.csv.invalidReferencesFileExtension');
+            throw new RowValidationException(__('plugins.importexport.csv.invalidReferencesFileExtension'));
         }
-
-        return null;
     }
 
     /**
-     * Validates the ORCID value. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates the ORCID value.
      *
      * Accepts the following formats:
      * - Full URL: https://orcid.org/0000-0002-1825-0097 or https://sandbox.orcid.org/0000-0002-1825-0097
      * - Dashed format: 0000-0002-1825-0097
      * - Numeric format: 0000000218250097
      * - Can end with X (checksum character)
+     *
+     * @throws RowValidationException
      */
-    public static function validateOrcid(?string $orcid): ?string
+    public static function validateOrcid(?string $orcid): void
     {
         if (empty($orcid)) {
-            return null;
+            return;
         }
 
-        $normalizedOrcid = self::normalizeOrcid($orcid);
+        $normalizedOrcid = static::normalizeOrcid($orcid);
 
         if ($normalizedOrcid === null) {
-            return __('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]);
+            throw new RowValidationException(__('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]));
         }
 
-        $digits = preg_replace('/[^0-9X]/', '', $normalizedOrcid);
+        $digits = preg_replace('/[^0-9X]/i', '', $normalizedOrcid);
 
         if (strlen($digits) !== 16) {
-            return __('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]);
+            throw new RowValidationException(__('plugins.importexport.csv.invalidOrcidFormat', ['orcid' => $orcid]));
         }
 
-        if (!self::validateOrcidChecksum($digits)) {
-            return __('plugins.importexport.csv.invalidOrcidChecksum', ['orcid' => $orcid]);
+        if (!static::validateOrcidExists($normalizedOrcid)) {
+            throw new RowValidationException(__('plugins.importexport.csv.orcidNotFound', ['orcid' => $orcid]));
         }
-
-        return null;
     }
 
     /**
@@ -337,11 +366,11 @@ class InvalidRowValidations
             return null;
         }
 
-        if (preg_match('/^https:\/\/(sandbox\.)?orcid\.org\/(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/', $orcid)) {
+        if (preg_match('/^https:\/\/(sandbox\.)?orcid\.org\/(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/i', $orcid)) {
             return $orcid;
         }
 
-        if (preg_match('/^(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/', $orcid)) {
+        if (preg_match('/^(\d{4})-(\d{4})-(\d{4})-(\d{3}[0-9X])$/i', $orcid)) {
             return 'https://orcid.org/' . $orcid;
         }
 
@@ -357,44 +386,47 @@ class InvalidRowValidations
     }
 
     /**
-     * Validates the ORCID checksum using ISNI algorithm.
+     * Validates if the ORCID entry exists via web request.
      */
-    private static function validateOrcidChecksum(string $digits): bool
+    private static function validateOrcidExists(string $orcid): bool
     {
-        $total = 0;
-        for ($i = 0; $i < 15; $i++) {
-            $total = ($total + (int) $digits[$i]) * 2;
+        try {
+            $client = Application::get()->getHttpClient();
+            $response = $client->request('HEAD', $orcid, [
+                'http_errors' => true,
+                'connect_timeout' => 5,
+                'headers' => [
+                    'Accept' => 'application/json, application/xml, text/html'
+                ]
+            ]);
+
+            return $response->getStatusCode() === 200;
+        } catch (\Exception $e) {
+            return false;
         }
-
-        $remainder = $total % 11;
-        $result = (12 - $remainder) % 11;
-        $expectedCheckDigit = ($result === 10) ? 'X' : (string) $result;
-
-        return $digits[15] === $expectedCheckDigit;
     }
 
     /**
-     * Validates the VOR DOI field. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates the VOR DOI field.
      *
      * Accepted formats:
      * - Full URL: https://doi.org/10.1234/example
      * - DOI identifier: 10.1234/example
      * - With doi: prefix: doi:10.1234/example
+     *
+     * @throws RowValidationException
      */
-    public static function validateVorDoi(?string $vorDoi): ?string
+    public static function validateVorDoi(?string $vorDoi): void
     {
         if (empty($vorDoi)) {
-            return null;
+            return;
         }
 
-        $normalizedDoi = self::normalizeVorDoi($vorDoi);
+        $normalizedDoi = static::normalizeVorDoi($vorDoi);
 
         if ($normalizedDoi === null) {
-            return __('plugins.importexport.csv.invalidVorDoiFormat', ['vorDoi' => $vorDoi]);
+            throw new RowValidationException(__('plugins.importexport.csv.invalidVorDoiFormat', ['vorDoi' => $vorDoi]));
         }
-
-        return null;
     }
 
     /**
@@ -428,18 +460,19 @@ class InvalidRowValidations
     }
 
     /**
-     * Validates the funders string format. Returns the reason if an error occurred,
-     * or null if everything is correct.
+     * Validates the funders string format.
      *
      * Funder format: "FunderName,FunderIdentification,Award1|Award2;FunderName2,FunderIdentification2,Award3"
      * - Each funder is separated by `;`
      * - Funder fields are separated by `,`
      * - Multiple awards for the same funder are separated by `|`
+     *
+     * @throws RowValidationException
      */
-    public static function validateFunders(?string $fundersString): ?string
+    public static function validateFunders(?string $fundersString): void
     {
         if (empty($fundersString)) {
-            return null;
+            return;
         }
 
         $fundersArray = array_map('trim', explode(';', $fundersString));
@@ -453,29 +486,26 @@ class InvalidRowValidations
             $funderName = $funderParts[0] ?? '';
 
             if (empty($funderName)) {
-                return __('plugins.importexport.csv.invalidFunderFormat', ['index' => $index + 1]);
+                throw new RowValidationException(__('plugins.importexport.csv.invalidFunderFormat', ['index' => $index + 1]));
             }
         }
-
-        return null;
     }
 
     /**
      * Validates that the Funding plugin is enabled when funders data is provided.
-     * Returns an error message if funders data is present but the plugin is not enabled,
-     * or null if everything is correct.
+     * Throws RowValidationException if funders data is present but the plugin is not enabled.
+     *
+     * @throws RowValidationException
      */
-    public static function validateFundingPluginEnabled(?string $fundersString, int $contextId): ?string
+    public static function validateFundingPluginEnabled(?string $fundersString, int $contextId): void
     {
         if (empty($fundersString)) {
-            return null;
+            return;
         }
 
         if (!FundersProcessor::isFundingPluginEnabled($contextId)) {
-            return __('plugins.importexport.csv.fundingPluginNotEnabled');
+            throw new RowValidationException(__('plugins.importexport.csv.fundingPluginNotEnabled'));
         }
-
-        return null;
     }
 
     /**
@@ -483,17 +513,18 @@ class InvalidRowValidations
      * This validation is only applied when the Funding plugin's 'enableGrantIdValidation'
      * setting is enabled for the context.
      *
-     * Returns an error message if any funder lacks a valid Crossref DOI,
-     * or null if everything is correct (or if validation is disabled).
+     * Throws RowValidationException if any funder lacks a valid Crossref DOI.
+     *
+     * @throws RowValidationException
      */
-    public static function validateFundersCrossrefRegistry(?string $fundersString, int $contextId): ?string
+    public static function validateFundersCrossrefRegistry(?string $fundersString, int $contextId): void
     {
         if (empty($fundersString)) {
-            return null;
+            return;
         }
 
         if (!FundersProcessor::isCrossrefValidationEnabled($contextId)) {
-            return null;
+            return;
         }
 
         $fundersArray = array_map('trim', explode(';', $fundersString));
@@ -514,22 +545,71 @@ class InvalidRowValidations
             // Check if the funder identification contains a valid Crossref Funder Registry DOI
             // Valid formats: https://doi.org/10.13039/... or http://dx.doi.org/10.13039/...
             if (!empty($funderIdentification)) {
-                $hasCrossrefDoi = preg_match('/https?:\/\/(dx\.)?doi\.org\/10\.13039\//', $funderIdentification);
+                $hasCrossrefDoi = preg_match('/https?:\/\/(dx\.)?doi\.org\/10\.13039\//i', $funderIdentification);
                 if (!$hasCrossrefDoi) {
-                    return __('plugins.importexport.csv.funderNotInCrossrefRegistry', [
+                    throw new RowValidationException(__('plugins.importexport.csv.funderNotInCrossrefRegistry', [
                         'funderName' => $funderName,
                         'index' => $index + 1
-                    ]);
+                    ]));
                 }
             } else {
                 // Funder identification is required for Crossref registry validation
-                return __('plugins.importexport.csv.funderMissingCrossrefId', [
+                throw new RowValidationException(__('plugins.importexport.csv.funderMissingCrossrefId', [
                     'funderName' => $funderName,
                     'index' => $index + 1
-                ]);
+                ]));
             }
         }
+    }
 
-        return null;
+    /**
+     * Validates whether a user already exists with the given username.
+     *
+     * @throws RowValidationException
+     */
+    public static function validateUserAlreadyExistsWithThisUsername(string $username): void
+    {
+        $existingUserByUsername = CachedEntities::getCachedUserByUsername($username);
+        if (!is_null($existingUserByUsername)) {
+            throw new RowValidationException(__('plugins.importexport.csv.userAlreadyExistsWithUsername', ['username' => $username]));
+        }
+    }
+
+    /**
+     * Validates whether a user already exists with the given email.
+     *
+     * @throws RowValidationException
+     */
+    public static function validateUserAlreadyExistsWithThisEmail(string $email): void
+    {
+        $existingUserByEmail = CachedEntities::getCachedUserByEmail($email);
+        if (!is_null($existingUserByEmail)) {
+            throw new RowValidationException(__('plugins.importexport.csv.userAlreadyExistsWithEmail', ['email' => $email]));
+        }
+    }
+
+    /**
+     * Validates if the publication was successfully retrieved or created.
+     *
+     * @throws RowValidationException
+     */
+    public static function validatePublicationWasSuccessfullyCreated(?Publication $publication): void
+    {
+        if (!$publication) {
+            throw new RowValidationException(__('plugins.importexport.csv.errorWhileCreatingPublication'));
+        }
+    }
+
+    /**
+     * Validates that section fields are either both filled or both empty.
+     * If one is provided, both must be provided.
+     *
+     * @throws RowValidationException
+     */
+    public static function validateSectionFields(object $data): void
+    {
+        if (empty($data->sectionTitle) xor empty($data->sectionAbbrev)) {
+            throw new RowValidationException(__('plugins.importexport.csv.incompleteSectionFields'));
+        }
     }
 }

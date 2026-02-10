@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/UserGroupsProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class UserGroupsProcessor
@@ -21,7 +21,7 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 
 class UserGroupsProcessor
 {
-	public static function process(array $roles, int $userId, int $journalId, string $locale)
+    public static function process(array $roles, int $userId, int $journalId, string $locale)
     {
         foreach ($roles as $role) {
             $userGroup = CachedEntities::getCachedUserGroupByName($role, $journalId, $locale);
@@ -29,5 +29,5 @@ class UserGroupsProcessor
                 Repo::userGroup()->assignUserToGroup($userId, $userGroup->id);
             }
         }
-	}
+    }
 }

@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/SubjectsProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class SubjectsProcessor
@@ -21,34 +21,32 @@ use APP\publication\Publication;
 
 class SubjectsProcessor
 {
-	public static function process(object $data, int $publicationId, ?Publication $basePublication = null)
+	public static function process(object $data, Publication $publication, ?Publication $basePublication = null)
     {
         if (empty($data->subjects) && !is_null($basePublication)) {
-            $baseSubjects = $basePublication->getData('subjects');
+            $baseSubjects = $basePublication->getData('subjects', $data->locale);
+
+            // Filter out null/empty values
+            if (is_array($baseSubjects)) {
+                $baseSubjects = array_filter($baseSubjects, fn($subject) => !is_null($subject) && $subject !== '');
+            }
 
             if (empty($baseSubjects)) {
                 return;
             }
 
-            $publication = Repo::publication()->get($publicationId);
-            if ($publication) {
-                Repo::publication()->edit($publication, ['subjects' => $baseSubjects]);
-            }
-
+            // Wrap in locale array to match expected structure
+            Repo::publication()->edit($publication, ['subjects' => [$data->locale => array_values($baseSubjects)]]);
             return;
         }
 
-		$subjectsList = [$data->locale => array_map('trim', explode(';', $data->subjects))];
+		$subjects = array_filter(array_map('trim', explode(';', $data->subjects)), fn($subject) => $subject !== '');
 
-		if (empty($subjectsList[$data->locale])) {
+		if (empty($subjects)) {
             return;
         }
 
-        $publication = Repo::publication()->get($publicationId);
-
-        if (!$publication) {
-            return;
-        }
+        $subjectsList = [$data->locale => array_values($subjects)];
 
         Repo::publication()->edit($publication, ['subjects' => $subjectsList]);
 	}
@@ -56,21 +54,20 @@ class SubjectsProcessor
     /**
      * Process subjects for multi-locale import (adds subjects in new locale)
      */
-    public static function processMultiLocale(object $data, int $publicationId): void
+    public static function processMultiLocale(object $data, Publication $publication): void
     {
         if (empty($data->subjects)) {
             return; // No new subjects to add
         }
 
-        $publication = Repo::publication()->get($publicationId);
-        if (!$publication) {
+        $newSubjects = array_filter(array_map('trim', explode(';', $data->subjects)), fn($subject) => $subject !== '');
+
+        if (empty($newSubjects)) {
             return;
         }
 
         $existingSubjects = $publication->getData('subjects') ?? [];
-
-        $newSubjects = array_map('trim', explode(';', $data->subjects));
-        $existingSubjects[$data->locale] = $newSubjects;
+        $existingSubjects[$data->locale] = array_values($newSubjects);
 
         Repo::publication()->edit($publication, ['subjects' => $existingSubjects]);
     }

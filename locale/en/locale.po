@@ -20,22 +20,22 @@ msgstr "Import and export issues or users through a CSV file."
 msgid "plugins.importexport.csv.cliUsage"
 msgstr "Command-line tool for importing issues or users through a CSV file.\n"
 "Usage:\n"
-"{$scriptName} [users|issues] username [pathToCsvFile] <sendWelcomeEmail> [--subscription-type <typeId>]\n"
+"{$scriptName} [users|issues] username [pathToCsvFile] [--sendWelcomeEmail] [--subscription-type <typeId>]\n"
 "Choose one of the following options:\n"
 " - users - import users from CSV file\n"
 " - issues - import issues from CSV file\n\n"
 "username - the username of the user to whom imported issues should be assigned.\n"
 "pathToCsvFile - the path to the CSV file to be imported.\n"
-"sendWelcomeEmail - optional parameter, if set to true, a welcome email will be sent to the imported users.\n"
+"--sendWelcomeEmail - optional parameter, if set, a welcome email will be sent to the imported users.\n"
 "--subscription-type <typeId> - optional parameter for user import, adds subscriptions with the specified type ID."
 
 msgid "plugins.importexport.csv.cliUsage.examples"
 msgstr "Examples:\n"
 "{$scriptName} users admin /home/user/import_files/users.csv\n"
 "{$scriptName} issues admin /home/user/import_files/issues.csv\n"
-"{$scriptName} users admin /home/user/import_files/users.csv true\n"
-"{$scriptName} issues admin /home/user/import_files/issues.csv true\n"
-"{$scriptName} users admin /home/user/import_files/users.csv true --subscription-type 1\n"
+"{$scriptName} users admin /home/user/import_files/users.csv --sendWelcomeEmail\n"
+"{$scriptName} issues admin /home/user/import_files/issues.csv --sendWelcomeEmail\n"
+"{$scriptName} users admin /home/user/import_files/users.csv --sendWelcomeEmail --subscription-type 1\n"
 
 msgid "plugins.importexport.csv.unknownUser"
 msgstr "Unknown User: \"{$username}\". Exiting."
@@ -52,6 +52,9 @@ msgstr "Could not create the file \"{$filename}\"."
 msgid "plugins.importexport.csv.rowDoesntContainAllFields"
 msgstr "Row doesn't contain all fields."
 
+msgid "plugins.importexport.csv.rowContainsTooManyFields"
+msgstr "Row contains more fields than expected."
+
 msgid "plugins.importexport.csv.verifyRequiredFieldsForThisRow"
 msgstr "Verify the required fields for this row."
 
@@ -59,7 +62,7 @@ msgid "plugins.importexport.csv.unknownServer"
 msgstr "Unknown server with path \"{$serverPath}\"."
 
 msgid "plugins.importexport.csv.unknownLocale"
-msgstr "Unknown locale or locale not supported by this server: \"{$locale}\""
+msgstr "Unknown locale or locale not supported by this server: \"{$locale}\". Supported locales: {$supportedLocales}"
 
 msgid "plugins.importexport.csv.invalidPreprintFile"
 msgstr "Invalid file for this preprint."
@@ -88,7 +91,7 @@ msgstr "There is no default author group in the journal {$journal}."
 msgid "plugins.importexpot.csv.fileProcessFinished"
 msgstr "Process for file \"{$filename}\" finished. {$processedRows} rows processed. {$failedRows} rows with error."
 
-msgid "plugins.importexport.csv.invalidBookCoverImage"
+msgid "plugins.importexport.csv.invalidPreprintCoverImage"
 msgstr "The cover image has an invalid format for this row."
 
 msgid "plugins.importexport.csv.erroWhileSavingBookCoverImage"
@@ -154,8 +157,8 @@ msgstr "References file must have a .txt extension."
 msgid "plugins.importexport.csv.invalidOrcidFormat"
 msgstr "Invalid ORCID format: \"{$orcid}\". Accepted formats: URL (https://orcid.org/0000-0000-0000-0000), dashed (0000-0000-0000-0000), or numeric (0000000000000000)."
 
-msgid "plugins.importexport.csv.invalidOrcidChecksum"
-msgstr "Invalid ORCID checksum for: \"{$orcid}\". Please verify the ORCID is correct."
+msgid "plugins.importexport.csv.orcidNotFound"
+msgstr "ORCID not found: \"{$orcid}\". The ORCID entry does not exist."
 
 msgid "plugins.importexport.csv.invalidVorDoiFormat"
 msgstr "Invalid VOR DOI format: \"{$vorDoi}\". Accepted formats: DOI URL (https://doi.org/10.1234/example), DOI identifier (10.1234/example), or with prefix (doi:10.1234/example)."
@@ -174,3 +177,15 @@ msgstr "Funder \"{$funderName}\" at position {$index} is not from the Crossref F
 
 msgid "plugins.importexport.csv.funderMissingCrossrefId"
 msgstr "Funder \"{$funderName}\" at position {$index} is missing a Crossref Funder Registry identification. Please provide a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...)."
+
+msgid "plugins.importexport.csv.skippingInvalidFile"
+msgstr "Skipping \"{$filename}\" (file from previous failed import). To re-import failed rows, fix errors in this file, rename it without the 'invalid_' prefix, and run the import again."
+
+msgid "plugins.importexport.csv.ExecutedInNSeconds"
+msgstr "Executed in: {$seconds} seconds.\n"
+
+msgid "plugins.importexport.csv.couldNotWriteFile"
+msgstr "Could not write to file \"{$filename}\"."
+
+msgid "plugins.importexport.csv.incompleteSectionFields"
+msgstr "Both sectionTitle and sectionAbbrev must be provided together. If one is filled, the other must also be filled."

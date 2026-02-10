@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/AuthorsProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class AuthorsProcessor
@@ -21,58 +21,41 @@ use APP\publication\Publication;
 
 class AuthorsProcessor
 {
-	public static function process(object $data, string $contactEmail, int $submissionId, Publication $publication, int $userGroupId, ?Publication $basePublication = null)
+    public static function process(
+        object $data,
+        string $contactEmail,
+        int $submissionId,
+        Publication $publication,
+        int $userGroupId,
+        ?Publication $basePublication = null
+    ): void
     {
         if (empty($data->authors) && !is_null($basePublication)) {
-            self::cloneAuthorsFromBasePublication($basePublication, $publication, $submissionId);
+            static::cloneAuthorsFromBasePublication($basePublication, $publication, $submissionId);
             return;
         }
 
-		$authorsString = array_map('trim', explode(';', $data->authors));
+        $authorsString = array_map('trim', explode(';', $data->authors));
 
         foreach ($authorsString as $index => $authorString) {
-            $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
-            $authorParts = array_map('trim', explode(',', $authorString));
-            $givenName = $authorParts[0] ?? '';
-            $familyName = $authorParts[1] ?? '';
-            $emailAddress = $authorParts[2] ?? '';
-            $orcid = $authorParts[3] ?? '';
-            $affiliation = $authorParts[4] ?? '';
-
-			if (empty($emailAddress)) {
-				$emailAddress = $contactEmail;
-			}
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
 
             $author = Repo::author()->newDataObject();
 
             $author->setSubmissionId($submissionId);
             $author->setUserGroupId($userGroupId);
-            $author->setGivenName($givenName, $data->locale);
-            $author->setFamilyName($familyName, $data->locale);
             $author->setEmail($emailAddress);
             $author->setData('publicationId', $publication->getId());
 
-            $normalizedOrcid = self::normalizeOrcid($orcid);
-            if (!empty($normalizedOrcid)) {
-                $author->setOrcid($normalizedOrcid);
-            }
-
-            if ($affiliation) {
-                $affiliationEntity = Repo::affiliation()->newDataObject();
-                $affiliationEntity->setName((string) $affiliation, $data->locale);
-
-                $author->addAffiliation($affiliationEntity);
-            }
-
+            static::updateAuthorFromCsv($author, $givenName, $familyName, $orcid, $affiliation, $data->locale, false);
 
             $authorId = Repo::author()->add($author);
 
-			if ($index === 0) {
-                Repo::author()->edit($author, ['primaryContact' => true]);
+            if ($index === 0) {
                 PublicationProcessor::updatePrimaryContactId($publication, $authorId);
-			}
-		}
-	}
+            }
+        }
+    }
 
     /**
      * Clone authors from base publication to new versioned publication
@@ -83,16 +66,28 @@ class AuthorsProcessor
         int $submissionId
     ): void
     {
-        $authors = $basePublication->getData('authors');
+        $authors = $basePublication->getData('authors') ?: [];
         if (empty($authors)) {
             return;
         }
 
         foreach ($authors as $author) {
-            $newAuthor = clone $author;
-            $newAuthor->setData('id', null);
-            $newAuthor->setData('publicationId', $newPublication->getId());
+            $newAuthor = Repo::author()->newDataObject();
             $newAuthor->setSubmissionId($submissionId);
+            $newAuthor->setUserGroupId($author->getUserGroupId());
+            $newAuthor->setGivenName($author->getGivenName(null), null);
+            $newAuthor->setFamilyName($author->getFamilyName(null), null);
+            $newAuthor->setEmail($author->getEmail());
+            $newAuthor->setData('publicationId', $newPublication->getId());
+            $newAuthor->setOrcid($author->getOrcid());
+
+            foreach ($author->getAffiliations() as $affiliation) {
+                $newAffiliation = Repo::affiliation()->newDataObject();
+                $newAffiliation->setRor($affiliation->getRor());
+                $newAffiliation->setName($affiliation->getName());
+                $newAuthor->addAffiliation($newAffiliation);
+            }
+
             $newAuthorId = Repo::author()->add($newAuthor);
 
             if ($author->getId() === $basePublication->getData('primaryContactId')) {
@@ -138,78 +133,101 @@ class AuthorsProcessor
         }
 
         $authorsString = array_map('trim', explode(';', $data->authors));
-        $existingAuthors = $publication->getData('authors');
+        $existingAuthors = $publication->getData('authors') ?: [];
 
-        foreach ($authorsString as $index => $authorString) {
-            $givenName = $familyName = $emailAddress = $orcid = $affiliation = null;
-            $authorParts = array_map('trim', explode(',', $authorString));
-            $givenName = $authorParts[0] ?? '';
-            $familyName = $authorParts[1] ?? '';
-            $emailAddress = $authorParts[2] ?? '';
-            $orcid = $authorParts[3] ?? '';
-            $affiliation = $authorParts[4] ?? '';
+        if (empty($existingAuthors)) {
+            return;
+        }
 
-            if (empty($emailAddress)) {
-                $emailAddress = $contactEmail;
-            }
+        foreach ($authorsString as $authorString) {
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
 
             $existingAuthor = null;
-            if (!empty($existingAuthors)) {
-                foreach ($existingAuthors as $author) {
-                    if ($author->getEmail() === $emailAddress) {
-                        $existingAuthor = $author;
-                        break;
-                    }
+            foreach ($existingAuthors as $author) {
+                if ($author->getEmail() === $emailAddress) {
+                    $existingAuthor = $author;
+                    break;
                 }
             }
-
-            if ($existingAuthor) {
-                $existingAuthor->setGivenName($givenName, $data->locale);
-                $existingAuthor->setFamilyName($familyName, $data->locale);
-
-                $normalizedOrcid = self::normalizeOrcid($orcid);
-                if (!empty($normalizedOrcid)) {
-                    $existingAuthor->setOrcid($normalizedOrcid);
-                }
-
-                if ($affiliation) {
-                    $existingAffiliations = $existingAuthor->getAffiliations();
-
-                    if (!empty($existingAffiliations)) {
-                        $firstAffiliation = reset($existingAffiliations);
-                        if ($firstAffiliation) {
-                            $firstAffiliation->setName((string) $affiliation, $data->locale);
-                        }
-                    } else {
-                        $affiliationEntity = Repo::affiliation()->newDataObject();
-                        $affiliationEntity->setName((string) $affiliation, $data->locale);
-                        $existingAuthor->addAffiliation($affiliationEntity);
-                    }
-                }
-
-                Repo::author()->dao->update($existingAuthor);
-            } else {
-                // Create new author if not found (shouldn't happen often in multi-locale imports)
+            $author = $existingAuthor;
+            if (!$author) {
                 $author = Repo::author()->newDataObject();
                 $author->setSubmissionId($submissionId);
                 $author->setUserGroupId($userGroupId);
-                $author->setGivenName($givenName, $data->locale);
-                $author->setFamilyName($familyName, $data->locale);
-                $author->setEmail($emailAddress);
                 $author->setData('publicationId', $publication->getId());
+                $author->setEmail($emailAddress);
+            }
 
-                $normalizedOrcidNew = self::normalizeOrcid($orcid);
-                if (!empty($normalizedOrcidNew)) {
-                    $author->setOrcid($normalizedOrcidNew);
+            static::updateAuthorFromCsv(
+                $author,
+                $givenName,
+                $familyName,
+                $orcid,
+                $affiliation,
+                $data->locale,
+                $existingAuthor !== null
+            );
+
+            $existingAuthor
+                ? Repo::author()->dao->update($author)
+                : Repo::author()->add($author);
+        }
+    }
+
+    /**
+     * Parse author string components
+     */
+    private static function parseAuthorString(string $authorString, string $contactEmail): array
+    {
+        $authorParts = array_map('trim', explode(',', $authorString));
+        $givenName = $authorParts[0] ?? '';
+        $familyName = $authorParts[1] ?? '';
+        $emailAddress = $authorParts[2] ?? '';
+        $orcid = $authorParts[3] ?? '';
+        $affiliation = $authorParts[4] ?? '';
+
+        if (empty($emailAddress)) {
+            $emailAddress = $contactEmail;
+        }
+
+        return [$givenName, $familyName, $emailAddress, $orcid, $affiliation];
+    }
+
+    /**
+     * Update author object with parsed data
+     */
+    private static function updateAuthorFromCsv(
+        object $author,
+        string $givenName,
+        string $familyName,
+        string $orcid,
+        string $affiliation,
+        string $locale,
+        bool $isExistingAuthor
+    ): void {
+        if (!$isExistingAuthor || !empty($givenName)) {
+            $author->setGivenName($givenName, $locale);
+        }
+        if (!$isExistingAuthor || !empty($familyName)) {
+            $author->setFamilyName($familyName, $locale);
+        }
+
+        $normalizedOrcid = static::normalizeOrcid($orcid);
+        if (!empty($normalizedOrcid)) {
+            $author->setOrcid($normalizedOrcid);
+        }
+
+        if ($affiliation) {
+            $existingAffiliations = $author->getAffiliations();
+            if (!empty($existingAffiliations)) {
+                $firstAffiliation = reset($existingAffiliations);
+                if ($firstAffiliation) {
+                    $firstAffiliation->setName((string) $affiliation, $locale);
                 }
-
-                if ($affiliation) {
-                    $affiliationEntity = Repo::affiliation()->newDataObject();
-                    $affiliationEntity->setName((string) $affiliation, $data->locale);
-                    $author->addAffiliation($affiliationEntity);
-                }
-
-                Repo::author()->add($author);
+            } else {
+                $affiliationEntity = Repo::affiliation()->newDataObject();
+                $affiliationEntity->setName((string) $affiliation, $locale);
+                $author->addAffiliation($affiliationEntity);
             }
         }
     }

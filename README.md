@@ -35,6 +35,12 @@ This plugin allows administrators to import users and preprints with their assoc
 		- [Crossref Registry Validation](#crossref-registry-validation)
 		- [Important Funders Notes](#important-funders-notes)
 	- [Supplementary Files Descriptions](#supplementary-files-descriptions)
+	- [Handling Failed Imports and Re-runs](#handling-failed-imports-and-re-runs)
+		- [How Invalid Files Work](#how-invalid-files-work)
+		- [Re-importing Failed Rows](#re-importing-failed-rows)
+		- [Important Notes](#important-notes-1)
+		- [Example: Complete Re-run Scenario](#example-complete-re-run-scenario)
+		- [Common Re-import Scenarios](#common-re-import-scenarios)
 	- [Troubleshooting](#troubleshooting)
 		- [Common Issues and Solutions](#common-issues-and-solutions)
 			- [File and Path Issues](#file-and-path-issues)
@@ -51,17 +57,17 @@ This plugin allows administrators to import users and preprints with their assoc
 To import users from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin users [username] [pathToFolderWithCsvFiles] [sendWelcomeEmail]
+php tools/importExport.php CSVImportExportPlugin users [username] [pathToFolderWithCsvFiles] [--sendWelcomeEmail]
 ```
 
 Parameters:
 - `username`: The username of a valid Preprint Manager. This username is used to validate that the command is running by a valid user as a security step.
 - `pathToFolderWithCsvFiles`: Path to the CSV file containing user data. Can be absolute or relative to the OPS root directory.
-- `sendWelcomeEmail`: (Optional) Set to `true` to send welcome emails to imported users. If set to true, the sender email will be the user retrieved by the username on the CLI command.
+- `--sendWelcomeEmail`: (Optional) If provided, welcome emails will be sent to imported users. The sender email will be the user retrieved by the username on the CLI command.
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_with_csv_user_files true
+php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_with_csv_user_files --sendWelcomeEmail
 ```
 
 ### Importing Preprints
@@ -580,6 +586,136 @@ Rules:
 - The number of descriptions must match both `suppFilenames` and `suppLabels` when provided.
 - Descriptions are stored per locale and can be provided again in multi-locale rows to set localized text.
 
+
+## Handling Failed Imports and Re-runs
+
+When an import encounters errors, the plugin automatically creates `invalid_*.csv` files containing the failed rows with error messages. Understanding how to handle these files is crucial for successful re-imports.
+
+### How Invalid Files Work
+
+1. **Automatic Creation**: When the import script encounters validation errors, failed rows are automatically written to `invalid_[original_filename].csv` in the same directory
+2. **Error Column**: Each `invalid_*.csv` file includes all original columns plus an `error` column explaining why the row failed
+3. **Automatic Deletion**: If all rows import successfully (zero failures), the invalid file is automatically deleted
+4. **Automatic Skip**: On re-runs, the plugin automatically skips files starting with `invalid_` to prevent accidental re-import
+
+### Re-importing Failed Rows
+
+**Recommended Workflow:**
+
+```bash
+# Initial import
+php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/import_folder/
+
+# Output shows:
+# Process for file "preprints.csv" finished. 50 rows processed. 3 rows with error.
+# => Creates: /path/to/import_folder/invalid_preprints.csv
+```
+
+**Option 1: Fix and Create New Import Folder (Recommended)**
+
+This is the cleanest approach to avoid confusion:
+
+```bash
+# 1. Create a new folder for the retry
+mkdir /path/to/import_retry/
+
+# 2. Copy the invalid file to the new folder and rename it
+cp /path/to/import_folder/invalid_preprints.csv /path/to/import_retry/preprints_retry.csv
+
+# 3. Fix the errors in the new file
+#    - Open preprints_retry.csv
+#    - Fix the issues described in the 'error' column
+#    - Remove the 'error' column before re-importing
+#    - Copy all the assets present on the rows that you will run again to the new folder
+
+# 4. Run the import on the new folder
+php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/import_retry/
+```
+
+**Option 2: Fix In Place**
+
+If you prefer to work in the same directory:
+
+```bash
+# 1. Rename the invalid file (removes 'invalid_' prefix)
+mv /path/to/import_folder/invalid_preprints.csv /path/to/import_folder/preprints_fixed.csv
+
+# 2. Remove or rename the original file to avoid duplicates
+mv /path/to/import_folder/preprints.csv /path/to/import_folder/preprints_completed.csv
+
+# 3. Fix errors in preprints_fixed.csv
+#    - Fix the issues described in the 'error' column
+#    - Remove the 'error' column
+
+# 4. Re-run the import (will only process preprints_fixed.csv)
+php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/import_folder/
+```
+
+### Important Notes
+
+**Avoiding Duplicates:**
+- The plugin **does not** check for duplicate submissions across re-runs
+- If you re-import successfully imported rows, they will be created again
+- Always ensure you only re-import the fixed rows from `invalid_*.csv` files
+- Move or rename successfully imported CSV files before re-running
+
+**File Naming Rules:**
+- Files starting with `invalid_` are automatically skipped
+- This prevents accidental re-import of error files
+- Rename `invalid_*.csv` files (remove the prefix) to re-import them after fixing
+
+**Best Practices:**
+1. **Keep originals**: Archive successfully imported files before re-runs
+2. **Separate directories**: Use different folders for original imports and retries
+3. **Remove error column**: Always remove the `error` column from fixed `invalid_*.csv` files before re-importing
+4. **Incremental approach**: Fix and re-import failed rows in small batches
+5. **Backup database**: Always backup your database before large imports
+
+### Example: Complete Re-run Scenario
+
+```bash
+# Step 1: Initial import with some failures
+php tools/importExport.php CSVImportExportPlugin preprints admin /import/batch1/
+# Output: 100 rows processed. 5 rows with error.
+# Result: /import/batch1/invalid_preprints.csv created
+
+# Step 2: Organize files
+mkdir /import/batch1/completed
+mv /import/batch1/preprints.csv /import/batch1/completed/
+
+# Step 3: Fix failed rows
+cp /import/batch1/invalid_preprints.csv /import/batch1/preprints_retry.csv
+# - Open preprints_retry.csv
+# - Fix the 5 rows based on error messages
+# - Remove the 'error' column
+# - Save the file
+
+# Step 4: Re-import only the fixed rows
+php tools/importExport.php CSVImportExportPlugin preprints admin /import/batch1/
+# The plugin will:
+# - Skip invalid_preprints.csv (automatically ignored)
+# - Process preprints_retry.csv (fixed rows)
+# - Create invalid_preprints_retry.csv if any still fail
+
+# Step 5: Verify success
+# If all rows succeed, invalid_preprints_retry.csv will be automatically deleted
+```
+
+### Common Re-import Scenarios
+
+**All rows succeeded:**
+- No `invalid_*.csv` file is created (or existing one is deleted)
+- All data imported successfully
+
+**Some rows failed:**
+- `invalid_*.csv` file contains failed rows
+- Successfully imported rows are in the database
+- Fix errors and re-import only the invalid file
+
+**All rows failed:**
+- `invalid_*.csv` contains all rows
+- Original file can be deleted or archived
+- Fix errors and re-import the invalid file
 
 ## Troubleshooting
 

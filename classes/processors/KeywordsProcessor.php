@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/KeywordsProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class KeywordsProcessor
@@ -21,34 +21,32 @@ use APP\publication\Publication;
 
 class KeywordsProcessor
 {
-    public static function process(object $data, int $publicationId, ?Publication $basePublication = null)
+    public static function process(object $data, Publication $publication, ?Publication $basePublication = null)
     {
         if (empty($data->keywords) && !is_null($basePublication)) {
-            $baseKeywords = $basePublication->getData('keywords');
+            $baseKeywords = $basePublication->getData('keywords', $data->locale);
+
+            // Filter out null/empty values
+            if (is_array($baseKeywords)) {
+                $baseKeywords = array_filter($baseKeywords, fn($keyword) => !is_null($keyword) && $keyword !== '');
+            }
 
             if (empty($baseKeywords)) {
                 return;
             }
 
-            $publication = Repo::publication()->get($publicationId);
-            if ($publication) {
-                Repo::publication()->edit($publication, ['keywords' => $baseKeywords]);
-            }
-
+            // Wrap in locale array to match expected structure
+            Repo::publication()->edit($publication, ['keywords' => [$data->locale => array_values($baseKeywords)]]);
             return;
         }
 
-		$keywordsList = [$data->locale => array_map('trim', explode(';', $data->keywords))];
+		$keywords = array_filter(array_map('trim', explode(';', $data->keywords)), fn($keyword) => $keyword !== '');
 
-        if (empty($keywordsList[$data->locale])) {
+        if (empty($keywords)) {
             return;
         }
 
-        $publication = Repo::publication()->get($publicationId);
-
-        if (!$publication) {
-            return;
-        }
+        $keywordsList = [$data->locale => array_values($keywords)];
 
         Repo::publication()->edit($publication, ['keywords' => $keywordsList]);
 	}
@@ -56,23 +54,20 @@ class KeywordsProcessor
     /**
      * Process keywords for multi-locale import (adds keywords in new locale)
      */
-    public static function processMultiLocale(object $data, int $publicationId): void
+    public static function processMultiLocale(object $data, Publication $publication): void
     {
         if (empty($data->keywords)) {
             return; // No new keywords to add
         }
 
-        $publication = Repo::publication()->get($publicationId);
-        if (!$publication) {
+        $newKeywords = array_filter(array_map('trim', explode(';', $data->keywords)), fn($keyword) => $keyword !== '');
+
+        if (empty($newKeywords)) {
             return;
         }
 
-        // Get existing keywords
         $existingKeywords = $publication->getData('keywords') ?? [];
-
-        // Add new locale keywords
-        $newKeywords = array_map('trim', explode(';', $data->keywords));
-        $existingKeywords[$data->locale] = $newKeywords;
+        $existingKeywords[$data->locale] = array_values($newKeywords);
 
         Repo::publication()->edit($publication, ['keywords' => $existingKeywords]);
     }

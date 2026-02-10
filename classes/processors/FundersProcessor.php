@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/FundersProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class FundersProcessor
@@ -18,7 +18,8 @@ namespace APP\plugins\importexport\csv\classes\processors;
 
 use APP\plugins\generic\funding\classes\Funder;
 use APP\plugins\generic\funding\classes\FunderAward;
-use APP\plugins\importexport\csv\classes\cachedAttributes\CachedDaos;
+use APP\plugins\generic\funding\classes\FunderAwardDAO;
+use APP\plugins\generic\funding\classes\FunderDAO;
 use APP\publication\Publication;
 use APP\submission\Submission;
 use PKP\db\DAOResultFactory;
@@ -26,23 +27,26 @@ use PKP\plugins\PluginRegistry;
 
 class FundersProcessor
 {
+    /** @var FunderDAO */
+    private static $funderDao;
+
+    /** @var FunderAwardDAO */
+    private static $funderAwardDao;
+    /**
+     * Get the Funding plugin instance, loading it if necessary.
+     */
+    private static function getFundingPlugin(int $contextId): ?object
+    {
+        return PluginRegistry::getPlugin('generic', 'FundingPlugin') ?? PluginRegistry::loadPlugin('generic', 'funding', $contextId);
+    }
+
     /**
      * Check if the Funding plugin is enabled and properly loaded with DAOs registered.
      */
     public static function isFundingPluginEnabled(int $contextId): bool
     {
-        $fundingPlugin = PluginRegistry::getPlugin('generic', 'FundingPlugin');
-
-        if (!$fundingPlugin) {
-            PluginRegistry::loadCategory('generic', true, $contextId);
-            $fundingPlugin = PluginRegistry::getPlugin('generic', 'FundingPlugin');
-        }
-
-        if (!$fundingPlugin || !$fundingPlugin->getEnabled($contextId)) {
-            return false;
-        }
-
-        return true;
+        $fundingPlugin = static::getFundingPlugin($contextId);
+        return (bool) $fundingPlugin?->getEnabled($contextId);
     }
 
     /**
@@ -50,12 +54,7 @@ class FundersProcessor
      */
     public static function isCrossrefValidationEnabled(int $contextId): bool
     {
-        $fundingPlugin = PluginRegistry::getPlugin('generic', 'FundingPlugin');
-
-        if (!$fundingPlugin) {
-            PluginRegistry::loadCategory('generic', true, $contextId);
-            $fundingPlugin = PluginRegistry::getPlugin('generic', 'FundingPlugin');
-        }
+        $fundingPlugin = static::getFundingPlugin($contextId);
 
         if (!$fundingPlugin || !$fundingPlugin->getEnabled($contextId)) {
             return false;
@@ -81,27 +80,19 @@ class FundersProcessor
         int $contextId,
         ?Publication $basePublication = null
     ): void {
-        if (!self::isFundingPluginEnabled($contextId)) {
+        if (!static::isFundingPluginEnabled($contextId)) {
             return;
         }
 
-        if (self::submissionHasFunders($submission->getId())) {
+        if (static::submissionHasFunders($submission->getId())) {
             return;
         }
 
-        if (empty($data->funders) && !is_null($basePublication)) {
-            $baseSubmissionId = $basePublication->getData('submissionId');
-            if ($baseSubmissionId !== $submission->getId()) {
-                self::cloneFundersFromSubmission($baseSubmissionId, $submission->getId(), $contextId);
-            }
-            return;
+        if (!empty($data->funders)) {
+            static::createFundersFromString($data->funders, $submission->getId(), $contextId);
+        } elseif (($baseSubmissionId = $basePublication?->getData('submissionId')) && $baseSubmissionId !== $submission->getId()) {
+            static::cloneFundersFromSubmission($baseSubmissionId, $submission->getId(), $contextId);
         }
-
-        if (empty($data->funders)) {
-            return;
-        }
-
-        self::createFundersFromString($data->funders, $submission->getId(), $contextId);
     }
 
     /**
@@ -109,10 +100,10 @@ class FundersProcessor
      */
     private static function submissionHasFunders(int $submissionId): bool
     {
-        $funderDao = CachedDaos::getFunderDao();
+        static::$funderDao ??= new FunderDAO();
 
         /** @var DAOResultFactory<Funder> */
-        $existingFunders = $funderDao->getBySubmissionId($submissionId);
+        $existingFunders = static::$funderDao->getBySubmissionId($submissionId);
         return $existingFunders->next() !== null;
     }
 
@@ -126,7 +117,7 @@ class FundersProcessor
         Submission $submission,
         int $contextId
     ): void {
-        if (!self::isFundingPluginEnabled($contextId)) {
+        if (!static::isFundingPluginEnabled($contextId)) {
             return;
         }
 
@@ -134,11 +125,11 @@ class FundersProcessor
             return;
         }
 
-        if (self::submissionHasFunders($submission->getId())) {
+        if (static::submissionHasFunders($submission->getId())) {
             return;
         }
 
-        self::createFundersFromString($data->funders, $submission->getId(), $contextId);
+        static::createFundersFromString($data->funders, $submission->getId(), $contextId);
     }
 
     /**
@@ -149,8 +140,7 @@ class FundersProcessor
      */
     private static function createFundersFromString(string $fundersString, int $submissionId, int $contextId): void
     {
-        $funderDao = CachedDaos::getFunderDao();
-        $funderAwardDao = CachedDaos::getFunderAwardDao();
+        static::$funderAwardDao ??= new FunderAwardDAO();
 
         $fundersArray = array_map('trim', explode(';', $fundersString));
 
@@ -169,13 +159,13 @@ class FundersProcessor
                 continue;
             }
 
-            $funder = $funderDao->newDataObject();
+            $funder = static::$funderDao->newDataObject();
             $funder->setContextId($contextId);
             $funder->setSubmissionId($submissionId);
             $funder->setFunderIdentification($funderIdentification);
             $funder->setFunderName($funderName);
 
-            $funderId = $funderDao->insertObject($funder);
+            $funderId = static::$funderDao->insertObject($funder);
 
             if (!empty($awardsString) && $funderId) {
                 $awardsArray = array_map('trim', explode('|', $awardsString));
@@ -185,10 +175,10 @@ class FundersProcessor
                         continue;
                     }
 
-                    $funderAward = $funderAwardDao->newDataObject();
+                    $funderAward = static::$funderAwardDao->newDataObject();
                     $funderAward->setFunderId($funderId);
                     $funderAward->setFunderAwardNumber($awardNumber);
-                    $funderAwardDao->insertObject($funderAward);
+                    static::$funderAwardDao->insertObject($funderAward);
                 }
             }
         }
@@ -199,31 +189,28 @@ class FundersProcessor
      */
     private static function cloneFundersFromSubmission(int $baseSubmissionId, int $newSubmissionId, int $contextId): void
     {
-        $funderDao = CachedDaos::getFunderDao();
-        $funderAwardDao = CachedDaos::getFunderAwardDao();
-
         /** @var DAOResultFactory<Funder> */
-        $baseFunders = $funderDao->getBySubmissionId($baseSubmissionId);
+        $baseFunders = static::$funderDao->getBySubmissionId($baseSubmissionId);
 
-        /** @var Funder|null $baseFunder */
-        while ($baseFunder = $baseFunders->next()) {
-            $newFunder = $funderDao->newDataObject();
+        /** @var Funder $baseFunder */
+        foreach ($baseFunders->toIterator() as $baseFunder) {
+            $newFunder = static::$funderDao->newDataObject();
             $newFunder->setContextId($contextId);
             $newFunder->setSubmissionId($newSubmissionId);
             $newFunder->setFunderIdentification($baseFunder->getFunderIdentification());
             $newFunder->setFunderName($baseFunder->getFunderName());
 
-            $newFunderId = $funderDao->insertObject($newFunder);
+            $newFunderId = static::$funderDao->insertObject($newFunder);
 
             if ($newFunderId) {
                 /** @var DAOResultFactory<FunderAward> */
-                $baseAwards = $funderAwardDao->getByFunderId($baseFunder->getId());
+                $baseAwards = static::$funderAwardDao->getByFunderId($baseFunder->getId());
                 /** @var FunderAward $baseAward */
-                while ($baseAward = $baseAwards->next()) {
-                    $newAward = $funderAwardDao->newDataObject();
+                foreach ($baseAwards->toIterator() as $baseAward) {
+                    $newAward = static::$funderAwardDao->newDataObject();
                     $newAward->setFunderId($newFunderId);
                     $newAward->setFunderAwardNumber($baseAward->getFunderAwardNumber());
-                    $funderAwardDao->insertObject($newAward);
+                    static::$funderAwardDao->insertObject($newAward);
                 }
             }
         }

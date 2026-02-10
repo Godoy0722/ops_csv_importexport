@@ -1,13 +1,13 @@
 <?php
 
 /**
- * @file plugins/importexport/csv/classes/handlers/CSVFileHandler.php
+ * @file plugins/importexport/csv/classes/handlers/CsvFileHandler.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class CSVFileHandler
+ * @class CsvFileHandler
  *
  * @ingroup plugins_importexport_csv
  *
@@ -16,7 +16,9 @@
 
 namespace APP\plugins\importexport\csv\classes\handlers;
 
-class CSVFileHandler
+use Exception;
+
+class CsvFileHandler
 {
     /** Create a new readable SplFileObject. Return null if an error occurred. */
     public static function createReadableCSVFile(string $filePath): ?\SplFileObject
@@ -26,11 +28,12 @@ class CSVFileHandler
             $file->setFlags(\SplFileObject::READ_CSV);
             return $file;
         } catch (\Exception $e) {
-            echo __('plugins.importexport.csv.couldNotOpenFile', [
+            $errorMessage =  __('plugins.importexport.csv.couldNotOpenFile', [
                 'filePath' => $filePath,
                 'errorMessage' => $e->getMessage(),
-            ]) . "\n";
-            return null;
+            ]);
+
+            throw new Exception($errorMessage);
         }
     }
 
@@ -43,9 +46,7 @@ class CSVFileHandler
 
             return $invalidRowsFile;
         } catch (\Exception $e) {
-            echo $e->getMessage() . "\n\n";
-            echo __('plugins.importexport.csv.couldNotCreateFile', ['filename' => $sourceDir . '/' . $filename]) . "\n";
-            return null;
+            throw new Exception(__('plugins.importexport.csv.couldNotCreateFile', ['filename' => $sourceDir . '/' . $filename]));
         }
 	}
 
@@ -57,7 +58,9 @@ class CSVFileHandler
         string $reason,
         int &$failedRows
     ) {
-        $invalidRowsCsvFile->fputcsv(array_merge(array_pad($fields, $rowSize, null), [$reason]));
+        if (!$invalidRowsCsvFile->fputcsv(array_merge(array_pad($fields, $rowSize, null), [$reason]))) {
+            throw new Exception(__('plugins.importexport.csv.couldNotWriteFile', ['filename' => $invalidRowsCsvFile->getFilename()]));
+        }
 		++$failedRows;
 	}
 }

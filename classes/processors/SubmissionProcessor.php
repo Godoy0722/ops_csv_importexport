@@ -3,8 +3,8 @@
 /**
  * @file plugins/importexport/csv/classes/processors/SubmissionProcessor.php
  *
- * Copyright (c) 2025 Simon Fraser University
- * Copyright (c) 2025 John Willinsky
+ * Copyright (c) 2026 Simon Fraser University
+ * Copyright (c) 2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class SubmissionProcessor
@@ -31,7 +31,7 @@ class SubmissionProcessor
         $submission->setData('status', Submission::STATUS_PUBLISHED);
         $submission->setData('locale', $data->locale);
         $submission->setData('stageId', WORKFLOW_STAGE_ID_PRODUCTION);
-        $submission->setData('submissionProgress', '0');
+        $submission->setData('submissionProgress', '');
         $submission->setData('abstract', $data->preprintAbstract, $data->locale);
         $submission->setData('dateSubmitted', $data->dateSubmitted ?? $data->datePosted);
 

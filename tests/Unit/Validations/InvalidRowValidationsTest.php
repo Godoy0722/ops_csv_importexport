@@ -16,12 +16,19 @@ namespace APP\plugins\importexport\csv\tests\Unit\Validations;
 
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
+use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
 use APP\server\Server;
+use GuzzleHttp\Psr7\Response;
+use Mockery;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use PKP\core\Registry;
+use PKP\tests\PKPTestCase;
 
 #[CoversClass(InvalidRowValidations::class)]
 class InvalidRowValidationsTest extends BaseTestCase
@@ -1138,5 +1145,130 @@ class InvalidRowValidationsTest extends BaseTestCase
         $result = InvalidRowValidations::versionExistsInAnyLocale($data, $processedPreprints);
 
         $this->assertFalse($result);
+    }
+
+    // ==================== ORCID Full Validation Tests (with HTTP mock) ====================
+
+    public function testValidateOrcidSucceedsWhenOrcidExists(): void
+    {
+        $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
+        $mockClient->shouldReceive('request')
+            ->once()
+            ->andReturn(new Response(200));
+        Registry::set(PKPTestCase::MOCKED_GUZZLE_CLIENT_NAME, $mockClient);
+
+        InvalidRowValidations::validateOrcid('0000-0002-1825-0097');
+        $this->assertTrue(true);
+    }
+
+    public function testValidateOrcidThrowsWhenOrcidNotFound(): void
+    {
+        $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
+        $mockClient->shouldReceive('request')
+            ->once()
+            ->andReturn(new Response(404));
+        Registry::set(PKPTestCase::MOCKED_GUZZLE_CLIENT_NAME, $mockClient);
+
+        $this->expectException(RowValidationException::class);
+        InvalidRowValidations::validateOrcid('0000-0002-1825-0097');
+    }
+
+    public function testValidateOrcidThrowsWhenHttpClientFails(): void
+    {
+        $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
+        $mockClient->shouldReceive('request')
+            ->once()
+            ->andThrow(new \Exception('Connection timeout'));
+        Registry::set(PKPTestCase::MOCKED_GUZZLE_CLIENT_NAME, $mockClient);
+
+        $this->expectException(RowValidationException::class);
+        InvalidRowValidations::validateOrcid('0000-0002-1825-0097');
+    }
+
+    public function testValidateOrcidThrowsForInvalidDigitCount(): void
+    {
+        $this->expectException(RowValidationException::class);
+        TestableInvalidRowValidationsForOrcidDigits::validateOrcid('anything');
+    }
+
+    // ==================== Funding Plugin Enabled Validation Tests ====================
+
+    public function testValidateFundingPluginEnabledWithEmptyStringReturnsEarly(): void
+    {
+        InvalidRowValidations::validateFundingPluginEnabled('', 1);
+        $this->assertTrue(true);
+    }
+
+    public function testValidateFundingPluginEnabledWithNullReturnsEarly(): void
+    {
+        InvalidRowValidations::validateFundingPluginEnabled(null, 1);
+        $this->assertTrue(true);
+    }
+
+    // ==================== Funding Plugin and Crossref Registry Validation (RunInSeparateProcess) ====================
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testFundingPluginAndCrossrefRegistryValidation(): void
+    {
+        $fundersMock = Mockery::mock('overload:' . FundersProcessor::class);
+        $fundersMock->shouldReceive('isFundingPluginEnabled')
+            ->with(1)->andReturn(true);
+        $fundersMock->shouldReceive('isFundingPluginEnabled')
+            ->with(2)->andReturn(false);
+        $fundersMock->shouldReceive('isCrossrefValidationEnabled')
+            ->with(1)->andReturn(false);
+        $fundersMock->shouldReceive('isCrossrefValidationEnabled')
+            ->with(2)->andReturn(true);
+
+        // Plugin enabled → no exception
+        InvalidRowValidations::validateFundingPluginEnabled('NSF,http://dx.doi.org/10.13039/100000001,Award1', 1);
+
+        // Plugin disabled → throws
+        try {
+            InvalidRowValidations::validateFundingPluginEnabled('NSF,http://dx.doi.org/10.13039/100000001,Award1', 2);
+            $this->fail('Expected RowValidationException for disabled funding plugin');
+        } catch (RowValidationException $e) {
+            $this->assertNotEmpty($e->getMessage());
+        }
+
+        // Crossref validation disabled → early return (no exception)
+        InvalidRowValidations::validateFundersCrossrefRegistry('NSF,http://dx.doi.org/10.13039/100000001,Award1', 1);
+
+        // Crossref validation enabled + valid DOIs + empty funder (skip) + empty name (skip)
+        InvalidRowValidations::validateFundersCrossrefRegistry(
+            'NSF,http://dx.doi.org/10.13039/100000001,Award1;;,http://doi.org/10.13039/100000002,Award2',
+            2
+        );
+
+        // Invalid crossref DOI → throws
+        try {
+            InvalidRowValidations::validateFundersCrossrefRegistry('NSF,https://example.com/not-crossref,Award1', 2);
+            $this->fail('Expected RowValidationException for invalid crossref DOI');
+        } catch (RowValidationException $e) {
+            $this->assertNotEmpty($e->getMessage());
+        }
+
+        // Missing funder identification → throws
+        try {
+            InvalidRowValidations::validateFundersCrossrefRegistry('NSF,,Award1', 2);
+            $this->fail('Expected RowValidationException for missing funder identification');
+        } catch (RowValidationException $e) {
+            $this->assertNotEmpty($e->getMessage());
+        }
+
+        $this->assertTrue(true);
+    }
+}
+
+/**
+ * Test helper subclass that overrides normalizeOrcid to test the invalid digit count path.
+ * Uses late static binding: validateOrcid() calls static::normalizeOrcid().
+ */
+class TestableInvalidRowValidationsForOrcidDigits extends InvalidRowValidations
+{
+    public static function normalizeOrcid(string $orcid): ?string
+    {
+        return 'https://orcid.org/short-id';
     }
 }

@@ -1,4 +1,4 @@
 .claude/
-.phpunit.chache/
+.phpunit.cache/
 imports/
 tests/coverage/

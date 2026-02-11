@@ -272,6 +272,29 @@ class CSVFileHandlerTest extends BaseTestCase
         $this->assertStringContainsString('Erro de validação', $content);
     }
 
+    // ==================== Error Path Tests ====================
+
+    public function testCreateCSVFileInvalidRowsThrowsExceptionForInvalidDirectory(): void
+    {
+        $this->expectException(\Exception::class);
+        CSVFileHandler::createCSVFileInvalidRows('/nonexistent/path/that/does/not/exist', 'invalid.csv', ['h1', 'h2']);
+    }
+
+    public function testProcessFailedRowThrowsExceptionOnWriteFailure(): void
+    {
+        /** @var \SplFileObject|\PHPUnit\Framework\MockObject\MockObject */
+        $fileMock = $this->getMockBuilder(\SplFileObject::class)
+            ->setConstructorArgs(['php://memory', 'w'])
+            ->onlyMethods(['fputcsv', 'getFilename'])
+            ->getMock();
+        $fileMock->method('fputcsv')->willReturn(false);
+        $fileMock->method('getFilename')->willReturn('test.csv');
+
+        $failedRows = 0;
+        $this->expectException(\Exception::class);
+        CSVFileHandler::processFailedRow($fileMock, ['field1'], 1, 'reason', $failedRows);
+    }
+
     // ==================== createCSVFileInvalidRows Additional Tests ====================
 
     public function testCreateCSVFileInvalidRowsWithEmptyHeaders(): void

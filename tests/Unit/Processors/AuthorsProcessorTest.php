@@ -23,6 +23,7 @@ use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
 use APP\publication\Publication;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PKP\affiliation\Affiliation;
 use ReflectionClass;
 
 #[CoversClass(AuthorsProcessor::class)]
@@ -576,5 +577,108 @@ class AuthorsProcessorTest extends BaseTestCase
 
         // Should return early since no existing authors (null/empty array)
         $this->assertEquals(0, $addCallCount);
+    }
+
+    // ==================== cloneAuthorsFromBasePublication Tests ====================
+
+    public function testProcessClonesAuthorsFromBasePublication(): void
+    {
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockPublicationRepository();
+        $this->mockAffiliationRepository();
+
+        $addedAuthorIds = [];
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addedAuthorIds) {
+            $id = count($addedAuthorIds) + 100;
+            $addedAuthorIds[] = $id;
+            return $id;
+        });
+
+        // Create base authors with affiliations
+        $affiliation1 = new Affiliation();
+        $affiliation1->setRor('https://ror.org/12345');
+        $affiliation1->setName('MIT', 'en');
+
+        $author1 = new Author();
+        $author1->setId(10);
+        $author1->setUserGroupId(1);
+        $author1->setGivenName('John', 'en');
+        $author1->setFamilyName('Doe', 'en');
+        $author1->setEmail('john@example.com');
+        $author1->setOrcid('https://orcid.org/0000-0002-1825-0097');
+        $author1->addAffiliation($affiliation1);
+
+        $author2 = new Author();
+        $author2->setId(20);
+        $author2->setUserGroupId(1);
+        $author2->setGivenName('Jane', 'en');
+        $author2->setFamilyName('Smith', 'en');
+        $author2->setEmail('jane@example.com');
+
+        // Create base publication with authors and primary contact
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+        $basePublication->setData('authors', [$author1, $author2]);
+        $basePublication->setData('primaryContactId', 10);
+
+        // Create new publication
+        $newPublication = new Publication();
+        $newPublication->setId(2);
+
+        $data = (object) ['authors' => '', 'locale' => 'en'];
+
+        AuthorsProcessor::process($data, 'contact@example.com', 1, $newPublication, 1, $basePublication);
+
+        // Both authors should be cloned
+        $this->assertCount(2, $addedAuthorIds);
+        // Primary contact should be set on new publication (author1 was primary in base)
+        $this->assertEquals(100, $newPublication->getData('primaryContactId'));
+    }
+
+    public function testProcessClonesAuthorsReturnsEarlyWithEmptyBaseAuthors(): void
+    {
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockAffiliationRepository();
+
+        $addCallCount = 0;
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function () use (&$addCallCount) {
+            $addCallCount++;
+            return $addCallCount;
+        });
+
+        // Base publication with no authors (getData returns null → ?: [] → empty)
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+
+        $newPublication = new Publication();
+        $newPublication->setId(2);
+
+        $data = (object) ['authors' => '', 'locale' => 'en'];
+
+        AuthorsProcessor::process($data, 'contact@example.com', 1, $newPublication, 1, $basePublication);
+
+        // No authors should be created (early return in cloneAuthorsFromBasePublication)
+        $this->assertEquals(0, $addCallCount);
+    }
+
+    // ==================== updateAuthorFromCsv Existing Affiliation Tests ====================
+
+    public function testUpdateAuthorFromCsvUpdatesExistingAffiliation(): void
+    {
+        $this->mockAffiliationRepository();
+        $method = $this->getUpdateAuthorFromCsvMethod();
+
+        $author = new Author();
+
+        // Add an existing affiliation first
+        $existingAffiliation = new Affiliation();
+        $existingAffiliation->setName('Old University', 'en');
+        $author->addAffiliation($existingAffiliation);
+
+        // Call with new affiliation data - should update existing affiliation, not create new one
+        $method->invoke(null, $author, 'John', 'Doe', '', 'New University', 'pt_BR', true);
+
+        // The existing affiliation should be updated with the new locale
+        $this->assertEquals('New University', $existingAffiliation->getName('pt_BR'));
     }
 }

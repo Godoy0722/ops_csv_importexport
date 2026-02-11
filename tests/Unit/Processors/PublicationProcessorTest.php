@@ -26,6 +26,8 @@ use Mockery;
 use PKP\file\FileManager;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 
 #[CoversClass(PublicationProcessor::class)]
 class PublicationProcessorTest extends BaseTestCase
@@ -991,5 +993,24 @@ class PublicationProcessorTest extends BaseTestCase
         $this->assertEquals([
             'pt_BR' => ['FAPESP'],
         ], $editParams['supportingAgencies']);
+    }
+
+    // ==================== uploadCoverImage Validation Return Path ====================
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testUploadCoverImageThrowsWhenValidationReturnsError(): void
+    {
+        $validationMock = Mockery::mock('overload:' . InvalidRowValidations::class);
+        $validationMock->shouldReceive('validateCoverImageIsValid')
+            ->andReturn('Invalid image format error');
+
+        $publicFileManager = Mockery::mock(PublicFileManager::class);
+        $fileManager = Mockery::mock(FileManager::class);
+
+        $data = (object) ['coverImageFilename' => 'cover.bmp'];
+
+        $this->expectException(\Exception::class);
+        PublicationProcessor::uploadCoverImage($data, 1, '/tmp', $publicFileManager, $fileManager);
     }
 }

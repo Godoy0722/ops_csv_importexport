@@ -213,10 +213,13 @@ class PreprintCommand
 
                     $fileUploadUser = $this->user;
                     $usedDefaultUser = false;
+                    $csvUser = null;
                     if (!empty($data->username)) {
                         $csvUser = CachedEntities::getCachedUserByUsername($data->username, true);
                         $csvUser ? $fileUploadUser = $csvUser : $usedDefaultUser = true;
                     }
+
+                    $hasValidCsvUser = !empty($data->username) && !$usedDefaultUser && isset($csvUser);
 
                     $server = CachedEntities::getCachedServer($data->serverPath);
 
@@ -353,14 +356,23 @@ class PreprintCommand
 
                     if ($isMultiLocaleImport) {
                         // For multi-locale imports, update existing publication with new locale data
+                        if ($hasValidCsvUser) {
+                            AuthorsProcessor::updateUsernameAuthorLocale($csvUser, $publication, $data->locale);
+                        }
                         AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
                         KeywordsProcessor::processMultiLocale($data, $publication);
                         SubjectsProcessor::processMultiLocale($data, $publication);
                         FundersProcessor::processMultiLocale($data, $submission, $server->getId());
                         PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication);
                     } else {
+                        $usernameAuthorAdded = false;
+                        if ($hasValidCsvUser && (!empty($data->authors) || is_null($basePublication))) {
+                            AuthorsProcessor::addAuthorFromUser($csvUser, $submission, $publication, $server, $userGroupId);
+                            $usernameAuthorAdded = true;
+                        }
+
                         // For new submissions or versions, use the regular process
-                        AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
+                        AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication, $usernameAuthorAdded ? $csvUser : null);
                         KeywordsProcessor::process($data, $publication, $basePublication);
                         SubjectsProcessor::process($data, $publication, $basePublication);
                         FundersProcessor::process($data, $submission, $server->getId(), $basePublication);

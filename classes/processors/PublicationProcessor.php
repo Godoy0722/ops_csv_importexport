@@ -91,6 +91,10 @@ class PublicationProcessor
         $submissionPublication->setData('copyrightYear', $copyrightYear);
         $submissionPublication->setData('licenseUrl', $licenseUrl);
 
+        if (!empty($data->doi)) {
+            $submissionPublication->setStoredPubId('doi', $data->doi);
+        }
+
         $oldPublication = Repo::publication()->get($submissionPublication->getId());
         Repo::publication()->dao->update($submissionPublication, $oldPublication);
 
@@ -210,7 +214,7 @@ class PublicationProcessor
         }
 
         if (!empty($data->doi)) {
-            $publication->setData('pub-id::doi', $data->doi);
+            $publication->setStoredPubId('doi', $data->doi);
         }
 
         if (!empty($data->references)) {

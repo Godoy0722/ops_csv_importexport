@@ -59,7 +59,7 @@ class PublicationProcessor
         }
 
         if (!empty($data->preprintAbstract)) {
-            $submissionPublication->setData('abstract', $data->preprintAbstract, $data->locale);
+            $submissionPublication->setData('abstract', static::normalizeAbstractToHtml($data->preprintAbstract), $data->locale);
         }
 
         if (!empty($data->preprintPrefix)) {
@@ -198,7 +198,8 @@ class PublicationProcessor
 
         foreach ($localizedFields as $field => $csvField) {
             if (!empty($data->{$csvField})) {
-                $publication->setData($field, $data->{$csvField}, $data->locale);
+                $value = $field === 'abstract' ? static::normalizeAbstractToHtml($data->{$csvField}) : $data->{$csvField};
+                $publication->setData($field, $value, $data->locale);
             } elseif ($basePublication->getLocalizedData($field, $data->locale)) {
                 $publication->setData($field, $basePublication->getLocalizedData($field, $data->locale), $data->locale);
             }
@@ -289,7 +290,8 @@ class PublicationProcessor
 
         foreach ($localizedFields as $field => $csvField) {
             if (!empty($data->{$csvField})) {
-                $publication->setData($field, $data->{$csvField}, $data->locale);
+                $value = $field === 'abstract' ? static::normalizeAbstractToHtml($data->{$csvField}) : $data->{$csvField};
+                $publication->setData($field, $value, $data->locale);
             }
         }
 
@@ -365,5 +367,30 @@ class PublicationProcessor
         $existingAgencies[$data->locale] = $newAgencies;
 
         Repo::publication()->edit($publication, ['supportingAgencies' => $existingAgencies]);
+    }
+
+    /**
+     * Normalize a plain-text abstract into HTML paragraphs.
+     *
+     * If the text already contains HTML block tags (<p> or <br), it is returned as-is.
+     * Otherwise the text is split on literal "\n" sequences and real newlines,
+     * and each non-empty segment is wrapped in <p>…</p>.
+     */
+    public static function normalizeAbstractToHtml(string $abstract): string
+    {
+        if (preg_match('/<(p|br)\b/i', $abstract)) {
+            return $abstract;
+        }
+
+        $abstract = str_replace('\n', "\n", $abstract);
+
+        $paragraphs = preg_split('/\r?\n/', $abstract);
+        $paragraphs = array_filter(array_map('trim', $paragraphs), fn(string $p) => $p !== '');
+
+        if (empty($paragraphs)) {
+            return '';
+        }
+
+        return implode('', array_map(fn(string $p) => "<p>{$p}</p>", $paragraphs));
     }
 }

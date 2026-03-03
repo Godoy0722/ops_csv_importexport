@@ -197,6 +197,34 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 >  - *Required for first version or single-version preprints
 >  - **For version > 1: Only `versionIdentifier` and `version` are required; all other fields are optional and will be cloned from the previous version if left empty
 
+> **Multi-Line Abstracts**
+> The `preprintAbstract` field supports multi-line content. Each line is automatically wrapped in `<p>` tags for proper display. You can write multi-line abstracts in two ways:
+>
+> **Option 1: Using `\n` (recommended for most editors)**
+>
+> Insert a literal `\n` where you want a paragraph break:
+> ```
+> This is the first paragraph.\nThis is the second paragraph.\nThis is the third paragraph.
+> ```
+>
+> **Option 2: Using real line breaks inside quotes**
+>
+> Wrap the abstract in double quotes and use actual line breaks. Most spreadsheet applications (Excel, LibreOffice Calc, Google Sheets) do this automatically when a cell contains newlines:
+> ```csv
+> "This is the first paragraph.
+> This is the second paragraph.
+> This is the third paragraph."
+> ```
+>
+> **Option 3: Using HTML tags**
+>
+> You can also provide the abstract with `<p>` or `<br>` tags directly. When HTML tags are detected, the content is stored as-is without any transformation:
+> ```
+> <p>This is the first paragraph.</p><p>This is the second paragraph.</p>
+> ```
+>
+> All three options above produce the same result: each paragraph is displayed separately on the preprint page.
+
 > **Authors Format**
 > The `authors` field in the preprints CSV must contain author information in the following format:
 >

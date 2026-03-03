@@ -37,6 +37,7 @@ class RequiredPreprintHeaders
         'coverImageAltText',
         'galleyFilenames',
         'galleyLabels',
+        'galleyViews',
         'suppFilenames',
         'suppLabels',
         'suppDescriptions',
@@ -52,6 +53,7 @@ class RequiredPreprintHeaders
         'supportingAgencies',
         'username',
         'funders',
+        'preprintViews',
     ];
 
     static $preprintRequiredHeaders = [

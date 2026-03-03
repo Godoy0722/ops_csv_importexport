@@ -28,6 +28,7 @@ use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
 use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
 use APP\plugins\importexport\csv\classes\processors\GalleyProcessor;
+use APP\plugins\importexport\csv\classes\processors\StatisticsProcessor;
 use APP\plugins\importexport\csv\classes\processors\KeywordsProcessor;
 use APP\plugins\importexport\csv\classes\processors\PublicationProcessor;
 use APP\plugins\importexport\csv\classes\processors\SectionsProcessor;
@@ -42,7 +43,6 @@ use Illuminate\Support\Facades\DB;
 use PKP\db\DAORegistry;
 use PKP\file\FileManager;
 use PKP\services\PKPFileService;
-use PKP\submission\GenreDAO;
 use PKP\user\User;
 
 class PreprintCommand
@@ -181,6 +181,9 @@ class PreprintCommand
                         );
                     }
 
+                    InvalidRowValidations::validatePreprintViews($data->preprintViews ?? null);
+                    InvalidRowValidations::validateGalleyViews($data->galleyViews ?? null, $data->galleyLabels ?? null);
+
                     if ($data->suppFilenames && $data->suppLabels && !empty($data->suppDescriptions)) {
                         InvalidRowValidations::validateSupplementaryDescriptions(
                             $data->suppFilenames,
@@ -300,7 +303,38 @@ class PreprintCommand
 
                     InvalidRowValidations::validatePublicationWasSuccessfullyCreated($publication);
 
-                    $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+                    $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+
+                    if (!empty($data->preprintViews) && (int)$data->preprintViews > 0) {
+                        StatisticsProcessor::insertPreprintViews(
+                            $submission->getId(),
+                            $server->getId(),
+                            (int)$data->preprintViews,
+                            $data->datePosted
+                        );
+                    }
+
+                    if (!empty($data->galleyViews) && !empty($galleyMetadata)) {
+                        $galleyViewsArray = explode(';', $data->galleyViews);
+                        foreach ($galleyViewsArray as $idx => $views) {
+                            $views = trim($views);
+                            if ($views === '' || (int)$views === 0) {
+                                continue;
+                            }
+                            if (isset($galleyMetadata[$idx])) {
+                                $meta = $galleyMetadata[$idx];
+                                StatisticsProcessor::insertGalleyViews(
+                                    $submission->getId(),
+                                    $server->getId(),
+                                    $meta['galleyId'],
+                                    $meta['submissionFileId'],
+                                    StatisticsProcessor::resolveFileType($meta['filename']),
+                                    (int)$views,
+                                    $data->datePosted
+                                );
+                            }
+                        }
+                    }
 
                     // Process supplementary files
                     if ($data->suppFilenames) {
@@ -466,6 +500,7 @@ class PreprintCommand
     {
         // Array to store each galley ID to its respective galley file
         $galleyIds = [];
+        $galleyMetadata = [];
         if ($data->galleyFilenames) {
             foreach (array_map('trim', explode(';', $data->galleyFilenames)) as $galleyFile) {
                 try {
@@ -491,7 +526,7 @@ class PreprintCommand
                 $galleyItem = $galleyIds[$i];
                 $galleyLabel = $galleyLabelsArray[$i];
 
-                $this->handleGalley(
+                $galleyMetadata[] = $this->handleGalley(
                     $galleyItem,
                     $data,
                     $submission->getId(),
@@ -503,7 +538,7 @@ class PreprintCommand
             }
         }
 
-        return $galleyIds;
+        return $galleyMetadata;
     }
 
     /**
@@ -541,7 +576,7 @@ class PreprintCommand
         int $publicationId,
         User $fileUploadUser,
         ?string $description = null
-    ): void
+    ): array
     {
         $galleyCompletePath = "{$this->sourceDir}/{$item['file']}";
         $galleyExtension = $this->fileManager->parseFileExtension($galleyCompletePath);
@@ -559,6 +594,12 @@ class PreprintCommand
         // Now that we have the submission file ID, it's time to process the galley itself.
         $galleyId = GalleyProcessor::process($submissionFile->getId(), $data, $label, $publicationId, $galleyExtension);
         SubmissionFileProcessor::updateAssocInfo($submissionFile, $galleyId);
+
+        return [
+            'galleyId' => $galleyId,
+            'submissionFileId' => $submissionFile->getId(),
+            'filename' => $item['file'],
+        ];
     }
 
     /**

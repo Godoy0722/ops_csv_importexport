@@ -42,7 +42,7 @@ class AuthorsProcessor
         $authorsString = array_map('trim', explode(';', $data->authors));
 
         foreach ($authorsString as $index => $authorString) {
-            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation, $biography] = static::parseAuthorString($authorString, $contactEmail);
 
             if ($usernameUser && static::csvAuthorMatchesUser($givenName, $familyName, $emailAddress, $usernameUser, $data->locale)) {
                 continue;
@@ -55,7 +55,7 @@ class AuthorsProcessor
             $author->setEmail($emailAddress);
             $author->setData('publicationId', $publication->getId());
 
-            static::updateAuthorFromCsv($author, $givenName, $familyName, $orcid, $affiliation, $data->locale, false);
+            static::updateAuthorFromCsv($author, $givenName, $familyName, $orcid, $affiliation, $biography, $data->locale, false);
 
             $authorId = Repo::author()->add($author);
 
@@ -170,6 +170,7 @@ class AuthorsProcessor
             $newAuthor->setEmail($author->getEmail());
             $newAuthor->setData('publicationId', $newPublication->getId());
             $newAuthor->setOrcid($author->getOrcid());
+            $newAuthor->setBiography($author->getBiography(null), null);
 
             foreach ($author->getAffiliations() as $affiliation) {
                 $newAffiliation = Repo::affiliation()->newDataObject();
@@ -230,7 +231,7 @@ class AuthorsProcessor
         }
 
         foreach ($authorsString as $authorString) {
-            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation, $biography] = static::parseAuthorString($authorString, $contactEmail);
 
             $existingAuthor = null;
             foreach ($existingAuthors as $author) {
@@ -254,6 +255,7 @@ class AuthorsProcessor
                 $familyName,
                 $orcid,
                 $affiliation,
+                $biography,
                 $data->locale,
                 $existingAuthor !== null
             );
@@ -275,12 +277,13 @@ class AuthorsProcessor
         $emailAddress = $authorParts[2] ?? '';
         $orcid = $authorParts[3] ?? '';
         $affiliation = $authorParts[4] ?? '';
+        $biography = $authorParts[5] ?? '';
 
         if (empty($emailAddress)) {
             $emailAddress = $contactEmail;
         }
 
-        return [$givenName, $familyName, $emailAddress, $orcid, $affiliation];
+        return [$givenName, $familyName, $emailAddress, $orcid, $affiliation, $biography];
     }
 
     /**
@@ -292,6 +295,7 @@ class AuthorsProcessor
         string $familyName,
         string $orcid,
         string $affiliation,
+        string $biography,
         string $locale,
         bool $isExistingAuthor
     ): void {
@@ -319,6 +323,10 @@ class AuthorsProcessor
                 $affiliationEntity->setName((string) $affiliation, $locale);
                 $author->addAffiliation($affiliationEntity);
             }
+        }
+
+        if (!empty($biography)) {
+            $author->setBiography($biography, $locale);
         }
     }
 }

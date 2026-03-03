@@ -207,16 +207,7 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 > This is the first paragraph.\nThis is the second paragraph.\nThis is the third paragraph.
 > ```
 >
-> **Option 2: Using real line breaks inside quotes**
->
-> Wrap the abstract in double quotes and use actual line breaks. Most spreadsheet applications (Excel, LibreOffice Calc, Google Sheets) do this automatically when a cell contains newlines:
-> ```csv
-> "This is the first paragraph.
-> This is the second paragraph.
-> This is the third paragraph."
-> ```
->
-> **Option 3: Using HTML tags**
+> **Option 2: Using HTML tags**
 >
 > You can also provide the abstract with `<p>` or `<br>` tags directly. When HTML tags are detected, the content is stored as-is without any transformation:
 > ```
@@ -229,7 +220,7 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 > The `authors` field in the preprints CSV must contain author information in the following format:
 >
 > ```
-> GivenName,FamilyName,Email,ORCiD,Affiliation;GivenName2,FamilyName2,Email2,ORCiD2,Affiliation2
+> GivenName,FamilyName,Email,ORCiD,Affiliation,Biography;GivenName2,FamilyName2,Email2,ORCiD2,Affiliation2,Biography2
 > ```
 >
 >  - Fields are separated by commas within each author
@@ -237,13 +228,14 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 >  - All fields except `GivenName` are optional and can be left empty
 >  - If `Email` is empty, the primary contact email of the server will be used
 >  - `ORCiD` must be the author identifier and is optional; see input options below
+>  - `Biography` is optional free text; it is stored per locale, so you can provide different biographies in multi-locale imports
 >
 > Examples:
 >
 > ```
-> "John,Doe,john@example.com,0000-0002-1825-0097,University of Example; Jane,Smith,,https://orcid.org/0000-0002-1694-233X,Another University"
-> "Maria,Silva,maria@example.com,0000000218250097,"
-> "Carlos,,carlos@example.com,,Example Corp"
+> "John,Doe,john@example.com,0000-0002-1825-0097,University of Example,Dr. John Doe is a researcher in quantum physics; Jane,Smith,,https://orcid.org/0000-0002-1694-233X,Another University,"
+> "Maria,Silva,maria@example.com,0000000218250097,,"
+> "Carlos,,carlos@example.com,,Example Corp,Senior engineer at Example Corp"
 > ```
 
 > **ORCiD Input Options**
@@ -468,6 +460,7 @@ The system will:
    - `categories` (category titles)
    - Author names (`givenName`, `familyName`)
    - Author affiliations
+   - Author biographies
 
 4. **Non-Localized Fields**:
    These fields are shared across all locales:

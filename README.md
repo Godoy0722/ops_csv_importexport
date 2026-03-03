@@ -34,6 +34,10 @@ This plugin allows administrators to import users and preprints with their assoc
 		- [Funders Examples](#funders-examples)
 		- [Crossref Registry Validation](#crossref-registry-validation)
 		- [Important Funders Notes](#important-funders-notes)
+	- [Usage Statistics](#usage-statistics)
+		- [Preprint Views](#preprint-views)
+		- [Galley Views](#galley-views)
+		- [Important Statistics Notes](#important-statistics-notes)
 	- [Supplementary Files Descriptions](#supplementary-files-descriptions)
 	- [Handling Failed Imports and Re-runs](#handling-failed-imports-and-re-runs)
 		- [How Invalid Files Work](#how-invalid-files-work)
@@ -171,6 +175,7 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 | coverImageAltText | No | Alt text for cover | Preprint Cover | Optional |
 | galleyFilenames | No | Semicolon-separated galley files | paper.pdf;slides.pptx | Optional |
 | galleyLabels | No | Labels for galleys | PDF;SLIDES | Must match galleyFilenames count |
+| galleyViews | No | Semicolon-separated view counts per galley | 150;42 | Must match galleyFilenames count. See [Usage Statistics](#usage-statistics) |
 | suppFilenames | No | Semicolon-separated supplementary files | supplement.pdf;data.csv | Optional |
 | suppLabels | No | Labels for supplementary files | Supplement;Dataset | Must match suppFilenames count |
 | suppDescriptions | No | Semicolon-separated descriptions for supplementary files | Supplementary analysis;Raw dataset (CSV) | Optional; if provided must match suppFilenames and suppLabels count |
@@ -186,6 +191,7 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 | supportingAgencies | No | Semicolon-separated funding sources | NIH;NSF;Wellcome Trust | See [Supporting Agencies](#supporting-agencies) |
 | username | No | Username of associated user | jsmith | See [Associated User](#associated-user) |
 | funders | No | Structured funder information | See [Funders Support](#funders-support) | Requires Funding plugin |
+| preprintViews | No | Total abstract/page view count | 523 | See [Usage Statistics](#usage-statistics) |
 
 > **Notes:**
 >  - *Required for first version or single-version preprints
@@ -289,8 +295,11 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 > The `username` field allows you to associate a preprint with a specific existing user in the system:
 >  - Provide the username of an existing user in OPS
 >  - This user will be recorded as the uploader of the submission files
->  - If the username is not found, the system will use the default CLI user (the one specified in the command) and print a notice
->  - Leave empty to use the default CLI user
+>  - The user is also added as a **contributor (author)** of the preprint and set as the primary contact. The contributor's name and affiliation are taken from the user's profile
+>  - In multi-locale imports, the contributor's locale-specific name data is updated from the user's profile for each locale
+>  - The user from `username` is added first, before the authors from the `authors` field. If the same person appears in both, the duplicate is automatically skipped
+>  - If the username is not found, the system will use the default CLI user (the one specified in the command) and print a notice. In this case, the user is **not** added as a contributor
+>  - Leave empty to use the default CLI user (as file uploader only, without adding as contributor)
 >
 > Behavior when username is not found:
 > ```
@@ -303,7 +312,7 @@ You can take a look at the example we provide on the [User CSV file](./examples/
 
 #### Preprints CSV Example
 
-You can take a look at the example we provide on the [Preprint CSV file](./examples/preprints/preprints_example.csv).
+You can take a look at the example we provide on the [Preprint CSV file](./examples/preprints/comprehensive_multilocale_preprints.csv).
 
 #### Import File Structure
 
@@ -374,7 +383,7 @@ For preprint with multiple versions, you'll need to set the `versionIdentifier` 
 
 #### Example 3: Mixed Preprints
 
-You can mix single-version and multi-version preprints in the same CSV file. Take a look at [the default CSV file](./examples/preprints/preprints_example.csv).
+You can mix single-version and multi-version preprints in the same CSV file. Take a look at the [example CSV file](./examples/preprints/comprehensive_multilocale_preprints.csv).
 
 ### Important Notes
 
@@ -439,6 +448,8 @@ The system will:
    - `doi`
    - `datePosted`
    - `dateSubmitted`
+   - `preprintViews`
+   - `galleyViews`
    - File attachments (galleys and supplementary files)
 
 ### Multi-Locale Best Practices
@@ -569,6 +580,47 @@ You can search for funders and their DOIs at: [https://search.crossref.org/searc
 5. **Plugin Integration**: The CSV import uses the same business logic as the Funding plugin's web interface (`FunderForm::execute()`), ensuring consistent data handling.
 
 6. **Data Export**: Imported funders will be included in Crossref XML, DataCite XML, and OpenAIRE metadata exports when using the respective plugins.
+
+## Usage Statistics
+
+The plugin supports importing usage statistics (view counts) for preprints and their galley files. This is useful when migrating from another system and you want to preserve historical view data.
+
+### Preprint Views
+
+The `preprintViews` column allows you to import the total number of abstract/page views for a preprint:
+- Must be a positive integer
+- The views are recorded against the `datePosted` date
+- Leave empty or set to 0 to skip
+
+Example:
+```
+523
+```
+
+### Galley Views
+
+The `galleyViews` column allows you to import download/view counts for each galley file individually:
+- Uses semicolon-separated values, one per galley file
+- Must have the same number of values as `galleyFilenames` and `galleyLabels`
+- Each value must be a non-negative integer (use 0 or leave empty to skip a galley)
+- Views are recorded against the `datePosted` date
+
+Example (matching three galleys):
+```
+galleyFilenames:  paper.pdf;paper.html;paper.epub
+galleyLabels:     PDF;HTML;EPUB
+galleyViews:      150;;42
+```
+
+In this example, the PDF galley gets 150 views, HTML gets none, and EPUB gets 42 views.
+
+### Important Statistics Notes
+
+- Statistics are inserted directly into the `metrics_submission` table
+- Views are associated with the preprint's `datePosted` date
+- `galleyViews` requires `galleyFilenames` to be present; providing galley views without galleys will cause the row to be rejected
+- For multi-version preprints, provide views only on the row where the galley files are defined
+- View counts are not localized — provide them once, on the primary locale row
 
 ## Supplementary Files Descriptions
 
@@ -902,6 +954,25 @@ php tools/importExport.php CSVImportExportPlugin preprints admin /import/batch1/
       - Look up Crossref Funder DOIs at [https://search.crossref.org/search/funders](https://search.crossref.org/search/funders)
       - Test with a single preprint with funders before large imports
       - Remember that funders are at submission level, so only provide them once per preprint (not per version or locale)
+
+#### Statistics Import Issues
+17. **Preprint Views Issues**
+    - Error: `Invalid preprintViews value`
+    - Solution:
+      - Ensure the value is a positive integer (no decimals, no negative numbers)
+      - Remove any non-numeric characters (commas, spaces, units)
+      - Leave the field empty if you don't want to import views
+
+18. **Galley Views Issues**
+    - Error: `Galley views provided without galley files`
+    - Solution:
+      - The `galleyViews` column requires `galleyFilenames` to also be provided
+      - Remove the `galleyViews` values if you don't have galley files on this row
+
+    - Error: `Number of galley views does not match number of galley files`
+    - Solution:
+      - Ensure the semicolon-separated `galleyViews` has the same number of entries as `galleyFilenames` and `galleyLabels`
+      - Use empty values (e.g., `150;;42`) for galleys you don't want to track views for
 
 #### General Troubleshooting Tips
 - Always back up your database before running imports

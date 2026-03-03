@@ -170,6 +170,7 @@ class AuthorsProcessor
             $newAuthor->setEmail($author->getEmail());
             $newAuthor->setData('publicationId', $newPublication->getId());
             $newAuthor->setOrcid($author->getOrcid());
+            $newAuthor->setOrcidVerified($author->hasVerifiedOrcid());
             $newAuthor->setBiography($author->getBiography(null), null);
 
             foreach ($author->getAffiliations() as $affiliation) {
@@ -309,6 +310,7 @@ class AuthorsProcessor
         $normalizedOrcid = static::normalizeOrcid($orcid);
         if (!empty($normalizedOrcid)) {
             $author->setOrcid($normalizedOrcid);
+            $author->setOrcidVerified(true);
         }
 
         if ($affiliation) {

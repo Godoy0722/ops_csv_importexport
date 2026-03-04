@@ -610,7 +610,7 @@ The plugin supports importing usage statistics (view counts) for preprints and t
 
 The `preprintViews` column allows you to import the total number of abstract/page views for a preprint:
 - Must be a positive integer
-- The views are recorded against the `datePosted` date
+- The views are recorded against the current date at the time of import
 - Leave empty or set to 0 to skip
 
 Example:
@@ -624,7 +624,7 @@ The `galleyViews` column allows you to import download/view counts for each gall
 - Uses semicolon-separated values, one per galley file
 - Must have the same number of values as `galleyFilenames` and `galleyLabels`
 - Each value must be a non-negative integer (use 0 or leave empty to skip a galley)
-- Views are recorded against the `datePosted` date
+- Views are recorded against the current date at the time of import
 
 Example (matching three galleys):
 ```
@@ -638,7 +638,7 @@ In this example, the PDF galley gets 150 views, HTML gets none, and EPUB gets 42
 ### Important Statistics Notes
 
 - Statistics are inserted directly into the `metrics_submission` table
-- Views are associated with the preprint's `datePosted` date
+- Views are associated with the current date at the time of import
 - `galleyViews` requires `galleyFilenames` to be present; providing galley views without galleys will cause the row to be rejected
 - For multi-version preprints, provide views only on the row where the galley files are defined
 - View counts are not localized — provide them once, on the primary locale row

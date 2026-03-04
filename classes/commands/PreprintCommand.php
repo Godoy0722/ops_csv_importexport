@@ -303,14 +303,21 @@ class PreprintCommand
 
                     InvalidRowValidations::validatePublicationWasSuccessfullyCreated($publication);
 
+                    if ($hasValidCsvUser) {
+                        Repo::stageAssignment()->build(
+                            $submission->getId(),
+                            $userGroupId,
+                            $csvUser->getId()
+                        );
+                    }
+
                     $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
 
                     if (!empty($data->preprintViews) && (int)$data->preprintViews > 0) {
                         StatisticsProcessor::insertPreprintViews(
                             $submission->getId(),
                             $server->getId(),
-                            (int)$data->preprintViews,
-                            $data->datePosted
+                            (int)$data->preprintViews
                         );
                     }
 
@@ -329,8 +336,7 @@ class PreprintCommand
                                     $meta['galleyId'],
                                     $meta['submissionFileId'],
                                     StatisticsProcessor::resolveFileType($meta['filename']),
-                                    (int)$views,
-                                    $data->datePosted
+                                    (int)$views
                                 );
                             }
                         }

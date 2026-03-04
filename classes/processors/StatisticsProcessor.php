@@ -18,6 +18,7 @@ namespace APP\plugins\importexport\csv\classes\processors;
 
 use APP\core\Application;
 use Illuminate\Support\Facades\DB;
+use PKP\core\Core;
 use PKP\statistics\PKPStatisticsHelper;
 
 class StatisticsProcessor
@@ -25,8 +26,10 @@ class StatisticsProcessor
     /**
      * Insert preprint abstract views into the metrics_submission table.
      */
-    public static function insertPreprintViews(int $submissionId, int $contextId, int $metric, string $date): void
+    public static function insertPreprintViews(int $submissionId, int $contextId, int $metric): void
     {
+        $date = Core::getCurrentDate();
+
         DB::table('metrics_submission')->insert([
             'load_id' => "csv_import_{$submissionId}_{$date}",
             'context_id' => $contextId,
@@ -46,9 +49,10 @@ class StatisticsProcessor
         int $galleyId,
         ?int $submissionFileId,
         int $fileType,
-        int $metric,
-        string $date
+        int $metric
     ): void {
+        $date = Core::getCurrentDate();
+
         DB::table('metrics_submission')->insert([
             'load_id' => "csv_import_{$submissionId}_{$date}",
             'context_id' => $contextId,

@@ -189,3 +189,15 @@ msgstr "Could not write to file \"{$filename}\"."
 
 msgid "plugins.importexport.csv.incompleteSectionFields"
 msgstr "Both sectionTitle and sectionAbbrev must be provided together. If one is filled, the other must also be filled."
+
+msgid "plugins.importexport.csv.invalidPreprintViews"
+msgstr "The preprintViews field must be empty or a non-negative integer."
+
+msgid "plugins.importexport.csv.galleyViewsWithoutGalleys"
+msgstr "galleyViews is provided but galleyLabels is empty. Galley labels are required when galley views are specified."
+
+msgid "plugins.importexport.csv.invalidNumberOfGalleyViews"
+msgstr "The number of galleyViews values doesn't match the number of galleyLabels. Please verify the semicolon-separated counts match."
+
+msgid "plugins.importexport.csv.invalidGalleyViewValue"
+msgstr "Invalid galley view value \"{$value}\". Each galley view must be empty or a non-negative integer."

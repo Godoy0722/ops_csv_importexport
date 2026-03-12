@@ -28,6 +28,7 @@ use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
 use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
 use APP\plugins\importexport\csv\classes\processors\GalleyProcessor;
+use APP\plugins\importexport\csv\classes\processors\StatisticsProcessor;
 use APP\plugins\importexport\csv\classes\processors\KeywordsProcessor;
 use APP\plugins\importexport\csv\classes\processors\PublicationProcessor;
 use APP\plugins\importexport\csv\classes\processors\SectionsProcessor;
@@ -42,7 +43,6 @@ use Illuminate\Support\Facades\DB;
 use PKP\db\DAORegistry;
 use PKP\file\FileManager;
 use PKP\services\PKPFileService;
-use PKP\submission\GenreDAO;
 use PKP\user\User;
 
 class PreprintCommand
@@ -181,6 +181,9 @@ class PreprintCommand
                         );
                     }
 
+                    InvalidRowValidations::validatePreprintViews($data->preprintViews ?? null);
+                    InvalidRowValidations::validateGalleyViews($data->galleyViews ?? null, $data->galleyLabels ?? null);
+
                     if ($data->suppFilenames && $data->suppLabels && !empty($data->suppDescriptions)) {
                         InvalidRowValidations::validateSupplementaryDescriptions(
                             $data->suppFilenames,
@@ -213,10 +216,13 @@ class PreprintCommand
 
                     $fileUploadUser = $this->user;
                     $usedDefaultUser = false;
+                    $csvUser = null;
                     if (!empty($data->username)) {
                         $csvUser = CachedEntities::getCachedUserByUsername($data->username, true);
                         $csvUser ? $fileUploadUser = $csvUser : $usedDefaultUser = true;
                     }
+
+                    $hasValidCsvUser = !empty($data->username) && !$usedDefaultUser && isset($csvUser);
 
                     $server = CachedEntities::getCachedServer($data->serverPath);
 
@@ -297,7 +303,44 @@ class PreprintCommand
 
                     InvalidRowValidations::validatePublicationWasSuccessfullyCreated($publication);
 
-                    $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+                    if ($hasValidCsvUser) {
+                        Repo::stageAssignment()->build(
+                            $submission->getId(),
+                            $userGroupId,
+                            $csvUser->getId()
+                        );
+                    }
+
+                    $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+
+                    if (!empty($data->preprintViews) && (int)$data->preprintViews > 0) {
+                        StatisticsProcessor::insertPreprintViews(
+                            $submission->getId(),
+                            $server->getId(),
+                            (int)$data->preprintViews
+                        );
+                    }
+
+                    if (!empty($data->galleyViews) && !empty($galleyMetadata)) {
+                        $galleyViewsArray = explode(';', $data->galleyViews);
+                        foreach ($galleyViewsArray as $idx => $views) {
+                            $views = trim($views);
+                            if ($views === '' || (int)$views === 0) {
+                                continue;
+                            }
+                            if (isset($galleyMetadata[$idx])) {
+                                $meta = $galleyMetadata[$idx];
+                                StatisticsProcessor::insertGalleyViews(
+                                    $submission->getId(),
+                                    $server->getId(),
+                                    $meta['galleyId'],
+                                    $meta['submissionFileId'],
+                                    StatisticsProcessor::resolveFileType($meta['filename']),
+                                    (int)$views
+                                );
+                            }
+                        }
+                    }
 
                     // Process supplementary files
                     if ($data->suppFilenames) {
@@ -353,14 +396,23 @@ class PreprintCommand
 
                     if ($isMultiLocaleImport) {
                         // For multi-locale imports, update existing publication with new locale data
+                        if ($hasValidCsvUser) {
+                            AuthorsProcessor::updateUsernameAuthorLocale($csvUser, $publication, $data->locale);
+                        }
                         AuthorsProcessor::processMultiLocale($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId);
                         KeywordsProcessor::processMultiLocale($data, $publication);
                         SubjectsProcessor::processMultiLocale($data, $publication);
                         FundersProcessor::processMultiLocale($data, $submission, $server->getId());
                         PublicationProcessor::processSupportingAgenciesMultiLocale($data, $publication);
                     } else {
+                        $usernameAuthorAdded = false;
+                        if ($hasValidCsvUser && (!empty($data->authors) || is_null($basePublication))) {
+                            AuthorsProcessor::addAuthorFromUser($csvUser, $submission, $publication, $server, $userGroupId);
+                            $usernameAuthorAdded = true;
+                        }
+
                         // For new submissions or versions, use the regular process
-                        AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication);
+                        AuthorsProcessor::process($data, $server->getContactEmail(), $submission->getId(), $publication, $userGroupId, $basePublication, $usernameAuthorAdded ? $csvUser : null);
                         KeywordsProcessor::process($data, $publication, $basePublication);
                         SubjectsProcessor::process($data, $publication, $basePublication);
                         FundersProcessor::process($data, $submission, $server->getId(), $basePublication);
@@ -454,6 +506,7 @@ class PreprintCommand
     {
         // Array to store each galley ID to its respective galley file
         $galleyIds = [];
+        $galleyMetadata = [];
         if ($data->galleyFilenames) {
             foreach (array_map('trim', explode(';', $data->galleyFilenames)) as $galleyFile) {
                 try {
@@ -479,7 +532,7 @@ class PreprintCommand
                 $galleyItem = $galleyIds[$i];
                 $galleyLabel = $galleyLabelsArray[$i];
 
-                $this->handleGalley(
+                $galleyMetadata[] = $this->handleGalley(
                     $galleyItem,
                     $data,
                     $submission->getId(),
@@ -491,7 +544,7 @@ class PreprintCommand
             }
         }
 
-        return $galleyIds;
+        return $galleyMetadata;
     }
 
     /**
@@ -529,7 +582,7 @@ class PreprintCommand
         int $publicationId,
         User $fileUploadUser,
         ?string $description = null
-    ): void
+    ): array
     {
         $galleyCompletePath = "{$this->sourceDir}/{$item['file']}";
         $galleyExtension = $this->fileManager->parseFileExtension($galleyCompletePath);
@@ -547,6 +600,12 @@ class PreprintCommand
         // Now that we have the submission file ID, it's time to process the galley itself.
         $galleyId = GalleyProcessor::process($submissionFile->getId(), $data, $label, $publicationId, $galleyExtension);
         SubmissionFileProcessor::updateAssocInfo($submissionFile, $galleyId);
+
+        return [
+            'galleyId' => $galleyId,
+            'submissionFileId' => $submissionFile->getId(),
+            'filename' => $item['file'],
+        ];
     }
 
     /**

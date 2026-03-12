@@ -604,6 +604,58 @@ class InvalidRowValidations
     }
 
     /**
+     * Validates the preprintViews field.
+     * Must be empty or a non-negative integer.
+     *
+     * @throws RowValidationException
+     */
+    public static function validatePreprintViews(?string $preprintViews): void
+    {
+        if (empty($preprintViews)) {
+            return;
+        }
+
+        if (!ctype_digit($preprintViews)) {
+            throw new RowValidationException(__('plugins.importexport.csv.invalidPreprintViews'));
+        }
+    }
+
+    /**
+     * Validates the galleyViews field.
+     * If provided, must have the same count of semicolon-separated values as galleyLabels,
+     * and each non-empty value must be a non-negative integer.
+     *
+     * @throws RowValidationException
+     */
+    public static function validateGalleyViews(?string $galleyViews, ?string $galleyLabels): void
+    {
+        if (empty($galleyViews)) {
+            return;
+        }
+
+        if (empty($galleyLabels)) {
+            throw new RowValidationException(__('plugins.importexport.csv.galleyViewsWithoutGalleys'));
+        }
+
+        $galleyViewsArray = explode(';', $galleyViews);
+        $galleyLabelsArray = explode(';', $galleyLabels);
+
+        if (count($galleyViewsArray) !== count($galleyLabelsArray)) {
+            throw new RowValidationException(__('plugins.importexport.csv.invalidNumberOfGalleyViews'));
+        }
+
+        foreach ($galleyViewsArray as $value) {
+            $value = trim($value);
+            if ($value === '') {
+                continue;
+            }
+            if (!ctype_digit($value)) {
+                throw new RowValidationException(__('plugins.importexport.csv.invalidGalleyViewValue', ['value' => $value]));
+            }
+        }
+    }
+
+    /**
      * Validates that section fields are either both filled or both empty.
      * If one is provided, both must be provided.
      *

@@ -18,6 +18,9 @@ namespace APP\plugins\importexport\csv\classes\processors;
 
 use APP\facades\Repo;
 use APP\publication\Publication;
+use APP\server\Server;
+use APP\submission\Submission;
+use PKP\user\User;
 
 class AuthorsProcessor
 {
@@ -27,7 +30,8 @@ class AuthorsProcessor
         int $submissionId,
         Publication $publication,
         int $userGroupId,
-        ?Publication $basePublication = null
+        ?Publication $basePublication = null,
+        ?User $usernameUser = null
     ): void
     {
         if (empty($data->authors) && !is_null($basePublication)) {
@@ -38,7 +42,11 @@ class AuthorsProcessor
         $authorsString = array_map('trim', explode(';', $data->authors));
 
         foreach ($authorsString as $index => $authorString) {
-            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation, $biography] = static::parseAuthorString($authorString, $contactEmail);
+
+            if ($usernameUser && static::csvAuthorMatchesUser($givenName, $familyName, $emailAddress, $usernameUser, $data->locale)) {
+                continue;
+            }
 
             $author = Repo::author()->newDataObject();
 
@@ -47,14 +55,96 @@ class AuthorsProcessor
             $author->setEmail($emailAddress);
             $author->setData('publicationId', $publication->getId());
 
-            static::updateAuthorFromCsv($author, $givenName, $familyName, $orcid, $affiliation, $data->locale, false);
+            static::updateAuthorFromCsv($author, $givenName, $familyName, $orcid, $affiliation, $biography, $data->locale, false);
 
             $authorId = Repo::author()->add($author);
 
-            if ($index === 0) {
+            if ($index === 0 && is_null($usernameUser)) {
                 PublicationProcessor::updatePrimaryContactId($publication, $authorId);
             }
         }
+    }
+
+    /**
+     * Create an Author from a User and add as primary contact
+     */
+    public static function addAuthorFromUser(
+        User $user,
+        Submission $submission,
+        Publication $publication,
+        Server $server,
+        int $userGroupId
+    ): int
+    {
+        $author = Repo::author()->newAuthorFromUser($user, $submission, $server);
+        $author->setData('publicationId', $publication->getId());
+        $author->setUserGroupId($userGroupId);
+        $author->setSubmissionId($submission->getId());
+
+        $authorId = Repo::author()->add($author);
+
+        PublicationProcessor::updatePrimaryContactId($publication, $authorId);
+
+        return $authorId;
+    }
+
+    /**
+     * Update locale-specific name data on the username-derived author
+     */
+    public static function updateUsernameAuthorLocale(
+        User $user,
+        Publication $publication,
+        string $locale
+    ): void
+    {
+        $existingAuthors = $publication->getData('authors') ?: [];
+        $userEmail = $user->getEmail();
+
+        foreach ($existingAuthors as $author) {
+            if (strcasecmp($author->getEmail(), $userEmail) === 0) {
+                $givenName = $user->getGivenName($locale) ?: $user->getGivenName($user->getDefaultLocale());
+                if ($givenName) {
+                    $author->setGivenName($givenName, $locale);
+                }
+
+                $familyName = $user->getFamilyName($locale) ?: $user->getFamilyName($user->getDefaultLocale());
+                if ($familyName) {
+                    $author->setFamilyName($familyName, $locale);
+                }
+
+                Repo::author()->dao->update($author);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Check if a CSV author entry matches a User on all three fields: givenName, familyName, and email.
+     * Returns true only when ALL three match (case-insensitive), meaning it's a duplicate.
+     */
+    private static function csvAuthorMatchesUser(
+        string $csvGivenName,
+        string $csvFamilyName,
+        string $csvEmail,
+        User $user,
+        string $locale
+    ): bool
+    {
+        if (strcasecmp($csvEmail, $user->getEmail()) !== 0) {
+            return false;
+        }
+
+        $userGivenName = $user->getGivenName($locale) ?: $user->getGivenName($user->getDefaultLocale()) ?: '';
+        if (strcasecmp($csvGivenName, $userGivenName) !== 0) {
+            return false;
+        }
+
+        $userFamilyName = $user->getFamilyName($locale) ?: $user->getFamilyName($user->getDefaultLocale()) ?: '';
+        if (strcasecmp($csvFamilyName, $userFamilyName) !== 0) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -80,6 +170,8 @@ class AuthorsProcessor
             $newAuthor->setEmail($author->getEmail());
             $newAuthor->setData('publicationId', $newPublication->getId());
             $newAuthor->setOrcid($author->getOrcid());
+            $newAuthor->setOrcidVerified($author->hasVerifiedOrcid());
+            $newAuthor->setBiography($author->getBiography(null), null);
 
             foreach ($author->getAffiliations() as $affiliation) {
                 $newAffiliation = Repo::affiliation()->newDataObject();
@@ -140,7 +232,7 @@ class AuthorsProcessor
         }
 
         foreach ($authorsString as $authorString) {
-            [$givenName, $familyName, $emailAddress, $orcid, $affiliation] = static::parseAuthorString($authorString, $contactEmail);
+            [$givenName, $familyName, $emailAddress, $orcid, $affiliation, $biography] = static::parseAuthorString($authorString, $contactEmail);
 
             $existingAuthor = null;
             foreach ($existingAuthors as $author) {
@@ -164,6 +256,7 @@ class AuthorsProcessor
                 $familyName,
                 $orcid,
                 $affiliation,
+                $biography,
                 $data->locale,
                 $existingAuthor !== null
             );
@@ -185,12 +278,13 @@ class AuthorsProcessor
         $emailAddress = $authorParts[2] ?? '';
         $orcid = $authorParts[3] ?? '';
         $affiliation = $authorParts[4] ?? '';
+        $biography = $authorParts[5] ?? '';
 
         if (empty($emailAddress)) {
             $emailAddress = $contactEmail;
         }
 
-        return [$givenName, $familyName, $emailAddress, $orcid, $affiliation];
+        return [$givenName, $familyName, $emailAddress, $orcid, $affiliation, $biography];
     }
 
     /**
@@ -202,6 +296,7 @@ class AuthorsProcessor
         string $familyName,
         string $orcid,
         string $affiliation,
+        string $biography,
         string $locale,
         bool $isExistingAuthor
     ): void {
@@ -215,6 +310,7 @@ class AuthorsProcessor
         $normalizedOrcid = static::normalizeOrcid($orcid);
         if (!empty($normalizedOrcid)) {
             $author->setOrcid($normalizedOrcid);
+            $author->setOrcidVerified(true);
         }
 
         if ($affiliation) {
@@ -229,6 +325,10 @@ class AuthorsProcessor
                 $affiliationEntity->setName((string) $affiliation, $locale);
                 $author->addAffiliation($affiliationEntity);
             }
+        }
+
+        if (!empty($biography)) {
+            $author->setBiography($biography, $locale);
         }
     }
 }

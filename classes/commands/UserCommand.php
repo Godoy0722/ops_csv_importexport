@@ -94,7 +94,7 @@ class UserCommand
                         InvalidRowValidations::validateUserAlreadyExistsWithThisUsername($data->username);
                     }
 
-                    $roles = array_map('trim', explode(';', $data->roles));
+                    $roles = array_map('trim', explode(';', $data->roles ?? ''));
 
                     InvalidRowValidations::validateAllUserGroupsAreValid($roles, $server->getId(), $server->getPrimaryLocale());
 
@@ -110,7 +110,7 @@ class UserCommand
 
                     $user = UsersProcessor::process($data, $server->getPrimaryLocale());
                     $userId = $user->getId();
-                    $userInterests = array_map('trim', explode(';', $data->reviewInterests));
+                    $userInterests = array_map('trim', explode(';', $data->reviewInterests ?? ''));
                     UserInterestsProcessor::process($userInterests, $userId);
                     UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
 

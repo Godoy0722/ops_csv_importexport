@@ -536,11 +536,30 @@ class PublicationProcessorTest extends BaseTestCase
 
         $publication = new Publication();
         $publication->setId(2);
+        $publication->setData('submissionId', 1);
 
         $basePublication = new Publication();
         $basePublication->setId(1);
 
         $pubRepoMock->shouldReceive('get')->with(2)->andReturn($publication);
+
+        $subRepoMock = $this->mockSubmissionRepository();
+        $submission = new \APP\submission\Submission();
+        $submission->setData('contextId', 1);
+        $subRepoMock->shouldReceive('get')->with(1)->andReturn($submission);
+
+        // Mock DOI repository for setStoredPubId
+        $capturedDoi = null;
+        $doiRepoMock = Mockery::mock(\APP\doi\Repository::class)->makePartial();
+        $doiRepoMock->shouldReceive('newDataObject')->andReturnUsing(function ($params) use (&$capturedDoi) {
+            $capturedDoi = $params['doi'];
+            $doiObj = new \PKP\doi\Doi();
+            $doiObj->setData('doi', $params['doi']);
+            $doiObj->setData('contextId', $params['contextId']);
+            return $doiObj;
+        });
+        $doiRepoMock->shouldReceive('add')->andReturn(99);
+        app()->instance(\APP\doi\Repository::class, $doiRepoMock);
 
         $data = CsvTestDataBuilder::preprint()
             ->withVersion('2')
@@ -552,7 +571,8 @@ class PublicationProcessorTest extends BaseTestCase
 
         $result = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->tempDir);
 
-        $this->assertEquals('10.1234/test-v2', $result->getData('pub-id::doi'));
+        $this->assertEquals('10.1234/test-v2', $capturedDoi);
+        $this->assertEquals(99, $result->getData('doiId'));
     }
 
     public function testProcessVersionedPublicationSetsReferencesFromFile(): void
@@ -705,7 +725,7 @@ class PublicationProcessorTest extends BaseTestCase
 
         $this->assertEquals('Título em Português', $result->getData('title', 'pt_BR'));
         $this->assertEquals('Subtítulo', $result->getData('subtitle', 'pt_BR'));
-        $this->assertEquals('Resumo do artigo', $result->getData('abstract', 'pt_BR'));
+        $this->assertEquals('<p>Resumo do artigo</p>', $result->getData('abstract', 'pt_BR'));
     }
 
     public function testProcessMultiLocalePublicationSkipsEmptyFields(): void
@@ -993,6 +1013,107 @@ class PublicationProcessorTest extends BaseTestCase
         $this->assertEquals([
             'pt_BR' => ['FAPESP'],
         ], $editParams['supportingAgencies']);
+    }
+
+    // ==================== DOI Handling Tests ====================
+
+    public function testProcessSetsDoiWhenProvided(): void
+    {
+        $pubRepoMock = $this->mockPublicationRepository();
+
+        $currentPub = new Publication();
+        $currentPub->setId(1);
+        $currentPub->setData('submissionId', 1);
+
+        $pubRepoMock->shouldReceive('get')->with(1)->andReturn($currentPub);
+
+        $submission = $this->createMockSubmission([
+            'id' => 1,
+            'contextId' => 1,
+            'currentPublication' => $currentPub,
+        ]);
+
+        $server = $this->createMockServer(['id' => 1]);
+
+        $subRepoMock = $this->mockSubmissionRepository();
+        $subRepoMock->shouldReceive('get')->with(1)->andReturn($submission);
+
+        $capturedDoi = null;
+        $doiRepoMock = Mockery::mock(\APP\doi\Repository::class)->makePartial();
+        $doiRepoMock->shouldReceive('newDataObject')->andReturnUsing(function ($params) use (&$capturedDoi) {
+            $capturedDoi = $params['doi'];
+            $doiObj = new \PKP\doi\Doi();
+            $doiObj->setData('doi', $params['doi']);
+            $doiObj->setData('contextId', $params['contextId']);
+            return $doiObj;
+        });
+        $doiRepoMock->shouldReceive('add')->andReturn(42);
+        app()->instance(\APP\doi\Repository::class, $doiRepoMock);
+
+        $data = CsvTestDataBuilder::preprint()
+            ->withLocale('en')
+            ->withTitle('Test Title')
+            ->withDoi('10.5555/test-doi')
+            ->withDatePosted('2024-01-15')
+            ->buildObject();
+
+        $result = PublicationProcessor::process($submission, $data, $server, $this->tempDir);
+
+        $this->assertEquals('10.5555/test-doi', $capturedDoi, 'DOI should be properly stored in the database');
+        $this->assertEquals(42, $result->getData('doiId'), 'Publication should reference the stored DOI ID');
+    }
+
+    public function testProcessDoesNotSetDoiWhenEmpty(): void
+    {
+        $pubRepoMock = $this->mockPublicationRepository();
+
+        $currentPub = new Publication();
+        $currentPub->setId(1);
+
+        $pubRepoMock->shouldReceive('get')->with(1)->andReturn($currentPub);
+
+        $submission = $this->createMockSubmission([
+            'id' => 1,
+            'currentPublication' => $currentPub,
+        ]);
+
+        $server = $this->createMockServer(['id' => 1]);
+
+        $data = CsvTestDataBuilder::preprint()
+            ->withLocale('en')
+            ->withTitle('Test Title')
+            ->withDoi('')
+            ->withDatePosted('2024-01-15')
+            ->buildObject();
+
+        $result = PublicationProcessor::process($submission, $data, $server, $this->tempDir);
+
+        $this->assertNull($result->getData('doiId'), 'DOI should NOT be added when doi column is empty');
+    }
+
+    public function testProcessVersionedPublicationDoesNotSetDoiWhenEmpty(): void
+    {
+        $pubRepoMock = $this->mockPublicationRepository();
+
+        $publication = new Publication();
+        $publication->setId(2);
+
+        $basePublication = new Publication();
+        $basePublication->setId(1);
+
+        $pubRepoMock->shouldReceive('get')->with(2)->andReturn($publication);
+
+        $data = CsvTestDataBuilder::preprint()
+            ->withVersion('2')
+            ->withTitle('Title')
+            ->withDoi('')
+            ->withDatePosted('2024-06-15')
+            ->withLocale('en')
+            ->buildObject();
+
+        $result = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->tempDir);
+
+        $this->assertNull($result->getData('doiId'), 'DOI should NOT be added when doi column is empty');
     }
 
     // ==================== uploadCoverImage Validation Return Path ====================

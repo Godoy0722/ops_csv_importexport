@@ -277,10 +277,10 @@ class RequiredPreprintHeadersTest extends BaseTestCase
             'serverPath', 'locale', 'versionIdentifier', 'version', 'preprintPrefix',
             'preprintTitle', 'preprintSubtitle', 'preprintAbstract', 'authors', 'keywords',
             'subjects', 'coverage', 'categories', 'doi', 'coverImageFilename',
-            'coverImageAltText', 'galleyFilenames', 'galleyLabels', 'suppFilenames',
+            'coverImageAltText', 'galleyFilenames', 'galleyLabels', 'galleyViews', 'suppFilenames',
             'suppLabels', 'suppDescriptions', 'sectionTitle', 'sectionAbbrev', 'datePosted',
             'dateSubmitted', 'copyrightYear', 'copyrightHolder', 'licenseUrl', 'references',
-            'vorDoi', 'supportingAgencies', 'username', 'funders'
+            'vorDoi', 'supportingAgencies', 'username', 'funders', 'preprintViews'
         ];
 
         $this->assertEquals($expectedHeaders, RequiredPreprintHeaders::$preprintHeaders);

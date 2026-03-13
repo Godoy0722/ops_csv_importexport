@@ -373,6 +373,56 @@ class SubjectsProcessorTest extends BaseTestCase
         ], $editParams['subjects']);
     }
 
+    public function testProcessDoesNotAddBlankSubjectsWhenColumnEmpty(): void
+    {
+        $editCallCount = 0;
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editCallCount, &$editParams) {
+            $editCallCount++;
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        // Empty subjects column
+        $data = (object) [
+            'subjects' => '',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication);
+
+        // Repo::publication()->edit should NOT be called at all
+        $this->assertEquals(0, $editCallCount, 'No subjects should be set when column is empty');
+        $this->assertNull($editParams, 'edit() should not have been called');
+    }
+
+    public function testProcessDoesNotAddBlankSubjectsWhenColumnContainsOnlyWhitespace(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        // Subjects column with only whitespace and semicolons
+        $data = (object) [
+            'subjects' => ' ; ; ',
+            'locale' => 'en',
+        ];
+
+        SubjectsProcessor::process($data, $publication);
+
+        $this->assertEquals(0, $editCallCount, 'No subjects should be set when column only contains whitespace');
+    }
+
     public function testProcessMultiLocaleReturnsEarlyWhenAllFilteredOut(): void
     {
         $editCallCount = 0;

@@ -336,7 +336,7 @@ class AuthorsProcessorTest extends BaseTestCase
         $method = $this->getUpdateAuthorFromCsvMethod();
         $author = new Author();
 
-        $method->invoke(null, $author, 'John', 'Doe', '', '', 'en', false);
+        $method->invoke(null, $author, 'John', 'Doe', '', '', '', 'en', false);
 
         $this->assertEquals('John', $author->getGivenName('en'));
         $this->assertEquals('Doe', $author->getFamilyName('en'));
@@ -350,7 +350,7 @@ class AuthorsProcessorTest extends BaseTestCase
         $author->setGivenName('Existing', 'en');
         $author->setFamilyName('Author', 'en');
 
-        $method->invoke(null, $author, '', '', '', '', 'en', true);
+        $method->invoke(null, $author, '', '', '', '', '', 'en', true);
 
         $this->assertEquals('Existing', $author->getGivenName('en'));
         $this->assertEquals('Author', $author->getFamilyName('en'));
@@ -362,7 +362,7 @@ class AuthorsProcessorTest extends BaseTestCase
         $method = $this->getUpdateAuthorFromCsvMethod();
         $author = new Author();
 
-        $method->invoke(null, $author, 'John', 'Doe', '0000-0002-1825-0097', '', 'en', false);
+        $method->invoke(null, $author, 'John', 'Doe', '0000-0002-1825-0097', '', '', 'en', false);
 
         $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $author->getOrcid());
     }
@@ -373,7 +373,7 @@ class AuthorsProcessorTest extends BaseTestCase
         $method = $this->getUpdateAuthorFromCsvMethod();
         $author = new Author();
 
-        $method->invoke(null, $author, 'John', 'Doe', 'invalid-orcid', '', 'en', false);
+        $method->invoke(null, $author, 'John', 'Doe', 'invalid-orcid', '', '', 'en', false);
 
         $this->assertEmpty($author->getOrcid());
     }
@@ -384,10 +384,49 @@ class AuthorsProcessorTest extends BaseTestCase
         $method = $this->getUpdateAuthorFromCsvMethod();
         $author = new Author();
 
-        $method->invoke(null, $author, 'John', 'Doe', '', 'MIT', 'en', false);
+        $method->invoke(null, $author, 'John', 'Doe', '', 'MIT', '', 'en', false);
 
         $affiliations = $author->getAffiliations();
         $this->assertNotEmpty($affiliations);
+    }
+
+    public function testUpdateAuthorFromCsvSetsBiography(): void
+    {
+        $this->mockAffiliationRepository();
+        $method = $this->getUpdateAuthorFromCsvMethod();
+        $author = new Author();
+
+        $method->invoke(null, $author, 'John', 'Doe', '', '', 'Expert in AI research', 'en', false);
+
+        $this->assertEquals('Expert in AI research', $author->getBiography('en'));
+    }
+
+    public function testProcessCreatesAuthorWithBiographyFromCsvField(): void
+    {
+        $addCallCount = 0;
+        $capturedAuthor = null;
+        $authorRepoMock = $this->mockAuthorRepository();
+        $this->mockPublicationRepository();
+        $this->mockAffiliationRepository();
+
+        $authorRepoMock->shouldReceive('add')->andReturnUsing(function ($author) use (&$addCallCount, &$capturedAuthor) {
+            $addCallCount++;
+            $capturedAuthor = $author;
+            return $addCallCount;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        $data = (object) [
+            'authors' => 'John,Doe,john@example.com,,MIT,Expert in machine learning',
+            'locale' => 'en',
+        ];
+
+        AuthorsProcessor::process($data, 'contact@example.com', 1, $publication, 1);
+
+        $this->assertEquals(1, $addCallCount);
+        $this->assertEquals('Expert in machine learning', $capturedAuthor->getBiography('en'));
     }
 
     public function testProcessCreatesSingleAuthor(): void
@@ -676,7 +715,7 @@ class AuthorsProcessorTest extends BaseTestCase
         $author->addAffiliation($existingAffiliation);
 
         // Call with new affiliation data - should update existing affiliation, not create new one
-        $method->invoke(null, $author, 'John', 'Doe', '', 'New University', 'pt_BR', true);
+        $method->invoke(null, $author, 'John', 'Doe', '', 'New University', '', 'pt_BR', true);
 
         // The existing affiliation should be updated with the new locale
         $this->assertEquals('New University', $existingAffiliation->getName('pt_BR'));

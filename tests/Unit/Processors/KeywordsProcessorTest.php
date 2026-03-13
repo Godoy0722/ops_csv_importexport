@@ -390,6 +390,56 @@ class KeywordsProcessorTest extends BaseTestCase
         ], $editParams['keywords']);
     }
 
+    public function testProcessDoesNotAddBlankKeywordsWhenColumnEmpty(): void
+    {
+        $editCallCount = 0;
+        $editParams = null;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub, $params) use (&$editCallCount, &$editParams) {
+            $editCallCount++;
+            $editParams = $params;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        // Empty keywords column
+        $data = (object) [
+            'keywords' => '',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication);
+
+        // Repo::publication()->edit should NOT be called at all
+        $this->assertEquals(0, $editCallCount, 'No keywords should be set when column is empty');
+        $this->assertNull($editParams, 'edit() should not have been called');
+    }
+
+    public function testProcessDoesNotAddBlankKeywordsWhenColumnContainsOnlyWhitespace(): void
+    {
+        $editCallCount = 0;
+        $pubRepoMock = $this->mockPublicationRepository();
+        $pubRepoMock->shouldReceive('edit')->andReturnUsing(function ($pub) use (&$editCallCount) {
+            $editCallCount++;
+            return $pub;
+        });
+
+        $publication = new Publication();
+        $publication->setId(1);
+
+        // Keywords column with only whitespace and semicolons
+        $data = (object) [
+            'keywords' => ' ; ; ',
+            'locale' => 'en',
+        ];
+
+        KeywordsProcessor::process($data, $publication);
+
+        $this->assertEquals(0, $editCallCount, 'No keywords should be set when column only contains whitespace');
+    }
+
     public function testProcessMultiLocaleReturnsEarlyWhenAllFilteredOut(): void
     {
         $editCallCount = 0;

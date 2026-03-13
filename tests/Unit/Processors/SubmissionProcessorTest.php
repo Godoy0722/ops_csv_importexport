@@ -161,7 +161,7 @@ class SubmissionProcessorTest extends BaseTestCase
         $this->assertEquals('en', $capturedSubmission->getData('locale'));
         $this->assertEquals(WORKFLOW_STAGE_ID_PRODUCTION, $capturedSubmission->getData('stageId'));
         $this->assertEquals('', $capturedSubmission->getData('submissionProgress'));
-        $this->assertEquals('My test abstract', $capturedSubmission->getData('abstract', 'en'));
+        $this->assertEquals('<p>My test abstract</p>', $capturedSubmission->getData('abstract', 'en'));
         $this->assertEquals('2024-01-10', $capturedSubmission->getData('dateSubmitted'));
     }
 

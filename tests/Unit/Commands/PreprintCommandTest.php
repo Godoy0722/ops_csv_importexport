@@ -26,6 +26,7 @@ use APP\plugins\importexport\csv\classes\processors\PublicationProcessor;
 use APP\plugins\importexport\csv\classes\processors\SectionsProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubjectsProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor;
+use APP\plugins\importexport\csv\classes\processors\StatisticsProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredPreprintHeaders;
@@ -60,7 +61,7 @@ class PreprintCommandTest extends BaseTestCase
     {
         $headers = CsvTestDataBuilder::getPreprintHeaders();
 
-        $this->assertCount(33, $headers);
+        $this->assertCount(35, $headers);
     }
 
     public function testPreprintRequiredHeadersCount(): void
@@ -419,6 +420,8 @@ class PreprintCommandTest extends BaseTestCase
         $validationMock->shouldReceive('validateFundingPluginEnabled');
         $validationMock->shouldReceive('validateFundersCrossrefRegistry');
         $validationMock->shouldReceive('validatePublicationWasSuccessfullyCreated');
+        $validationMock->shouldReceive('validatePreprintViews');
+        $validationMock->shouldReceive('validateGalleyViews');
         $validationMock->shouldReceive('versionExistsInAnyLocale')->andReturn(false)->byDefault();
 
         // Overload processors - PublicationProcessor
@@ -449,6 +452,8 @@ class PreprintCommandTest extends BaseTestCase
         $authorsMock = Mockery::mock('overload:' . AuthorsProcessor::class);
         $authorsMock->shouldReceive('process');
         $authorsMock->shouldReceive('processMultiLocale');
+        $authorsMock->shouldReceive('addAuthorFromUser');
+        $authorsMock->shouldReceive('updateUsernameAuthorLocale');
 
         $keywordsMock = Mockery::mock('overload:' . KeywordsProcessor::class);
         $keywordsMock->shouldReceive('process');
@@ -469,6 +474,11 @@ class PreprintCommandTest extends BaseTestCase
 
         $sectionsMock = Mockery::mock('overload:' . SectionsProcessor::class);
         $sectionsMock->shouldReceive('process');
+
+        $statisticsMock = Mockery::mock('overload:' . StatisticsProcessor::class);
+        $statisticsMock->shouldReceive('insertPreprintViews');
+        $statisticsMock->shouldReceive('insertGalleyViews');
+        $statisticsMock->shouldReceive('resolveFileType')->andReturn(1)->byDefault();
 
         // Overload file-related processors
         $submissionFileMockObj = new SubmissionFile();
@@ -502,6 +512,11 @@ class PreprintCommandTest extends BaseTestCase
         $subRepoMock = $this->mockSubmissionRepository();
         $subRepoMock->shouldReceive('get')->andReturn($subMock)->byDefault();
         $subRepoMock->shouldReceive('delete');
+
+        // Mock stageAssignment repository for Repo::stageAssignment()->build()
+        $stageAssignmentMock = Mockery::mock(\PKP\stageAssignment\Repository::class);
+        $stageAssignmentMock->shouldReceive('build')->andReturn(new \PKP\stageAssignment\StageAssignment());
+        app()->instance(\PKP\stageAssignment\Repository::class, $stageAssignmentMock);
 
         // Pre-populate CachedEntities
         $server = $this->createMockServer(['id' => 1, 'path' => 'testserver', 'supportedLocales' => ['en', 'pt_BR']]);
@@ -1365,5 +1380,106 @@ class PreprintCommandTest extends BaseTestCase
 
         // Line 385-389: PublicationProcessor::setCoverImage was called for v2 with base cover image
         $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+    }
+
+    /**
+     * Test 1: If a valid user is inserted on the username column, it must be assigned to the preprint.
+     * Verifies that Repo::stageAssignment()->build() is called with the correct user.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testRunAssignsValidUserToPreprint(): void
+    {
+        $mocks = $this->setupAllMocks();
+
+        // Add a valid cached user
+        $csvUser = $this->createMockUser(['id' => 10, 'username' => 'validauthor']);
+        CachedEntities::$users['validauthor'] = $csvUser;
+
+        // Track stageAssignment build calls
+        $stageAssignmentCalled = false;
+        $capturedUserId = null;
+        $capturedSubmissionId = null;
+        $stageAssignmentMock = Mockery::mock(\PKP\stageAssignment\Repository::class);
+        $stageAssignmentMock->shouldReceive('build')
+            ->andReturnUsing(function ($submissionId, $userGroupId, $userId) use (&$stageAssignmentCalled, &$capturedUserId, &$capturedSubmissionId) {
+                $stageAssignmentCalled = true;
+                $capturedUserId = $userId;
+                $capturedSubmissionId = $submissionId;
+                return new \PKP\stageAssignment\StageAssignment();
+            });
+        app()->instance(\PKP\stageAssignment\Repository::class, $stageAssignmentMock);
+
+        $headers = RequiredPreprintHeaders::$preprintHeaders;
+        $row = CsvTestDataBuilder::preprint()
+            ->withServerPath('testserver')
+            ->withLocale('en')
+            ->withTitle('User Assignment Test')
+            ->withAuthors('John,Doe,john@example.com,,MIT')
+            ->withDatePosted('2024-01-15')
+            ->withSectionTitle('Preprints')
+            ->withSectionAbbrev('PRE')
+            ->withUsername('validauthor')
+            ->buildArray();
+
+        $this->createTestCsvFile($this->tempDir, 'preprints.csv', $headers, [$row]);
+
+        $senderUser = $this->createMockUser();
+        $command = new PreprintCommand($this->tempDir, $senderUser);
+
+        ob_start();
+        $command->run();
+        $output = ob_get_clean();
+
+        $this->assertTrue($stageAssignmentCalled, 'stageAssignment()->build() should have been called for valid user');
+        $this->assertEquals(10, $capturedUserId, 'The valid user ID should be passed to stageAssignment');
+        $this->assertEquals(1, $capturedSubmissionId, 'The submission ID should be passed to stageAssignment');
+        $this->assertStringNotContainsString('plugins.importexport.csv.usernameNotFoundUsingDefault', $output);
+    }
+
+    /**
+     * Test 2: If the username column is filled with an invalid user, there mustn't be any assignment.
+     * Verifies that Repo::stageAssignment()->build() is NOT called for unknown users.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testRunDoesNotAssignInvalidUserToPreprint(): void
+    {
+        $mocks = $this->setupAllMocks();
+
+        // Track stageAssignment build calls
+        $stageAssignmentCalled = false;
+        $stageAssignmentMock = Mockery::mock(\PKP\stageAssignment\Repository::class);
+        $stageAssignmentMock->shouldReceive('build')
+            ->andReturnUsing(function () use (&$stageAssignmentCalled) {
+                $stageAssignmentCalled = true;
+                return new \PKP\stageAssignment\StageAssignment();
+            });
+        app()->instance(\PKP\stageAssignment\Repository::class, $stageAssignmentMock);
+
+        // 'nonexistentuser' is NOT in the cache, so getCachedUserByUsername returns null
+        $headers = RequiredPreprintHeaders::$preprintHeaders;
+        $row = CsvTestDataBuilder::preprint()
+            ->withServerPath('testserver')
+            ->withLocale('en')
+            ->withTitle('Invalid User Test')
+            ->withAuthors('John,Doe,john@example.com,,MIT')
+            ->withDatePosted('2024-01-15')
+            ->withSectionTitle('Preprints')
+            ->withSectionAbbrev('PRE')
+            ->withUsername('nonexistentuser')
+            ->buildArray();
+
+        $this->createTestCsvFile($this->tempDir, 'preprints.csv', $headers, [$row]);
+
+        $senderUser = $this->createMockUser(['username' => 'admin']);
+        $command = new PreprintCommand($this->tempDir, $senderUser);
+
+        ob_start();
+        $command->run();
+        $output = ob_get_clean();
+
+        $this->assertFalse($stageAssignmentCalled, 'stageAssignment()->build() should NOT have been called for invalid user');
+        $this->assertStringContainsString('plugins.importexport.csv.usernameNotFoundUsingDefault', $output);
     }
 }

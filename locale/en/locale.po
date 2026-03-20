@@ -201,3 +201,9 @@ msgstr "The number of galleyViews values doesn't match the number of galleyLabel
 
 msgid "plugins.importexport.csv.invalidGalleyViewValue"
 msgstr "Invalid galley view value \"{$value}\". Each galley view must be empty or a non-negative integer."
+
+msgid "plugins.importexport.csv.invalidSourceDir"
+msgstr "The source directory is invalid or does not exist."
+
+msgid "plugins.importexport.csv.filePathEscapesSourceDir"
+msgstr "File path \"{$filename}\" escapes the source directory. Filenames must not contain path traversal sequences."

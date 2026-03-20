@@ -2,3 +2,4 @@
 .phpunit.cache/
 imports/
 tests/coverage/
+CLAUDE.md

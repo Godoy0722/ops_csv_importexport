@@ -30,6 +30,27 @@ class InvalidRowValidations
     static array $coverImageAllowedTypes = ['gif', 'jpg', 'png', 'webp'];
 
     /**
+     * Validates that a resolved file path stays within the source directory.
+     * Prevents path traversal attacks via CSV filenames like "../../etc/passwd".
+     *
+     * @throws RowValidationException
+     */
+    public static function validatePathWithinSourceDir(string $filename, string $sourceDir): string
+    {
+        $resolvedSourceDir = realpath($sourceDir);
+        if ($resolvedSourceDir === false) {
+            throw new RowValidationException(__('plugins.importexport.csv.invalidSourceDir'));
+        }
+
+        $resolvedPath = realpath("{$resolvedSourceDir}/{$filename}");
+        if ($resolvedPath === false || !str_starts_with($resolvedPath, $resolvedSourceDir . DIRECTORY_SEPARATOR)) {
+            throw new RowValidationException(__('plugins.importexport.csv.filePathEscapesSourceDir', ['filename' => $filename]));
+        }
+
+        return $resolvedPath;
+    }
+
+    /**
      * Validates whether the email is valid.
      *
      * @throws RowValidationException
@@ -82,6 +103,7 @@ class InvalidRowValidations
      */
     public static function validatePreprintFileIsValid(string $coverImageFilename, string $sourceDir): void
     {
+        static::validatePathWithinSourceDir($coverImageFilename, $sourceDir);
         $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
 
         if (!is_readable($preprintCoverImagePath)) {
@@ -96,6 +118,7 @@ class InvalidRowValidations
      */
     public static function validateCoverImageIsValid(string $coverImageFilename, string $sourceDir): void
     {
+        static::validatePathWithinSourceDir($coverImageFilename, $sourceDir);
         $preprintCoverImagePath = "{$sourceDir}/{$coverImageFilename}";
 
         if (!is_readable($preprintCoverImagePath)) {
@@ -124,6 +147,7 @@ class InvalidRowValidations
         }
 
         foreach($galleyFilenamesArray as $galleyFilename) {
+            static::validatePathWithinSourceDir($galleyFilename, $sourceDir);
             $galleyPath = "{$sourceDir}/{$galleyFilename}";
             if (!is_readable($galleyPath)) {
                 throw new RowValidationException(__('plugins.importexport.csv.invalidGalleyFile', ['filename' => $galleyFilename]));
@@ -146,6 +170,7 @@ class InvalidRowValidations
         }
 
         foreach($suppFilenamesArray as $suppFilename) {
+            static::validatePathWithinSourceDir($suppFilename, $sourceDir);
             $suppPath = "{$sourceDir}/{$suppFilename}";
             if (!is_readable($suppPath)) {
                 throw new RowValidationException(__('plugins.importexport.csv.invalidSupplementaryFile', ['filename' => $suppFilename]));
@@ -309,6 +334,7 @@ class InvalidRowValidations
             return; // References file is optional
         }
 
+        static::validatePathWithinSourceDir($referencesFilename, $sourceDir);
         $referencesFilePath = "{$sourceDir}/{$referencesFilename}";
 
         if (!is_readable($referencesFilePath)) {

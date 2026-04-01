@@ -24,6 +24,7 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\exceptions\FileNotSavedException;
 use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
 use APP\plugins\importexport\csv\classes\handlers\CsvFileHandler;
+use APP\plugins\importexport\csv\classes\handlers\DryModeReporter;
 use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
 use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
@@ -112,8 +113,12 @@ class PreprintCommand
         $this->fileService ??= app()->get('file');
     }
 
-    public function run(): void
+    public function run(): int
     {
+        $totalFiles = 0;
+        $totalPassed = 0;
+        $totalFailed = 0;
+
         foreach (new \DirectoryIterator($this->sourceDir) as $fileInfo) {
             // Accept CSV files regardless of extension case (e.g., .csv, .CSV, .Csv)
             if (!$fileInfo->isFile() || strcasecmp($fileInfo->getExtension(), 'csv') !== 0) {
@@ -138,6 +143,7 @@ class PreprintCommand
 
             $this->processedRows = 0;
             $this->failedRows = 0;
+            $fileFailedRows = [];
 
             foreach ($file as $index => $fields) {
                 if (!$index || empty(array_filter($fields))) {
@@ -481,8 +487,26 @@ class PreprintCommand
                         }
                     }
                     CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $e->getMessage(), $this->failedRows);
+                    if ($this->dryMode) {
+                        $fileFailedRows[] = ['row' => $this->processedRows, 'reason' => $e->getMessage()];
+                    }
                     continue;
                 }
+            }
+
+            if ($this->dryMode) {
+                $passed = $this->processedRows - $this->failedRows;
+                DryModeReporter::printFileHeader($basename);
+                if (!empty($fileFailedRows)) {
+                    DryModeReporter::printTableHeader();
+                    foreach ($fileFailedRows as $failedRow) {
+                        DryModeReporter::printFailedRow($failedRow['row'], $failedRow['reason']);
+                    }
+                }
+                DryModeReporter::printFileSummary($passed, $this->failedRows, $this->processedRows);
+                $totalFiles++;
+                $totalPassed += $passed;
+                $totalFailed += $this->failedRows;
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [
@@ -492,10 +516,15 @@ class PreprintCommand
             ]) . "\n";
         }
 
-        if (!$this->dryMode) {
-            $this->syncCoverImagesForProcessedPreprints();
-            $this->setCurrentVersionsForProcessedPreprints();
+        if ($this->dryMode) {
+            DryModeReporter::printGrandTotal($totalFiles, $totalPassed, $totalFailed);
+            return $totalFailed > 0 ? 1 : 0;
         }
+
+        $this->syncCoverImagesForProcessedPreprints();
+        $this->setCurrentVersionsForProcessedPreprints();
+
+        return 0;
     }
 
     /**

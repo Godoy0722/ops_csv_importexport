@@ -145,6 +145,11 @@ class PreprintCommand
             $this->failedRows = 0;
             $fileFailedRows = [];
 
+            if ($this->dryMode) {
+                DB::statement('SET FOREIGN_KEY_CHECKS=0');
+                DB::beginTransaction();
+            }
+
             foreach ($file as $index => $fields) {
                 if (!$index || empty(array_filter($fields))) {
                     continue; // Skip headers or end of file
@@ -290,10 +295,6 @@ class PreprintCommand
                         }
                     }
 
-                    if ($this->dryMode) {
-                        continue;
-                    }
-
                     if ($isMultiLocaleImport) {
                         $submission = $existingSubmission;
                         $publication = $basePublication;
@@ -321,7 +322,11 @@ class PreprintCommand
                         );
                     }
 
-                    $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+                    if (!$this->dryMode) {
+                        $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+                    } else {
+                        $galleyMetadata = [];
+                    }
 
                     if (!empty($data->preprintViews) && (int)$data->preprintViews > 0) {
                         StatisticsProcessor::insertPreprintViews(
@@ -331,7 +336,7 @@ class PreprintCommand
                         );
                     }
 
-                    if (!empty($data->galleyViews) && !empty($galleyMetadata)) {
+                    if (!$this->dryMode && !empty($data->galleyViews) && !empty($galleyMetadata)) {
                         $galleyViewsArray = explode(';', $data->galleyViews);
                         foreach ($galleyViewsArray as $idx => $views) {
                             $views = trim($views);
@@ -353,7 +358,7 @@ class PreprintCommand
                     }
 
                     // Process supplementary files
-                    if ($data->suppFilenames) {
+                    if (!$this->dryMode && $data->suppFilenames) {
                         // Get supplementary genre for supplementary files
                         $suppGenreId = CachedEntities::getCachedSupplementaryGenreId($server->getId()) ?? $genreId;
                         $suppIds = [];
@@ -507,6 +512,11 @@ class PreprintCommand
                 $totalFiles++;
                 $totalPassed += $passed;
                 $totalFailed += $this->failedRows;
+
+                DB::rollBack();
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+                CachedEntities::reset();
+                $this->processedPreprints = [];
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [

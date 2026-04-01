@@ -99,7 +99,7 @@ class PreprintCommand
      */
     private array $processedPreprints;
 
-    public function __construct(private string $sourceDir, private User $user)
+    public function __construct(private string $sourceDir, private User $user, private bool $dryMode = false)
     {
         $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
         $this->processedPreprints = [];
@@ -244,7 +244,7 @@ class PreprintCommand
                     }
 
                     $coverImageUploadName = null;
-                    if ($data->coverImageFilename) {
+                    if (!$this->dryMode && $data->coverImageFilename) {
                         try {
                             $coverImageUploadName = PublicationProcessor::uploadCoverImage(
                                 $data,
@@ -282,6 +282,10 @@ class PreprintCommand
                             $existingSubmission = $lastVersionData['submission'];
                             $basePublication = $lastVersionData['publication'];
                         }
+                    }
+
+                    if ($this->dryMode) {
+                        continue;
                     }
 
                     if ($isMultiLocaleImport) {
@@ -488,8 +492,10 @@ class PreprintCommand
             ]) . "\n";
         }
 
-        $this->syncCoverImagesForProcessedPreprints();
-        $this->setCurrentVersionsForProcessedPreprints();
+        if (!$this->dryMode) {
+            $this->syncCoverImagesForProcessedPreprints();
+            $this->setCurrentVersionsForProcessedPreprints();
+        }
     }
 
     /**

@@ -207,3 +207,18 @@ msgstr "The source directory is invalid or does not exist."
 
 msgid "plugins.importexport.csv.filePathEscapesSourceDir"
 msgstr "File path \"{$filename}\" escapes the source directory. Filenames must not contain path traversal sequences."
+
+msgid "plugins.importexport.csv.dryModeFileHeader"
+msgstr "=== {$filename} ==="
+
+msgid "plugins.importexport.csv.dryModeTableHeader"
+msgstr "ROW  | STATUS | ERROR"
+
+msgid "plugins.importexport.csv.dryModeFailedRow"
+msgstr "{$row}  | FAILED | {$reason}"
+
+msgid "plugins.importexport.csv.dryModeFileSummary"
+msgstr "Result: {$passed} passed, {$failed} failed ({$total} total)"
+
+msgid "plugins.importexport.csv.dryModeGrandTotal"
+msgstr "--- Dry-mode complete: {$files} files, {$passed} passed, {$failed} failed ---"

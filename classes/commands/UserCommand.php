@@ -40,7 +40,8 @@ class UserCommand
     public function __construct(
         private string $sourceDir,
         private User $senderEmailUser,
-        private bool $sendWelcomeEmail
+        private bool $sendWelcomeEmail,
+        private bool $dryMode = false
     ) {
         $this->expectedRowSize = count(RequiredUserHeaders::$userHeaders);
     }
@@ -106,6 +107,10 @@ class UserCommand
                     // User will need to use password reset function to receive a reset link
                     if (is_null($data->tempPassword)) {
                         $data->tempPassword = Validation::generatePassword();
+                    }
+
+                    if ($this->dryMode) {
+                        continue;
                     }
 
                     $user = UsersProcessor::process($data, $server->getPrimaryLocale());

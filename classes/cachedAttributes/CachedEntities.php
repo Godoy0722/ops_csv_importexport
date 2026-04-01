@@ -58,6 +58,20 @@ class CachedEntities
     /** @var array<string,SubscriptionType|null> */
     static array $subscriptionTypes = [];
 
+    /** Resets all cached entities. Used after dry-mode rollback to clear stale IDs. */
+    public static function reset(): void
+    {
+        static::$servers = [];
+        static::$userGroupIds = [];
+        static::$userGroups = [];
+        static::$genreIds = [];
+        static::$supplementaryGenreIds = [];
+        static::$categories = [];
+        static::$sections = [];
+        static::$users = [];
+        static::$subscriptionTypes = [];
+    }
+
     /** Retrieves a cached Server by its path. Returns null if an error occurs. */
     static function getCachedServer(string $serverPath): ?Server
     {

@@ -26,6 +26,7 @@ use APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor;
 use APP\plugins\importexport\csv\classes\processors\UsersProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredUserHeaders;
+use Illuminate\Support\Facades\DB;
 use PKP\security\Validation;
 use PKP\user\User;
 
@@ -77,6 +78,11 @@ class UserCommand
             $this->failedRows = 0;
             $fileFailedRows = [];
 
+            if ($this->dryMode) {
+                DB::statement('SET FOREIGN_KEY_CHECKS=0');
+                DB::beginTransaction();
+            }
+
             foreach ($file as $index => $fields) {
                 if (!$index || empty(array_filter($fields))) {
                     continue; // Skip headers or end of file
@@ -115,17 +121,13 @@ class UserCommand
                         $data->tempPassword = Validation::generatePassword();
                     }
 
-                    if ($this->dryMode) {
-                        continue;
-                    }
-
                     $user = UsersProcessor::process($data, $server->getPrimaryLocale());
                     $userId = $user->getId();
                     $userInterests = array_map('trim', explode(';', $data->reviewInterests ?? ''));
                     UserInterestsProcessor::process($userInterests, $userId);
                     UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
 
-                    if ($this->sendWelcomeEmail) {
+                    if ($this->sendWelcomeEmail && !$this->dryMode) {
                         // @review There were some discussions about strategies for mail delivery
                         WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                     }
@@ -157,6 +159,10 @@ class UserCommand
                 $totalFiles++;
                 $totalPassed += $passed;
                 $totalFailed += $this->failedRows;
+
+                DB::rollBack();
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+                CachedEntities::reset();
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [

@@ -131,7 +131,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
         $this->validateUser();
 
-        match ($this->command) {
+        $exitCode = match ($this->command) {
             'preprints' => (new PreprintCommand($this->sourceDir, $this->user, $dryMode))->run(),
             'users' => (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail, $dryMode))->run(),
             default => throw new \InvalidArgumentException(__('plugins.importexport.csv.invalidCommand', ['command' => $this->command])),
@@ -140,6 +140,8 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $endTime = microtime(true);
         $executionTime = $endTime - $startTime;
         echo __('plugins.importexport.csv.ExecutedInNSeconds', ['seconds' => number_format($executionTime, 2)]);
+
+        exit($exitCode);
     }
 
     private function validateUser(): void

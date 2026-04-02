@@ -624,12 +624,11 @@ class PreprintCommandDryModeTest extends BaseTestCase
     }
 
     /**
-     * Dry-mode with invalid rows produces zero invalid_ files on disk.
-     * The DryModeReporter console output is sufficient — no filesystem side effects.
+     * Dry-mode still creates invalid_ CSV files (same as normal mode).
      */
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
-    public function testDryModeDoesNotCreateInvalidCsvFiles(): void
+    public function testDryModeCreatesInvalidCsvFiles(): void
     {
         $mocks = $this->setupDryModeMocks();
 
@@ -653,8 +652,46 @@ class PreprintCommandDryModeTest extends BaseTestCase
         $command->run();
         ob_get_clean();
 
-        // No invalid_ files should exist in the source directory
+        // invalid_ files SHOULD exist — dry-mode creates them just like normal mode
         $invalidFiles = glob($this->tempDir . '/invalid_*');
-        $this->assertEmpty($invalidFiles, 'Dry-mode must not create invalid_ CSV files on disk');
+        $this->assertNotEmpty($invalidFiles, 'Dry-mode must create invalid_ CSV files on disk');
+    }
+
+    /**
+     * Dry-mode reporter row numbers account for the CSV header row (row 1 = headers, data starts at row 2).
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testDryModeReporterRowNumbersAccountForHeaderRow(): void
+    {
+        $mocks = $this->setupDryModeMocks();
+
+        // All rows fail validation
+        $mocks['validationMock']->shouldReceive('validateRowContainAllFields')
+            ->andThrow(new RowValidationException('Missing field'));
+
+        $this->createTestCsvFile(
+            $this->tempDir,
+            'preprints.csv',
+            CsvTestDataBuilder::getPreprintHeaders(),
+            [
+                CsvTestDataBuilder::minimalPreprintRow(),
+                CsvTestDataBuilder::minimalPreprintRow(),
+            ]
+        );
+
+        $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
+
+        ob_start();
+        $command->run();
+        ob_get_clean();
+
+        // Row 1 = headers, so first data row = row 2, second data row = row 3
+        $mocks['dryModeReporterMock']->shouldHaveReceived('printFailedRow')->twice();
+        $mocks['dryModeReporterMock']->shouldHaveReceived('printFailedRow')
+            ->with(2, \Mockery::any());
+        $mocks['dryModeReporterMock']->shouldHaveReceived('printFailedRow')
+            ->with(3, \Mockery::any());
+        $this->assertTrue(true); // Mockery expectations verified above
     }
 }

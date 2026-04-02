@@ -485,11 +485,6 @@ class PreprintCommand
                     }
 
                 } catch (RowValidationException | FileNotSavedException $e) {
-                    if ($this->dryMode) {
-                        ++$this->failedRows;
-                        $fileFailedRows[] = ['row' => $this->processedRows, 'reason' => $e->getMessage()];
-                        continue;
-                    }
                     if (is_null($invalidCsvFile)) {
                         $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
                         if (is_null($invalidCsvFile)) {
@@ -497,6 +492,9 @@ class PreprintCommand
                         }
                     }
                     CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $e->getMessage(), $this->failedRows);
+                    if ($this->dryMode) {
+                        $fileFailedRows[] = ['row' => $this->processedRows + 1, 'reason' => $e->getMessage()];
+                    }
                     continue;
                 }
             }

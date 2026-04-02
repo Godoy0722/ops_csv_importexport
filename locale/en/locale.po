@@ -58,6 +58,9 @@ msgstr "Row contains more fields than expected."
 msgid "plugins.importexport.csv.verifyRequiredFieldsForThisRow"
 msgstr "Verify the required fields for this row."
 
+msgid "plugins.importexport.csv.baseRowFailedForIdentifier"
+msgstr "Skipped: the base row for identifier \"{$identifier}\" failed validation earlier in this file. Fix the base row first, then this row will be processed as a multi-locale/version import."
+
 msgid "plugins.importexport.csv.unknownServer"
 msgstr "Unknown server with path \"{$serverPath}\"."
 

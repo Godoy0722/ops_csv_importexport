@@ -694,4 +694,71 @@ class PreprintCommandDryModeTest extends BaseTestCase
             ->with(3, \Mockery::any());
         $this->assertTrue(true); // Mockery expectations verified above
     }
+
+    /**
+     * When a base row fails, subsequent multi-locale rows for the same identifier
+     * show a cascaded failure message instead of the generic "Verify required fields."
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testDryModeCascadedMultiLocaleFailureShowsDescriptiveError(): void
+    {
+        $mocks = $this->setupDryModeMocks();
+
+        // Make validateRowContainAllFields throw on first call only (base row fails)
+        $callCount = 0;
+        $mocks['validationMock']->shouldReceive('validateRowContainAllFields')
+            ->andReturnUsing(function () use (&$callCount) {
+                $callCount++;
+                if ($callCount === 1) {
+                    throw new RowValidationException('Base row validation failed');
+                }
+                return null;
+            });
+
+        // Build base row with versionIdentifier
+        $baseRow = CsvTestDataBuilder::preprint()
+            ->withServerPath('testserver')
+            ->withLocale('en')
+            ->withTitle('Test Preprint')
+            ->withAuthors('John,Doe,john@example.com,,Test University')
+            ->withDatePosted('2024-01-15')
+            ->withSectionTitle('Preprints')
+            ->withSectionAbbrev('PRE')
+            ->withVersionIdentifier('TEST-MULTI-001')
+            ->withVersion('1')
+            ->buildArray();
+
+        // Multi-locale row — same versionIdentifier
+        $multiLocaleRow = CsvTestDataBuilder::preprint()
+            ->withServerPath('testserver')
+            ->withLocale('pt_BR')
+            ->withTitle('Preprint de Teste')
+            ->withVersionIdentifier('TEST-MULTI-001')
+            ->withVersion('1')
+            ->buildArray();
+
+        $this->createTestCsvFile(
+            $this->tempDir,
+            'preprints.csv',
+            CsvTestDataBuilder::getPreprintHeaders(),
+            [$baseRow, $multiLocaleRow]
+        );
+
+        $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
+
+        ob_start();
+        $exitCode = $command->run();
+        ob_get_clean();
+
+        $this->assertSame(1, $exitCode);
+
+        // Read the invalid_ file and verify it contains the cascaded failure message
+        $invalidFiles = glob($this->tempDir . '/invalid_*');
+        $this->assertNotEmpty($invalidFiles, 'Expected invalid_ file to be created');
+
+        $invalidContent = file_get_contents($invalidFiles[0]);
+        $this->assertStringContainsString('TEST-MULTI-001', $invalidContent,
+            'Cascaded failure message should reference the versionIdentifier');
+    }
 }

@@ -99,6 +99,7 @@ class PreprintCommand
      * @var array
      */
     private array $processedPreprints;
+    private array $failedIdentifiers = [];
 
     public function __construct(private string $sourceDir, private User $user, private bool $dryMode = false)
     {
@@ -164,6 +165,20 @@ class PreprintCommand
                         RequiredPreprintHeaders::$preprintHeaders,
                         array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                     );
+
+                    // Check for cascaded multi-locale/version failure before required fields check
+                    if (
+                        !empty($data->versionIdentifier)
+                        && !empty($data->version)
+                        && !isset($this->processedPreprints[$data->versionIdentifier])
+                        && isset($this->failedIdentifiers[$data->versionIdentifier])
+                    ) {
+                        throw new RowValidationException(
+                            __('plugins.importexport.csv.baseRowFailedForIdentifier', [
+                                'identifier' => $data->versionIdentifier,
+                            ])
+                        );
+                    }
 
                     InvalidRowValidations::validateRowHasAllRequiredFields(
                         $data,
@@ -485,6 +500,12 @@ class PreprintCommand
                     }
 
                 } catch (RowValidationException | FileNotSavedException $e) {
+                    // Track failed versionIdentifiers for cascaded failure detection
+                    $failedIdentifier = $fields[2] ?? null;
+                    if (!empty($failedIdentifier)) {
+                        $this->failedIdentifiers[$failedIdentifier] = true;
+                    }
+
                     if (is_null($invalidCsvFile)) {
                         $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
                         if (is_null($invalidCsvFile)) {
@@ -517,6 +538,7 @@ class PreprintCommand
                 DB::statement('SET FOREIGN_KEY_CHECKS=1');
                 CachedEntities::reset();
                 $this->processedPreprints = [];
+                $this->failedIdentifiers = [];
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [

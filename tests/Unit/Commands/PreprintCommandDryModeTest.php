@@ -619,4 +619,39 @@ class PreprintCommandDryModeTest extends BaseTestCase
         $this->assertSame(1, $exitCode);
         $mocks['dryModeReporterMock']->shouldHaveReceived('printFailedRow')->twice();
     }
+
+    /**
+     * Dry-mode with invalid rows produces zero invalid_ files on disk.
+     * The DryModeReporter console output is sufficient — no filesystem side effects.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testDryModeDoesNotCreateInvalidCsvFiles(): void
+    {
+        $mocks = $this->setupDryModeMocks();
+
+        // All calls throw RowValidationException
+        $mocks['validationMock']->shouldReceive('validateRowContainAllFields')
+            ->andThrow(new RowValidationException('Row validation failed'));
+
+        $this->createTestCsvFile(
+            $this->tempDir,
+            'preprints.csv',
+            CsvTestDataBuilder::getPreprintHeaders(),
+            [
+                CsvTestDataBuilder::minimalPreprintRow(),
+                CsvTestDataBuilder::minimalPreprintRow(),
+            ]
+        );
+
+        $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
+
+        ob_start();
+        $command->run();
+        ob_get_clean();
+
+        // No invalid_ files should exist in the source directory
+        $invalidFiles = glob($this->tempDir . '/invalid_*');
+        $this->assertEmpty($invalidFiles, 'Dry-mode must not create invalid_ CSV files on disk');
+    }
 }

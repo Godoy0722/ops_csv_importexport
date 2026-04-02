@@ -395,4 +395,35 @@ class UserCommandDryModeTest extends BaseTestCase
         // All rows failed — exit code must be 1
         $this->assertSame(1, $exitCode);
     }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testDryModeDoesNotCreateInvalidCsvFiles(): void
+    {
+        $mocks = $this->setupDryModeMocks();
+
+        // All rows throw RowValidationException
+        $mocks['validationMock']->shouldReceive('validateRowContainAllFields')
+            ->andThrow(new RowValidationException('Invalid row'));
+
+        $this->createTestCsvFile(
+            $this->tempDir,
+            'users.csv',
+            RequiredUserHeaders::$userHeaders,
+            [
+                CsvTestDataBuilder::minimalUserRow(),
+                CsvTestDataBuilder::minimalUserRow(),
+            ]
+        );
+
+        $command = new UserCommand($this->tempDir, $this->createMockUser(), false, dryMode: true);
+
+        ob_start();
+        $command->run();
+        ob_get_clean();
+
+        // No invalid_ files should exist in the source directory
+        $invalidFiles = glob($this->tempDir . '/invalid_*');
+        $this->assertEmpty($invalidFiles, 'Dry-mode must not create invalid_ CSV files on disk');
+    }
 }

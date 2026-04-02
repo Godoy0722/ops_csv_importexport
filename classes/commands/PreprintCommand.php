@@ -24,6 +24,7 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\exceptions\FileNotSavedException;
 use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
 use APP\plugins\importexport\csv\classes\handlers\CsvFileHandler;
+use APP\plugins\importexport\csv\classes\handlers\DryModeReporter;
 use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
 use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
@@ -98,8 +99,9 @@ class PreprintCommand
      * @var array
      */
     private array $processedPreprints;
+    private array $failedIdentifiers = [];
 
-    public function __construct(private string $sourceDir, private User $user)
+    public function __construct(private string $sourceDir, private User $user, private bool $dryMode = false)
     {
         $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
         $this->processedPreprints = [];
@@ -112,8 +114,12 @@ class PreprintCommand
         $this->fileService ??= app()->get('file');
     }
 
-    public function run(): void
+    public function run(): int
     {
+        $totalFiles = 0;
+        $totalPassed = 0;
+        $totalFailed = 0;
+
         foreach (new \DirectoryIterator($this->sourceDir) as $fileInfo) {
             // Accept CSV files regardless of extension case (e.g., .csv, .CSV, .Csv)
             if (!$fileInfo->isFile() || strcasecmp($fileInfo->getExtension(), 'csv') !== 0) {
@@ -138,6 +144,12 @@ class PreprintCommand
 
             $this->processedRows = 0;
             $this->failedRows = 0;
+            $fileFailedRows = [];
+
+            if ($this->dryMode) {
+                DB::statement('SET FOREIGN_KEY_CHECKS=0');
+                DB::beginTransaction();
+            }
 
             foreach ($file as $index => $fields) {
                 if (!$index || empty(array_filter($fields))) {
@@ -153,6 +165,20 @@ class PreprintCommand
                         RequiredPreprintHeaders::$preprintHeaders,
                         array_pad(array_map('trim', $fields), $this->expectedRowSize, null)
                     );
+
+                    // Check for cascaded multi-locale/version failure before required fields check
+                    if (
+                        !empty($data->versionIdentifier)
+                        && !empty($data->version)
+                        && !isset($this->processedPreprints[$data->versionIdentifier])
+                        && isset($this->failedIdentifiers[$data->versionIdentifier])
+                    ) {
+                        throw new RowValidationException(
+                            __('plugins.importexport.csv.baseRowFailedForIdentifier', [
+                                'identifier' => $data->versionIdentifier,
+                            ])
+                        );
+                    }
 
                     InvalidRowValidations::validateRowHasAllRequiredFields(
                         $data,
@@ -244,7 +270,7 @@ class PreprintCommand
                     }
 
                     $coverImageUploadName = null;
-                    if ($data->coverImageFilename) {
+                    if (!$this->dryMode && $data->coverImageFilename) {
                         try {
                             $coverImageUploadName = PublicationProcessor::uploadCoverImage(
                                 $data,
@@ -311,7 +337,11 @@ class PreprintCommand
                         );
                     }
 
-                    $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+                    if (!$this->dryMode) {
+                        $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
+                    } else {
+                        $galleyMetadata = [];
+                    }
 
                     if (!empty($data->preprintViews) && (int)$data->preprintViews > 0) {
                         StatisticsProcessor::insertPreprintViews(
@@ -321,7 +351,7 @@ class PreprintCommand
                         );
                     }
 
-                    if (!empty($data->galleyViews) && !empty($galleyMetadata)) {
+                    if (!$this->dryMode && !empty($data->galleyViews) && !empty($galleyMetadata)) {
                         $galleyViewsArray = explode(';', $data->galleyViews);
                         foreach ($galleyViewsArray as $idx => $views) {
                             $views = trim($views);
@@ -343,7 +373,7 @@ class PreprintCommand
                     }
 
                     // Process supplementary files
-                    if ($data->suppFilenames) {
+                    if (!$this->dryMode && $data->suppFilenames) {
                         // Get supplementary genre for supplementary files
                         $suppGenreId = CachedEntities::getCachedSupplementaryGenreId($server->getId()) ?? $genreId;
                         $suppIds = [];
@@ -431,7 +461,7 @@ class PreprintCommand
                         ? PublicationProcessor::updateSectionId($publication, $basePublication->getData('sectionId'))
                         : SectionsProcessor::process($data, $server, $publication);
 
-                    if ($data->coverImageFilename) {
+                    if ($data->coverImageFilename && $coverImageUploadName !== null) {
                         PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
                     } elseif ($basePublication && $basePublication->getLocalizedData('coverImage', $data->locale)) {
                         PublicationProcessor::setCoverImage(
@@ -470,6 +500,12 @@ class PreprintCommand
                     }
 
                 } catch (RowValidationException | FileNotSavedException $e) {
+                    // Track failed versionIdentifiers for cascaded failure detection
+                    $failedIdentifier = $fields[2] ?? null;
+                    if (!empty($failedIdentifier)) {
+                        $this->failedIdentifiers[$failedIdentifier] = true;
+                    }
+
                     if (is_null($invalidCsvFile)) {
                         $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
                         if (is_null($invalidCsvFile)) {
@@ -477,8 +513,32 @@ class PreprintCommand
                         }
                     }
                     CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $e->getMessage(), $this->failedRows);
+                    if ($this->dryMode) {
+                        $fileFailedRows[] = ['row' => $this->processedRows + 1, 'reason' => $e->getMessage()];
+                    }
                     continue;
                 }
+            }
+
+            if ($this->dryMode) {
+                $passed = $this->processedRows - $this->failedRows;
+                DryModeReporter::printFileHeader($basename);
+                if (!empty($fileFailedRows)) {
+                    DryModeReporter::printTableHeader();
+                    foreach ($fileFailedRows as $failedRow) {
+                        DryModeReporter::printFailedRow($failedRow['row'], $failedRow['reason']);
+                    }
+                }
+                DryModeReporter::printFileSummary($passed, $this->failedRows, $this->processedRows);
+                $totalFiles++;
+                $totalPassed += $passed;
+                $totalFailed += $this->failedRows;
+
+                DB::rollBack();
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+                CachedEntities::reset();
+                $this->processedPreprints = [];
+                $this->failedIdentifiers = [];
             }
 
             echo __('plugins.importexpot.csv.fileProcessFinished', [
@@ -488,8 +548,15 @@ class PreprintCommand
             ]) . "\n";
         }
 
+        if ($this->dryMode) {
+            DryModeReporter::printGrandTotal($totalFiles, $totalPassed, $totalFailed);
+            return $totalFailed > 0 ? 1 : 0;
+        }
+
         $this->syncCoverImagesForProcessedPreprints();
         $this->setCurrentVersionsForProcessedPreprints();
+
+        return 0;
     }
 
     /**

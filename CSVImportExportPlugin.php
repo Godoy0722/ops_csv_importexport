@@ -107,6 +107,14 @@ class CSVImportExportPlugin extends ImportExportPlugin
             $args = array_values($args);
         }
 
+        $dryMode = false;
+        $key = array_search('--dry-mode', $args);
+        if ($key !== false) {
+            $dryMode = true;
+            unset($args[$key]);
+            $args = array_values($args);
+        }
+
         $this->command = array_shift($args);
         $this->username = array_shift($args);
         $this->sourceDir = array_shift($args);
@@ -123,15 +131,17 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
         $this->validateUser();
 
-        match ($this->command) {
-            'preprints' => (new PreprintCommand($this->sourceDir, $this->user))->run(),
-            'users' => (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail))->run(),
+        $exitCode = match ($this->command) {
+            'preprints' => (new PreprintCommand($this->sourceDir, $this->user, $dryMode))->run(),
+            'users' => (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail, $dryMode))->run(),
             default => throw new \InvalidArgumentException(__('plugins.importexport.csv.invalidCommand', ['command' => $this->command])),
         };
 
         $endTime = microtime(true);
         $executionTime = $endTime - $startTime;
         echo __('plugins.importexport.csv.ExecutedInNSeconds', ['seconds' => number_format($executionTime, 2)]);
+
+        exit($exitCode);
     }
 
     private function validateUser(): void

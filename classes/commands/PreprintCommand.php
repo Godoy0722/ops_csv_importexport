@@ -446,7 +446,7 @@ class PreprintCommand
                         ? PublicationProcessor::updateSectionId($publication, $basePublication->getData('sectionId'))
                         : SectionsProcessor::process($data, $server, $publication);
 
-                    if ($data->coverImageFilename) {
+                    if ($data->coverImageFilename && $coverImageUploadName !== null) {
                         PublicationProcessor::updateCoverImage($publication, $data, $coverImageUploadName);
                     } elseif ($basePublication && $basePublication->getLocalizedData('coverImage', $data->locale)) {
                         PublicationProcessor::setCoverImage(

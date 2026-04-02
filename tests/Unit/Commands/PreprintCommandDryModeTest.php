@@ -502,8 +502,11 @@ class PreprintCommandDryModeTest extends BaseTestCase
     {
         $mocks = $this->setupDryModeMocks();
 
-        // Explicitly assert that uploadCoverImage is never called in dry-mode
+        // Explicitly assert that uploadCoverImage and updateCoverImage are never called in dry-mode
+        // uploadCoverImage is skipped by the !$this->dryMode guard
+        // updateCoverImage is skipped because $coverImageUploadName remains null
         $mocks['publicationProcessorMock']->shouldNotReceive('uploadCoverImage');
+        $mocks['publicationProcessorMock']->shouldNotReceive('updateCoverImage');
 
         // Create a dummy cover image file so path-existence checks would pass in normal mode
         $this->createTestFile($this->tempDir, 'cover.jpg', 'fake image content');

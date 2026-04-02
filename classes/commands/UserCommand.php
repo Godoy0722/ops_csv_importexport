@@ -132,6 +132,11 @@ class UserCommand
                         WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                     }
                 } catch (RowValidationException $e) {
+                    if ($this->dryMode) {
+                        ++$this->failedRows;
+                        $fileFailedRows[] = ['row' => $this->processedRows, 'reason' => $e->getMessage()];
+                        continue;
+                    }
                     if (is_null($invalidCsvFile)) {
                         $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredUserHeaders::$userHeaders);
                         if (is_null($invalidCsvFile)) {
@@ -139,9 +144,6 @@ class UserCommand
                         }
                     }
                     CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $e->getMessage(), $this->failedRows);
-                    if ($this->dryMode) {
-                        $fileFailedRows[] = ['row' => $this->processedRows, 'reason' => $e->getMessage()];
-                    }
                     continue;
                 }
             }

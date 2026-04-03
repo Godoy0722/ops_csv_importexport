@@ -69,31 +69,31 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GUI-01 | — | Pending |
-| GUI-02 | — | Pending |
-| UPLOAD-01 | — | Pending |
-| UPLOAD-02 | — | Pending |
-| UPLOAD-03 | — | Pending |
-| CFG-01 | — | Pending |
-| CFG-02 | — | Pending |
-| CFG-03 | — | Pending |
-| CFG-04 | — | Pending |
-| CFG-05 | — | Pending |
-| EXEC-01 | — | Pending |
-| EXEC-02 | — | Pending |
-| EXEC-03 | — | Pending |
-| RES-01 | — | Pending |
-| RES-02 | — | Pending |
-| RES-03 | — | Pending |
-| SEC-01 | — | Pending |
-| SEC-02 | — | Pending |
-| SEC-03 | — | Pending |
+| GUI-01 | Phase 6 | Pending |
+| GUI-02 | Phase 6 | Pending |
+| UPLOAD-01 | Phase 7 | Pending |
+| UPLOAD-02 | Phase 4 | Pending |
+| UPLOAD-03 | Phase 5 | Pending |
+| CFG-01 | Phase 6 | Pending |
+| CFG-02 | Phase 6 | Pending |
+| CFG-03 | Phase 6 | Pending |
+| CFG-04 | Phase 6 | Pending |
+| CFG-05 | Phase 6 | Pending |
+| EXEC-01 | Phase 7 | Pending |
+| EXEC-02 | Phase 7 | Pending |
+| EXEC-03 | Phase 5 | Pending |
+| RES-01 | Phase 7 | Pending |
+| RES-02 | Phase 7 | Pending |
+| RES-03 | Phase 7 | Pending |
+| SEC-01 | Phase 6 | Pending |
+| SEC-02 | Phase 4 | Pending |
+| SEC-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-03*
-*Last updated: 2026-04-03 after initial definition*
+*Last updated: 2026-04-03 — traceability mapped to Phases 4-7*

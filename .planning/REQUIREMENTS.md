@@ -1,88 +1,99 @@
-# Requirements: OPS CSV Import Plugin — Dry-Run Mode
+# Requirements: OPS CSV Import Plugin
 
-**Defined:** 2026-03-31
-**Core Value:** Operators must be able to validate an entire CSV import — seeing every pass, failure, and reason — without any database side effects.
+**Defined:** 2026-04-03
+**Core Value:** Operators must be able to bulk-import CSV data reliably — with the confidence that comes from validating everything first without database side effects.
 
-## v1 Requirements
+## v2.0 Requirements
 
-### CLI Integration
+Requirements for Web GUI milestone. Each maps to roadmap phases.
 
-- [ ] **CLI-01**: Operator can pass `--dry-mode` flag to the plugin CLI for both preprints and users commands
-- [ ] **CLI-02**: Plugin entry point parses `--dry-mode` and propagates the flag to the appropriate command
-- [ ] **CLI-03**: Existing import behavior is completely unaffected when `--dry-mode` is not passed
+### GUI Integration
 
-### Validation
+- [ ] **GUI-01**: Operator can access the CSV import form as a vertical tab under Settings > Website
+- [ ] **GUI-02**: Plugin registers its settings tab via the OPS `Template::Settings::website` hook
 
-- [ ] **VAL-01**: Dry-mode runs the same structural validation (header checks) as a real import
-- [ ] **VAL-02**: Dry-mode runs the same semantic validation (row data checks) as a real import
-- [ ] **VAL-03**: Dry-mode performs read-only DB lookups (sections, categories, servers, genres, users) via CachedEntities and Repo reads
-- [ ] **VAL-04**: Dry-mode performs zero database writes (no submissions, publications, authors, files, or any other entities created)
+### File Upload
 
-### Reporting
+- [ ] **UPLOAD-01**: Operator can upload a ZIP file containing CSVs and referenced assets via drag-and-drop or file picker
+- [ ] **UPLOAD-02**: Server extracts the uploaded ZIP to a temporary directory with path traversal protection
+- [ ] **UPLOAD-03**: Server cleans up the temporary directory after import completes (success or failure)
 
-- [ ] **RPT-01**: Dry-mode prints a per-file console report to stdout showing pass/fail status for every row
-- [ ] **RPT-02**: Each failed row in the report includes the specific validation error reason
-- [ ] **RPT-03**: Report is formatted in a user-friendly, readable way suitable for CLI operators
-- [ ] **RPT-04**: Per-file `invalid_{filename}.csv` is generated with failed rows and error reasons (same as normal mode)
+### Import Configuration
 
-### Exit Behavior
+- [ ] **CFG-01**: Operator can select the import type (preprints or users)
+- [ ] **CFG-02**: Operator can toggle dry-run mode on or off
+- [ ] **CFG-03**: Operator can toggle "send welcome emails" when import type is users
+- [ ] **CFG-04**: Welcome email toggle is hidden when import type is preprints
+- [ ] **CFG-05**: Import uses the logged-in user as the import actor (no username field)
 
-- [ ] **EXIT-01**: Dry-mode exits with code 0 when all rows across all files pass validation
-- [ ] **EXIT-02**: Dry-mode exits with code 1 when any row in any file fails validation
+### Import Execution
 
-### Testing
+- [ ] **EXEC-01**: Operator sees a loading spinner while the import is processing
+- [ ] **EXEC-02**: Submit button is disabled during processing to prevent double-submission
+- [ ] **EXEC-03**: Import executes the existing PreprintCommand or UserCommand based on selected type
 
-- [ ] **TEST-01**: Dry-mode functionality is covered by unit tests following existing BaseTestCase/CsvTestDataBuilder patterns
-- [ ] **TEST-02**: Tests verify that no database writes occur during dry-mode execution
+### Results Display
 
-## v2 Requirements
+- [ ] **RES-01**: Dry-run results are shown in a side modal with the same information as CLI output (per-file pass/fail, error reasons)
+- [ ] **RES-02**: Real import results are shown inline after completion (row count, failure count)
+- [ ] **RES-03**: Invalid CSV files are automatically downloaded when failures exist (both dry and real modes)
 
-### Enhanced Reporting
+### Security
 
-- **RPT-05**: Report output to file in addition to console
-- **RPT-06**: Combined multi-file summary report
-- **RPT-07**: Machine-readable report format (JSON/XML) for programmatic consumption
+- [ ] **SEC-01**: All POST actions are protected with CSRF validation
+- [ ] **SEC-02**: ZIP extraction validates entry paths to prevent Zip Slip attacks
+- [ ] **SEC-03**: Only authorized users (site admin / journal manager) can access the import form
 
-### Extended Validation
+## Future Requirements
 
-- **VAL-05**: Dry-mode detects duplicate rows within the same CSV
-- **VAL-06**: Dry-mode warns about potential conflicts with existing database records
+Deferred to future release. Tracked but not in current roadmap.
+
+### Enhanced UX
+
+- **UX-01**: Per-file named invalid CSV download links (instead of auto-download)
+- **UX-02**: Import history / audit log in the GUI
+- **UX-03**: Import type auto-detection from ZIP contents
+- **UX-04**: Multi-server context selector for site-admin installs
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Web UI for dry-mode | Plugin is CLI-only by design |
-| Extra validations beyond real import | User chose same validations for consistency |
-| Combined multi-file report | User chose per-file reports |
-| Report to file output | User chose console stdout only |
-| Progress bars or interactive output | CLI tool, keep it simple |
+| Real-time row-by-row progress bar | OPS has no SSE/WebSocket infrastructure; synchronous import with spinner is sufficient |
+| Async background import via job queue | Most OPS installs lack persistent queue workers; adds complexity for marginal gain |
+| Inline CSV row editing | Disproportionate UI complexity for the import workflow |
+| Multiple ZIP upload | Complicates result display and error association; one ZIP per import run |
+| Machine-readable report format (JSON/XML) | Deferred from v1.0; still not in scope |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLI-01 | Phase 1 | Pending |
-| CLI-02 | Phase 1 | Pending |
-| CLI-03 | Phase 1 | Pending |
-| VAL-01 | Phase 1 | Pending |
-| VAL-02 | Phase 1 | Pending |
-| VAL-03 | Phase 1 | Pending |
-| VAL-04 | Phase 1 | Pending |
-| RPT-01 | Phase 2 | Pending |
-| RPT-02 | Phase 2 | Pending |
-| RPT-03 | Phase 2 | Pending |
-| RPT-04 | Phase 2 | Pending |
-| EXIT-01 | Phase 2 | Pending |
-| EXIT-02 | Phase 2 | Pending |
-| TEST-01 | Phase 3 | Pending |
-| TEST-02 | Phase 3 | Pending |
+| GUI-01 | — | Pending |
+| GUI-02 | — | Pending |
+| UPLOAD-01 | — | Pending |
+| UPLOAD-02 | — | Pending |
+| UPLOAD-03 | — | Pending |
+| CFG-01 | — | Pending |
+| CFG-02 | — | Pending |
+| CFG-03 | — | Pending |
+| CFG-04 | — | Pending |
+| CFG-05 | — | Pending |
+| EXEC-01 | — | Pending |
+| EXEC-02 | — | Pending |
+| EXEC-03 | — | Pending |
+| RES-01 | — | Pending |
+| RES-02 | — | Pending |
+| RES-03 | — | Pending |
+| SEC-01 | — | Pending |
+| SEC-02 | — | Pending |
+| SEC-03 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 15
-- Unmapped: 0
+- v2.0 requirements: 19 total
+- Mapped to phases: 0
+- Unmapped: 19
 
 ---
-*Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after roadmap creation (traceability complete)*
+*Requirements defined: 2026-04-03*
+*Last updated: 2026-04-03 after initial definition*

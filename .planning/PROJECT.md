@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A CLI-only plugin for Open Preprint Systems (OPS) 3.5.x that bulk-imports users and preprints from CSV files. Includes a `--dry-mode` flag that runs the full validation pipeline without writing to the database, producing per-file console reports and invalid CSV files so operators can preview and fix issues before committing a real import.
+A plugin for Open Preprint Systems (OPS) 3.5.x that bulk-imports users and preprints from CSV files. Available via CLI and web GUI. Includes a `--dry-mode` / dry-run toggle that runs the full validation pipeline without writing to the database, producing per-file reports and invalid CSV files so operators can preview and fix issues before committing a real import.
 
 ## Core Value
 
@@ -32,11 +32,11 @@ Operators must be able to bulk-import CSV data reliably — with the confidence 
 
 ### Active
 
-(None yet — planning next milestone)
+(Defining requirements for v2.0 Web GUI)
 
 ### Out of Scope
 
-- Web UI for dry-mode — plugin is CLI-only by design
+- Web UI for dry-mode — addressed in v2.0
 - Combined multi-file report — user chose per-file reports
 - Extra validation beyond what real import does — same validations for consistency
 - File output for reports — console stdout only (invalid CSVs are still written)
@@ -67,6 +67,22 @@ Operators must be able to bulk-import CSV data reliably — with the confidence 
 | Non-zero exit code on failures | Enables scripting and CI integration | ✓ Good |
 | Transaction-based dry-mode | Per-file DB transaction wrapping with rollback for zero side effects | ✓ Good |
 
+## Current Milestone: v2.0 Web GUI
+
+**Goal:** Add a web-based GUI for the CSV import plugin so operators without server access can import preprints and users through the OPS admin interface.
+
+**Target features:**
+- Settings tab (Shariff-style vertical tab under Settings > Website)
+- ZIP file upload with progress bar (CSVs + referenced images/galleys)
+- Import type selector (users / preprints)
+- Send welcome emails toggle (for users)
+- Dry-run mode toggle
+- Dry-mode results modal (CLI-equivalent output + auto-download of invalid CSV)
+- Real import execution with auto-download of invalid CSV
+- Progress feedback during import processing
+- Uses logged-in user as the import user
+- Server-side: extract ZIP to temp dir, run import, clean up
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -85,4 +101,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after v1.0 milestone*
+*Last updated: 2026-04-03 after v2.0 milestone start*

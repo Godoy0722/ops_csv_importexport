@@ -33,10 +33,13 @@ class CsvImportForm extends FormComponent
         $this->action = $action;
 
         $this
+            ->addPage(['id' => 'default', 'submitButton' => ['label' => __('plugins.importexport.csv.form.submitButton')]])
+            ->addGroup(['id' => 'default', 'pageId' => 'default'])
             ->addField(new FieldUpload('importFile', [
                 'label' => __('plugins.importexport.csv.form.importFile'),
                 'description' => __('plugins.importexport.csv.form.importFile.description'),
                 'isRequired' => true,
+                'groupId' => 'default',
                 'options' => [
                     'url' => $uploadUrl,
                     'acceptedFiles' => '.zip,.csv',
@@ -45,6 +48,7 @@ class CsvImportForm extends FormComponent
             ->addField(new FieldSelect('importType', [
                 'label' => __('plugins.importexport.csv.form.importType'),
                 'isRequired' => true,
+                'groupId' => 'default',
                 'options' => [
                     ['value' => 'preprints', 'label' => __('plugins.importexport.csv.form.importType.preprints')],
                     ['value' => 'users', 'label' => __('plugins.importexport.csv.form.importType.users')],
@@ -55,6 +59,7 @@ class CsvImportForm extends FormComponent
                 'label' => __('plugins.importexport.csv.form.dryMode'),
                 'description' => __('plugins.importexport.csv.form.dryMode.description'),
                 'type' => 'checkbox',
+                'groupId' => 'default',
                 'options' => [
                     ['value' => true, 'label' => __('plugins.importexport.csv.form.dryMode.enable')],
                 ],
@@ -63,6 +68,7 @@ class CsvImportForm extends FormComponent
             ->addField(new FieldOptions('sendWelcomeEmail', [
                 'label' => __('plugins.importexport.csv.form.sendWelcomeEmail'),
                 'type' => 'checkbox',
+                'groupId' => 'default',
                 'options' => [
                     ['value' => true, 'label' => __('plugins.importexport.csv.form.sendWelcomeEmail.enable')],
                 ],

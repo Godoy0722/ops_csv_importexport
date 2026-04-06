@@ -64,7 +64,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
         if (!Application::isUnderMaintenance() && $this->getEnabled()) {
             $this->addLocaleData();
-            \HookRegistry::register('Template::Settings::website', [$this, 'callbackShowWebsiteSettingsTab']);
+            \HookRegistry::register('Template::Settings::admin', [$this, 'callbackShowAdminSettingsTab']);
 
             $request = Application::get()->getRequest();
             $templateMgr = \APP\template\TemplateManager::getManager($request);
@@ -118,17 +118,23 @@ class CSVImportExportPlugin extends ImportExportPlugin
     }
 
     /**
-     * Hook callback for Template::Settings::website — injects the CSV import tab.
+     * Hook callback for Template::Settings::admin — injects the CSV import tab.
      */
-    public function callbackShowWebsiteSettingsTab(string $hookName, array $args): bool
+    public function callbackShowAdminSettingsTab(string $hookName, array $args): bool
     {
         $templateMgr = $args[1];
         $output = &$args[2];
         $request = Application::get()->getRequest();
 
+        // The display() handler routes through a server context — use the first available server
+        $serverPath = $this->getFirstServerPath();
+        if (!$serverPath) {
+            return false;
+        }
+
         $form = new CsvImportForm(
-            $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'management', 'importexport', ['plugin', $this->getName(), 'import']),
-            $request->getDispatcher()->url($request, PKPApplication::ROUTE_API, $request->getContext()->getPath(), 'temporaryFiles')
+            $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $serverPath, 'management', 'importexport', ['plugin', $this->getName(), 'import']),
+            $request->getDispatcher()->url($request, PKPApplication::ROUTE_API, $serverPath, 'temporaryFiles')
         );
 
         $state = $templateMgr->getTemplateVars('state');
@@ -140,7 +146,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $downloadBaseUrl = $request->getDispatcher()->url(
             $request,
             PKPApplication::ROUTE_PAGE,
-            null,
+            $serverPath,
             'management',
             'importexport',
             ['plugin', $this->getName(), 'downloadInvalidCsv']
@@ -162,6 +168,14 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $output .= '<script>window.csvImportPluginConfig = ' . $configJson . ';</script>';
 
         return false;
+    }
+
+    private function getFirstServerPath(): ?string
+    {
+        $contextDao = Application::getContextDAO();
+        $contexts = $contextDao->getAll();
+        $context = $contexts->next();
+        return $context ? $context->getPath() : null;
     }
 
     /**

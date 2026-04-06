@@ -226,6 +226,9 @@ msgstr "Result: {$passed} passed, {$failed} failed ({$total} total)"
 msgid "plugins.importexport.csv.dryModeGrandTotal"
 msgstr "--- Dry-mode complete: {$files} files, {$passed} passed, {$failed} failed ---"
 
+msgid "plugins.importexport.csv.form.submitButton"
+msgstr "Import"
+
 msgid "plugins.importexport.csv.form.importFile"
 msgstr "Import File"
 

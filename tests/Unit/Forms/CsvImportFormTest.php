@@ -94,4 +94,21 @@ class CsvImportFormTest extends BaseTestCase
         $this->assertNotNull($sendWelcomeEmailField);
         $this->assertEquals(['importType', 'users'], $sendWelcomeEmailField['showWhen']);
     }
+
+    public function testImportFileFieldAcceptsBothZipAndCsv(): void
+    {
+        $form = new CsvImportForm('http://example.com/action', 'http://example.com/upload');
+
+        $config = $form->getConfig();
+        $importFileField = null;
+        foreach ($config['fields'] as $field) {
+            if ($field['name'] === 'importFile') {
+                $importFileField = $field;
+                break;
+            }
+        }
+
+        $this->assertNotNull($importFileField);
+        $this->assertEquals('.zip,.csv', $importFileField['options']['acceptedFiles']);
+    }
 }

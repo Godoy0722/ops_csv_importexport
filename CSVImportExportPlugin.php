@@ -65,6 +65,14 @@ class CSVImportExportPlugin extends ImportExportPlugin
         if (!Application::isUnderMaintenance() && $this->getEnabled()) {
             $this->addLocaleData();
             \HookRegistry::register('Template::Settings::website', [$this, 'callbackShowWebsiteSettingsTab']);
+
+            $request = Application::get()->getRequest();
+            $templateMgr = \APP\template\TemplateManager::getManager($request);
+            $scriptUrl = $request->getBaseUrl() . '/' . $this->getPluginPath() . '/scripts/csvImportResults.js';
+            $templateMgr->addJavaScript('csvImportResults', $scriptUrl, [
+                'contexts' => ['backend'],
+                'priority' => $templateMgr::STYLE_SEQUENCE_LAST,
+            ]);
         }
 
         return true;
@@ -120,7 +128,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
         $form = new CsvImportForm(
             $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'management', 'importexport', ['plugin', $this->getName(), 'import']),
-            $request->getDispatcher()->url($request, PKPApplication::ROUTE_COMPONENT, null, 'api.file.TemporaryFileApiHandler', 'uploadFile')
+            $request->getDispatcher()->url($request, PKPApplication::ROUTE_API, $request->getContext()->getPath(), 'temporaryFiles')
         );
 
         $state = $templateMgr->getTemplateVars('state');
@@ -128,6 +136,30 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $templateMgr->assign('state', $state);
 
         $output .= $templateMgr->fetch($this->getTemplateResource('settingsForm.tpl'));
+
+        $downloadBaseUrl = $request->getDispatcher()->url(
+            $request,
+            PKPApplication::ROUTE_PAGE,
+            null,
+            'management',
+            'importexport',
+            ['plugin', $this->getName(), 'downloadInvalidCsv']
+        );
+        $configJson = json_encode([
+            'formId' => FORM_CSV_IMPORT,
+            'downloadBaseUrl' => $downloadBaseUrl,
+            'labels' => [
+                'dryModeTitle' => __('plugins.importexport.csv.results.dryModeTitle'),
+                'importCompleteTitle' => __('plugins.importexport.csv.results.importCompleteTitle'),
+                'importType' => __('plugins.importexport.csv.results.importType'),
+                'filesProcessed' => __('plugins.importexport.csv.results.filesProcessed'),
+                'totalRows' => __('plugins.importexport.csv.results.totalRows'),
+                'successfulRows' => __('plugins.importexport.csv.results.successfulRows'),
+                'failedRows' => __('plugins.importexport.csv.results.failedRows'),
+                'invalidFiles' => __('plugins.importexport.csv.results.invalidFiles'),
+            ],
+        ]);
+        $output .= '<script>window.csvImportPluginConfig = ' . $configJson . ';</script>';
 
         return false;
     }
@@ -167,38 +199,42 @@ class CSVImportExportPlugin extends ImportExportPlugin
         }
     }
 
-    private function handleUploadZip(PKPRequest $request): void
+    private function verifyCsrf(PKPRequest $request): void
     {
-        if (!$request->checkCSRF()) {
+        $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+        if ($headerToken === null || $headerToken !== $request->getSession()->token()) {
             throw new \Exception('CSRF mismatch!');
         }
+    }
+
+    private function sendJsonResponse(array $data, int $statusCode = 200): void
+    {
+        http_response_code($statusCode);
+        header('Content-Type: application/json');
+        $this->result = json_encode($data);
+        echo $this->result;
+        $this->isResultManaged = true;
+    }
+
+    private function handleUploadZip(PKPRequest $request): void
+    {
+        $this->verifyCsrf($request);
 
         $user = $request->getUser();
         $temporaryFileManager = new TemporaryFileManager();
         $temporaryFile = $temporaryFileManager->handleUpload('uploadedFile', $user->getId());
 
         if (!$temporaryFile) {
-            $json = new JSONMessage(false, __('plugins.importexport.csv.uploadFailed'));
-            header('Content-Type: application/json');
-            $this->result = $json->getString();
-            $this->isResultManaged = true;
+            $this->sendJsonResponse(['errorMessage' => __('plugins.importexport.csv.uploadFailed')], 400);
             return;
         }
 
-        $json = new JSONMessage(true);
-        $json->setAdditionalAttributes([
-            'temporaryFileId' => $temporaryFile->getId(),
-        ]);
-        header('Content-Type: application/json');
-        $this->result = $json->getString();
-        $this->isResultManaged = true;
+        $this->sendJsonResponse(['temporaryFileId' => $temporaryFile->getId()]);
     }
 
     private function handleImport(PKPRequest $request): void
     {
-        if (!$request->checkCSRF()) {
-            throw new \Exception('CSRF mismatch!');
-        }
+        $this->verifyCsrf($request);
 
         $user = $request->getUser();
         $importType = $request->getUserVar('importType');
@@ -206,29 +242,35 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $sendWelcomeEmail = (bool) $request->getUserVar('sendWelcomeEmail');
 
         if (!in_array($importType, ['preprints', 'users'])) {
-            $json = new JSONMessage(false, __('plugins.importexport.csv.invalidImportType', ['importType' => $importType]));
-            header('Content-Type: application/json');
-            $this->result = $json->getString();
-            $this->isResultManaged = true;
+            $this->sendJsonResponse(['errorMessage' => __('plugins.importexport.csv.invalidImportType', ['importType' => $importType])], 400);
             return;
         }
 
-        $temporaryFileId = $request->getUserVar('temporaryFileId');
+        $importFile = $request->getUserVar('importFile');
+        $temporaryFileId = is_array($importFile) ? ($importFile['temporaryFileId'] ?? null) : $request->getUserVar('temporaryFileId');
         $temporaryFileManager = new TemporaryFileManager();
         $temporaryFile = $temporaryFileManager->getFile($temporaryFileId, $user->getId());
 
         if (!$temporaryFile) {
-            $json = new JSONMessage(false, __('plugins.importexport.csv.uploadFailed'));
-            header('Content-Type: application/json');
-            $this->result = $json->getString();
-            $this->isResultManaged = true;
+            $this->sendJsonResponse(['errorMessage' => __('plugins.importexport.csv.uploadFailed')], 400);
             return;
         }
 
         try {
-            $extractor = new ZipExtractor();
-            $extractDir = $extractor->extract($temporaryFile->getFilePath());
-            $sourceDir = ZipExtractor::resolveSourceDir($extractDir);
+            set_time_limit(1200);
+
+            $filePath = $temporaryFile->getFilePath();
+            $extension = strtolower(pathinfo($temporaryFile->getOriginalFileName(), PATHINFO_EXTENSION));
+
+            if ($extension === 'zip') {
+                $extractor = new ZipExtractor();
+                $extractDir = $extractor->extract($filePath);
+                $sourceDir = ZipExtractor::resolveSourceDir($extractDir);
+            } else {
+                $sourceDir = sys_get_temp_dir() . '/csv_import_' . bin2hex(random_bytes(16));
+                mkdir($sourceDir, 0700, true);
+                copy($filePath, $sourceDir . '/' . $temporaryFile->getOriginalFileName());
+            }
 
             ob_start();
             $result = match ($importType) {
@@ -258,8 +300,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
                 'sourceDir' => $sourceDir,
             ]);
 
-            $json = new JSONMessage(true);
-            $json->setAdditionalAttributes([
+            $this->sendJsonResponse([
                 'uuid' => $uuid,
                 'importType' => $importType,
                 'dryMode' => $dryMode,
@@ -268,21 +309,13 @@ class CSVImportExportPlugin extends ImportExportPlugin
                 'successfulRows' => $result['successfulRows'],
                 'failedRows' => $result['failedRows'],
                 'invalidFiles' => $invalidFiles,
+                'perFile' => $result['perFile'],
             ]);
-            header('Content-Type: application/json');
-            $this->result = $json->getString();
-            $this->isResultManaged = true;
 
         } catch (ImportLockException $e) {
-            $json = new JSONMessage(false, $e->getMessage());
-            header('Content-Type: application/json');
-            $this->result = $json->getString();
-            $this->isResultManaged = true;
+            $this->sendJsonResponse(['errorMessage' => $e->getMessage()], 403);
         } catch (ZipExtractionException $e) {
-            $json = new JSONMessage(false, __('plugins.importexport.csv.zipExtractionFailed', ['reason' => $e->getMessage()]));
-            header('Content-Type: application/json');
-            $this->result = $json->getString();
-            $this->isResultManaged = true;
+            $this->sendJsonResponse(['errorMessage' => __('plugins.importexport.csv.zipExtractionFailed', ['reason' => $e->getMessage()])], 400);
         }
     }
 
@@ -294,9 +327,9 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $result = $store->get($uuid);
 
         if ($result === null) {
-            $json = new JSONMessage(true, ['done' => false]);
+            $this->sendJsonResponse(['done' => false]);
         } else {
-            $json = new JSONMessage(true, [
+            $this->sendJsonResponse([
                 'done'           => true,
                 'status'         => $result['status'],
                 'importType'     => $result['importType'],
@@ -306,10 +339,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
                 'invalidFiles'   => $result['perFileResults'] ?? [],
             ]);
         }
-
-        header('Content-Type: application/json');
-        $this->result = $json->getString();
-        $this->isResultManaged = true;
     }
 
     private function handleDownloadInvalidCsv(PKPRequest $request): void

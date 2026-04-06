@@ -226,11 +226,11 @@ msgstr "Result: {$passed} passed, {$failed} failed ({$total} total)"
 msgid "plugins.importexport.csv.dryModeGrandTotal"
 msgstr "--- Dry-mode complete: {$files} files, {$passed} passed, {$failed} failed ---"
 
-msgid "plugins.importexport.csv.form.zipFile"
-msgstr "ZIP File"
+msgid "plugins.importexport.csv.form.importFile"
+msgstr "Import File"
 
-msgid "plugins.importexport.csv.form.zipFile.description"
-msgstr "Upload a ZIP file containing CSV files and any associated assets (cover images, galley files)."
+msgid "plugins.importexport.csv.form.importFile.description"
+msgstr "Upload a ZIP file containing CSV files and assets (cover images, galley files), or a single CSV file directly."
 
 msgid "plugins.importexport.csv.form.importType"
 msgstr "Import Type"
@@ -267,3 +267,27 @@ msgstr "File upload failed."
 
 msgid "plugins.importexport.csv.zipExtractionFailed"
 msgstr "Failed to extract ZIP file: {$reason}"
+
+msgid "plugins.importexport.csv.results.dryModeTitle"
+msgstr "Dry-Run Results"
+
+msgid "plugins.importexport.csv.results.importCompleteTitle"
+msgstr "Import Complete"
+
+msgid "plugins.importexport.csv.results.importType"
+msgstr "Import Type"
+
+msgid "plugins.importexport.csv.results.filesProcessed"
+msgstr "Files Processed"
+
+msgid "plugins.importexport.csv.results.totalRows"
+msgstr "Total Rows"
+
+msgid "plugins.importexport.csv.results.successfulRows"
+msgstr "Successful Rows"
+
+msgid "plugins.importexport.csv.results.failedRows"
+msgstr "Failed Rows"
+
+msgid "plugins.importexport.csv.results.invalidFiles"
+msgstr "Download invalid rows"

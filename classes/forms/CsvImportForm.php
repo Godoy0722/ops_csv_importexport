@@ -33,13 +33,13 @@ class CsvImportForm extends FormComponent
         $this->action = $action;
 
         $this
-            ->addField(new FieldUpload('zipFile', [
-                'label' => __('plugins.importexport.csv.form.zipFile'),
-                'description' => __('plugins.importexport.csv.form.zipFile.description'),
+            ->addField(new FieldUpload('importFile', [
+                'label' => __('plugins.importexport.csv.form.importFile'),
+                'description' => __('plugins.importexport.csv.form.importFile.description'),
                 'isRequired' => true,
                 'options' => [
                     'url' => $uploadUrl,
-                    'acceptedFiles' => '.zip',
+                    'acceptedFiles' => '.zip,.csv',
                 ],
             ]))
             ->addField(new FieldSelect('importType', [

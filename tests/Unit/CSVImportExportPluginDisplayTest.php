@@ -73,6 +73,10 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
             $request->shouldReceive('getContext')->andReturn($config['context']);
         }
 
+        if (isset($config['session'])) {
+            $request->shouldReceive('getSession')->andReturn($config['session']);
+        }
+
         return $request;
     }
 
@@ -148,7 +152,12 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
 
     public function testHandleUploadZipWithoutCsrfThrowsException(): void
     {
-        $request = $this->createMockRequest(['checkCSRF' => false]);
+        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
+
+        $session = Mockery::mock(\Illuminate\Contracts\Session\Session::class);
+        $session->shouldReceive('token')->andReturn('valid-token');
+
+        $request = $this->createMockRequest(['session' => $session]);
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('CSRF mismatch!');
@@ -169,31 +178,34 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
         $plugin = new class extends CSVImportExportPlugin {
             public function callUploadZip($request): void
             {
-                // Replicate handleUploadZip logic with null upload result
-                if (!$request->checkCSRF()) {
-                    throw new \Exception('CSRF mismatch!');
-                }
-
-                $json = new \PKP\core\JSONMessage(false, 'Upload failed');
+                http_response_code(400);
                 header('Content-Type: application/json');
-                $this->result = $json->getString();
+                $this->result = json_encode(['errorMessage' => 'Upload failed']);
+                echo $this->result;
                 $this->isResultManaged = true;
             }
         };
 
-        // Suppress header() calls in CLI test context
-        @$plugin->callUploadZip($request);
+        // Suppress header() calls and echo in CLI test context
+        @ob_start();
+        $plugin->callUploadZip($request);
+        @ob_end_clean();
 
         $this->assertTrue($plugin->isResultManaged);
         $decoded = json_decode($plugin->result, true);
-        $this->assertFalse($decoded['status']);
+        $this->assertArrayHasKey('errorMessage', $decoded);
     }
 
     // ==================== handleImport tests ====================
 
     public function testHandleImportWithoutCsrfThrowsException(): void
     {
-        $request = $this->createMockRequest(['checkCSRF' => false]);
+        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
+
+        $session = Mockery::mock(\Illuminate\Contracts\Session\Session::class);
+        $session->shouldReceive('token')->andReturn('valid-token');
+
+        $request = $this->createMockRequest(['session' => $session]);
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('CSRF mismatch!');
@@ -203,10 +215,14 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
 
     public function testHandleImportWithInvalidImportTypeReturnsJsonError(): void
     {
+        $session = Mockery::mock(\Illuminate\Contracts\Session\Session::class);
+        $session->shouldReceive('token')->andReturn('valid-token');
+        $_SERVER['HTTP_X_CSRF_TOKEN'] = 'valid-token';
+
         $user = $this->createMockUser(['id' => 1]);
 
         $request = $this->createMockRequest([
-            'checkCSRF' => true,
+            'session' => $session,
             'user' => $user,
             'userVars' => [
                 'importType' => 'invalidType',
@@ -217,9 +233,11 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
 
         @$this->invokeHandler('handleImport', $request);
 
+        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
+
         $this->assertTrue($this->plugin->isResultManaged);
         $decoded = $this->decodeResult();
-        $this->assertFalse($decoded['status']);
+        $this->assertArrayHasKey('errorMessage', $decoded);
     }
 
     // ==================== handlePollResult tests ====================
@@ -244,9 +262,9 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
                 $result = $store->get($uuid);
 
                 if ($result === null) {
-                    $json = new \PKP\core\JSONMessage(true, ['done' => false]);
+                    $data = ['done' => false];
                 } else {
-                    $json = new \PKP\core\JSONMessage(true, [
+                    $data = [
                         'done'           => true,
                         'status'         => $result['status'],
                         'importType'     => $result['importType'],
@@ -254,11 +272,12 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
                         'rowsFailed'     => $result['rowsFailed'],
                         'capturedOutput' => $result['capturedOutput'],
                         'invalidFiles'   => $result['perFileResults'] ?? [],
-                    ]);
+                    ];
                 }
 
                 header('Content-Type: application/json');
-                $this->result = $json->getString();
+                $this->result = json_encode($data);
+                echo $this->result;
                 $this->isResultManaged = true;
             }
         };
@@ -267,12 +286,13 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
             'userVars' => ['uuid' => 'nonexistent-uuid'],
         ]);
 
-        @$plugin->callPollResult($request);
+        @ob_start();
+        $plugin->callPollResult($request);
+        @ob_end_clean();
 
         $this->assertTrue($plugin->isResultManaged);
         $decoded = json_decode($plugin->result, true);
-        $this->assertTrue($decoded['status']);
-        $this->assertFalse($decoded['content']['done']);
+        $this->assertFalse($decoded['done']);
 
         $this->cleanupTempDirectory($tempDir);
     }
@@ -309,9 +329,9 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
                 $result = $store->get($uuid);
 
                 if ($result === null) {
-                    $json = new \PKP\core\JSONMessage(true, ['done' => false]);
+                    $data = ['done' => false];
                 } else {
-                    $json = new \PKP\core\JSONMessage(true, [
+                    $data = [
                         'done'           => true,
                         'status'         => $result['status'],
                         'importType'     => $result['importType'],
@@ -319,11 +339,12 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
                         'rowsFailed'     => $result['rowsFailed'],
                         'capturedOutput' => $result['capturedOutput'],
                         'invalidFiles'   => $result['perFileResults'] ?? [],
-                    ]);
+                    ];
                 }
 
                 header('Content-Type: application/json');
-                $this->result = $json->getString();
+                $this->result = json_encode($data);
+                echo $this->result;
                 $this->isResultManaged = true;
             }
         };
@@ -332,20 +353,20 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
             'userVars' => ['uuid' => $uuid],
         ]);
 
-        @$plugin->callPollResult($request);
+        @ob_start();
+        $plugin->callPollResult($request);
+        @ob_end_clean();
 
         $this->assertTrue($plugin->isResultManaged);
         $decoded = json_decode($plugin->result, true);
-        $this->assertTrue($decoded['status']);
 
-        $content = $decoded['content'];
-        $this->assertTrue($content['done']);
-        $this->assertEquals('success', $content['status']);
-        $this->assertEquals('preprints', $content['importType']);
-        $this->assertEquals(10, $content['rowsProcessed']);
-        $this->assertEquals(2, $content['rowsFailed']);
-        $this->assertEquals('Processing complete.', $content['capturedOutput']);
-        $this->assertEquals(['invalid_data.csv'], $content['invalidFiles']);
+        $this->assertTrue($decoded['done']);
+        $this->assertEquals('success', $decoded['status']);
+        $this->assertEquals('preprints', $decoded['importType']);
+        $this->assertEquals(10, $decoded['rowsProcessed']);
+        $this->assertEquals(2, $decoded['rowsFailed']);
+        $this->assertEquals('Processing complete.', $decoded['capturedOutput']);
+        $this->assertEquals(['invalid_data.csv'], $decoded['invalidFiles']);
 
         $this->cleanupTempDirectory($tempDir);
     }
@@ -494,23 +515,25 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
             public function callImportLockPath($request): void
             {
                 // Simulate the catch block for ImportLockException
-                $json = new \PKP\core\JSONMessage(false, 'Import is currently locked');
+                http_response_code(403);
                 header('Content-Type: application/json');
-                $this->result = $json->getString();
+                $this->result = json_encode(['errorMessage' => 'Import is currently locked']);
+                echo $this->result;
                 $this->isResultManaged = true;
             }
         };
 
         $request = $this->createMockRequest([
-            'checkCSRF' => true,
             'user' => $user,
         ]);
 
-        @$plugin->callImportLockPath($request);
+        @ob_start();
+        $plugin->callImportLockPath($request);
+        @ob_end_clean();
 
         $this->assertTrue($plugin->isResultManaged);
         $decoded = json_decode($plugin->result, true);
-        $this->assertFalse($decoded['status']);
-        $this->assertStringContainsString('locked', $decoded['content']);
+        $this->assertArrayHasKey('errorMessage', $decoded);
+        $this->assertStringContainsString('locked', $decoded['errorMessage']);
     }
 }

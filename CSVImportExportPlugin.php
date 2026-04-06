@@ -24,11 +24,12 @@ use APP\plugins\importexport\csv\classes\exceptions\ZipExtractionException;
 use APP\plugins\importexport\csv\classes\forms\CsvImportForm;
 use APP\plugins\importexport\csv\classes\handlers\ZipExtractor;
 use APP\plugins\importexport\csv\classes\store\ImportResultStore;
-use PKP\core\JSONMessage;
 use PKP\core\PKPApplication;
 use PKP\core\PKPRequest;
 use PKP\file\TemporaryFileManager;
+use PKP\plugins\Hook;
 use PKP\plugins\ImportExportPlugin;
+use PKP\security\Validation;
 use PKP\user\User;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -64,7 +65,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
         if (!Application::isUnderMaintenance() && $this->getEnabled()) {
             $this->addLocaleData();
-            \HookRegistry::register('Template::Settings::admin', [$this, 'callbackShowAdminSettingsTab']);
+            Hook::add('Template::Settings::admin', [$this, 'callbackShowAdminSettingsTab']);
 
             $request = Application::get()->getRequest();
             $templateMgr = \APP\template\TemplateManager::getManager($request);
@@ -126,7 +127,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $output = &$args[2];
         $request = Application::get()->getRequest();
 
-        // The display() handler routes through a server context — use the first available server
         $serverPath = $this->getFirstServerPath();
         if (!$serverPath) {
             return false;
@@ -151,9 +151,18 @@ class CSVImportExportPlugin extends ImportExportPlugin
             'importexport',
             ['plugin', $this->getName(), 'downloadInvalidCsv']
         );
+        $cleanupUrl = $request->getDispatcher()->url(
+            $request,
+            PKPApplication::ROUTE_PAGE,
+            $serverPath,
+            'management',
+            'importexport',
+            ['plugin', $this->getName(), 'cleanup']
+        );
         $configJson = json_encode([
             'formId' => FORM_CSV_IMPORT,
             'downloadBaseUrl' => $downloadBaseUrl,
+            'cleanupUrl' => $cleanupUrl,
             'labels' => [
                 'dryModeTitle' => __('plugins.importexport.csv.results.dryModeTitle'),
                 'importCompleteTitle' => __('plugins.importexport.csv.results.importCompleteTitle'),
@@ -163,6 +172,8 @@ class CSVImportExportPlugin extends ImportExportPlugin
                 'successfulRows' => __('plugins.importexport.csv.results.successfulRows'),
                 'failedRows' => __('plugins.importexport.csv.results.failedRows'),
                 'invalidFiles' => __('plugins.importexport.csv.results.invalidFiles'),
+                'importing' => __('plugins.importexport.csv.form.importing'),
+                'imported' => __('plugins.importexport.csv.form.imported'),
             ],
         ]);
         $output .= '<script>window.csvImportPluginConfig = ' . $configJson . ';</script>';
@@ -174,6 +185,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
     {
         $contextDao = Application::getContextDAO();
         $contexts = $contextDao->getAll();
+        /** @var Context $context */
         $context = $contexts->next();
         return $context ? $context->getPath() : null;
     }
@@ -185,10 +197,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
     {
         parent::display($args, $request);
         $this->requireSiteAdmin($request);
-
-        ZipExtractor::cleanupExpired(
-            sys_get_temp_dir() . '/csv_import_results'
-        );
 
         $op = array_shift($args) ?? '';
 
@@ -209,6 +217,9 @@ class CSVImportExportPlugin extends ImportExportPlugin
             case 'downloadInvalidCsv':
                 $this->handleDownloadInvalidCsv($request);
                 break;
+            case 'cleanup':
+                $this->handleCleanup($request);
+                break;
             default:
                 throw new NotFoundHttpException();
         }
@@ -216,16 +227,8 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
     private function requireSiteAdmin(PKPRequest $request): void
     {
-        if (!$request->getUser() || !\PKP\security\Validation::isSiteAdmin()) {
+        if (!$request->getUser() || !Validation::isSiteAdmin()) {
             throw new NotFoundHttpException();
-        }
-    }
-
-    private function verifyCsrf(PKPRequest $request): void
-    {
-        $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
-        if ($headerToken === null || $headerToken !== $request->getSession()->token()) {
-            throw new \Exception('CSRF mismatch!');
         }
     }
 
@@ -240,7 +243,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
     private function handleUploadZip(PKPRequest $request): void
     {
-        $this->verifyCsrf($request);
 
         $user = $request->getUser();
         $temporaryFileManager = new TemporaryFileManager();
@@ -256,7 +258,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
     private function handleImport(PKPRequest $request): void
     {
-        $this->verifyCsrf($request);
 
         $user = $request->getUser();
         $importType = $request->getUserVar('importType');
@@ -324,14 +325,14 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
             $this->sendJsonResponse([
                 'uuid' => $uuid,
-                'importType' => $importType,
-                'dryMode' => $dryMode,
-                'filesProcessed' => $result['filesProcessed'],
-                'totalRows' => $result['totalRows'],
-                'successfulRows' => $result['successfulRows'],
-                'failedRows' => $result['failedRows'],
-                'invalidFiles' => $invalidFiles,
-                'perFile' => $result['perFile'],
+                'resultImportType' => $importType,
+                'resultDryMode' => $dryMode,
+                'resultFilesProcessed' => $result['filesProcessed'],
+                'resultTotalRows' => $result['totalRows'],
+                'resultSuccessfulRows' => $result['successfulRows'],
+                'resultFailedRows' => $result['failedRows'],
+                'resultInvalidFiles' => $invalidFiles,
+                'resultPerFile' => $result['perFile'],
             ]);
 
         } catch (ImportLockException $e) {
@@ -352,13 +353,13 @@ class CSVImportExportPlugin extends ImportExportPlugin
             $this->sendJsonResponse(['done' => false]);
         } else {
             $this->sendJsonResponse([
-                'done'           => true,
-                'status'         => $result['status'],
-                'importType'     => $result['importType'],
-                'rowsProcessed'  => $result['rowsProcessed'],
-                'rowsFailed'     => $result['rowsFailed'],
+                'done' => true,
+                'status' => $result['status'],
+                'importType' => $result['importType'],
+                'rowsProcessed' => $result['rowsProcessed'],
+                'rowsFailed' => $result['rowsFailed'],
                 'capturedOutput' => $result['capturedOutput'],
-                'invalidFiles'   => $result['perFileResults'] ?? [],
+                'invalidFiles' => $result['perFileResults'] ?? [],
             ]);
         }
     }
@@ -396,6 +397,31 @@ class CSVImportExportPlugin extends ImportExportPlugin
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         readfile($filePath);
         $this->isResultManaged = true;
+    }
+
+    private function handleCleanup(PKPRequest $request): void
+    {
+
+        $uuid = $request->getUserVar('uuid');
+        if (empty($uuid)) {
+            $this->sendJsonResponse(['cleaned' => false], 400);
+            return;
+        }
+
+        $storeDir = sys_get_temp_dir() . '/csv_import_results';
+        $store = new ImportResultStore($storeDir);
+        $result = $store->get($uuid);
+
+        if ($result !== null) {
+            $sourceDir = $result['sourceDir'] ?? '';
+            if ($sourceDir && is_dir($sourceDir) && str_starts_with(realpath($sourceDir), realpath(sys_get_temp_dir()) . '/')) {
+                ZipExtractor::deleteDirectory($sourceDir);
+            }
+
+            $store->delete($uuid);
+        }
+
+        $this->sendJsonResponse(['cleaned' => true]);
     }
 
     /**

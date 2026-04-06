@@ -7,9 +7,10 @@
  *
  * CSV Import settings tab for Settings > Website
  *}
+
 <tab id="csvImportPlugin" label="{translate key="plugins.importexport.csv.displayName"}">
-	<pkp-form
-		v-bind="components.{$smarty.const.FORM_CSV_IMPORT}"
-		@set="set"
-	/>
+    <pkp-form
+        v-bind="components.{$smarty.const.FORM_CSV_IMPORT}"
+        @set="set"
+    />
 </tab>

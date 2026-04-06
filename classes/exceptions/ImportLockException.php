@@ -20,6 +20,6 @@ class ImportLockException extends \RuntimeException
 {
     public function __construct()
     {
-        parent::__construct('Import is currently locked');
+        parent::__construct(__('plugins.importexport.csv.importLocked'));
     }
 }

@@ -20,16 +20,16 @@ class ZipExtractionException extends \RuntimeException
 {
     public static function corruptArchive(string $path): self
     {
-        return new self("Cannot open ZIP archive: {$path}");
+        return new self(__('plugins.importexport.csv.zipCorruptArchive', ['path' => $path]));
     }
 
     public static function bombDetected(int $actual, int $limit): self
     {
-        return new self("ZIP bomb detected: {$actual} exceeds limit {$limit}");
+        return new self(__('plugins.importexport.csv.zipBombDetected', ['actual' => $actual, 'limit' => $limit]));
     }
 
     public static function pathTraversal(string $entryName): self
     {
-        return new self("Path traversal detected in ZIP entry: {$entryName}");
+        return new self(__('plugins.importexport.csv.zipPathTraversal', ['entry' => $entryName]));
     }
 }

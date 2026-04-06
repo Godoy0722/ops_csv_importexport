@@ -74,7 +74,6 @@ class ZipExtractor
 
                 $name = $stat['name'];
 
-                // Path traversal check
                 if (str_contains($name, '..') || str_starts_with($name, '/')) {
                     throw ZipExtractionException::pathTraversal($name);
                 }
@@ -82,7 +81,6 @@ class ZipExtractor
                 $compressedSize   = (int) $stat['comp_size'];
                 $uncompressedSize = (int) $stat['size'];
 
-                // Per-entry compression ratio bomb check (skip entries with no compressed size)
                 if ($compressedSize > 0) {
                     $ratio = $uncompressedSize / $compressedSize;
                     if ($ratio > self::MAX_RATIO) {
@@ -92,13 +90,11 @@ class ZipExtractor
 
                 $totalUncompressed += $uncompressedSize;
 
-                // Total size bomb check
                 if ($totalUncompressed > self::MAX_TOTAL_BYTES) {
                     throw ZipExtractionException::bombDetected($totalUncompressed, self::MAX_TOTAL_BYTES);
                 }
             }
 
-            // All checks passed — extract to a unique subdirectory
             $extractDir = $baseDir . '/csv_import_' . bin2hex(random_bytes(8));
             mkdir($extractDir, 0700, true);
 
@@ -185,7 +181,7 @@ class ZipExtractor
      *
      * @param string $dir Absolute path to the directory.
      */
-    private static function deleteDirectory(string $dir): void
+    public static function deleteDirectory(string $dir): void
     {
         if (!is_dir($dir)) {
             return;

@@ -229,6 +229,12 @@ msgstr "--- Dry-mode complete: {$files} files, {$passed} passed, {$failed} faile
 msgid "plugins.importexport.csv.form.submitButton"
 msgstr "Import"
 
+msgid "plugins.importexport.csv.form.importing"
+msgstr "Importing"
+
+msgid "plugins.importexport.csv.form.imported"
+msgstr "Imported"
+
 msgid "plugins.importexport.csv.form.importFile"
 msgstr "Import File"
 
@@ -270,6 +276,18 @@ msgstr "File upload failed."
 
 msgid "plugins.importexport.csv.zipExtractionFailed"
 msgstr "Failed to extract ZIP file: {$reason}"
+
+msgid "plugins.importexport.csv.importLocked"
+msgstr "An import is currently in progress. Please wait for it to complete before starting another."
+
+msgid "plugins.importexport.csv.zipCorruptArchive"
+msgstr "Cannot open ZIP archive: \"{$path}\"."
+
+msgid "plugins.importexport.csv.zipBombDetected"
+msgstr "ZIP archive rejected: uncompressed size ({$actual}) exceeds the allowed limit ({$limit})."
+
+msgid "plugins.importexport.csv.zipPathTraversal"
+msgstr "ZIP archive rejected: entry \"{$entry}\" contains a path traversal sequence."
 
 msgid "plugins.importexport.csv.results.dryModeTitle"
 msgstr "Dry-Run Results"

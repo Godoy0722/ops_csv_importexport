@@ -150,22 +150,7 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
 
     // ==================== handleUploadZip tests ====================
 
-    public function testHandleUploadZipWithoutCsrfThrowsException(): void
-    {
-        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
-
-        $session = Mockery::mock(\Illuminate\Contracts\Session\Session::class);
-        $session->shouldReceive('token')->andReturn('valid-token');
-
-        $request = $this->createMockRequest(['session' => $session]);
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('CSRF mismatch!');
-
-        $this->invokeHandler('handleUploadZip', $request);
-    }
-
-    public function testHandleUploadZipWithValidCsrfAndFailedUploadReturnsError(): void
+    public function testHandleUploadZipWithFailedUploadReturnsError(): void
     {
         $user = $this->createMockUser(['id' => 42]);
 
@@ -198,31 +183,11 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
 
     // ==================== handleImport tests ====================
 
-    public function testHandleImportWithoutCsrfThrowsException(): void
-    {
-        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
-
-        $session = Mockery::mock(\Illuminate\Contracts\Session\Session::class);
-        $session->shouldReceive('token')->andReturn('valid-token');
-
-        $request = $this->createMockRequest(['session' => $session]);
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('CSRF mismatch!');
-
-        $this->invokeHandler('handleImport', $request);
-    }
-
     public function testHandleImportWithInvalidImportTypeReturnsJsonError(): void
     {
-        $session = Mockery::mock(\Illuminate\Contracts\Session\Session::class);
-        $session->shouldReceive('token')->andReturn('valid-token');
-        $_SERVER['HTTP_X_CSRF_TOKEN'] = 'valid-token';
-
         $user = $this->createMockUser(['id' => 1]);
 
         $request = $this->createMockRequest([
-            'session' => $session,
             'user' => $user,
             'userVars' => [
                 'importType' => 'invalidType',
@@ -232,8 +197,6 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
         ]);
 
         @$this->invokeHandler('handleImport', $request);
-
-        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
 
         $this->assertTrue($this->plugin->isResultManaged);
         $decoded = $this->decodeResult();

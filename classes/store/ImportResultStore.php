@@ -45,6 +45,15 @@ class ImportResultStore
         return json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
     }
 
+    public function delete(string $uuid): void
+    {
+        $path = $this->path($uuid);
+
+        if (file_exists($path)) {
+            unlink($path);
+        }
+    }
+
     private function path(string $uuid): string
     {
         $sanitized = preg_replace('/[^a-f0-9\-]/', '', $uuid);

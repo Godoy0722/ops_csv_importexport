@@ -225,3 +225,45 @@ msgstr "Result: {$passed} passed, {$failed} failed ({$total} total)"
 
 msgid "plugins.importexport.csv.dryModeGrandTotal"
 msgstr "--- Dry-mode complete: {$files} files, {$passed} passed, {$failed} failed ---"
+
+msgid "plugins.importexport.csv.form.zipFile"
+msgstr "ZIP File"
+
+msgid "plugins.importexport.csv.form.zipFile.description"
+msgstr "Upload a ZIP file containing CSV files and any associated assets (cover images, galley files)."
+
+msgid "plugins.importexport.csv.form.importType"
+msgstr "Import Type"
+
+msgid "plugins.importexport.csv.form.importType.preprints"
+msgstr "Preprints"
+
+msgid "plugins.importexport.csv.form.importType.users"
+msgstr "Users"
+
+msgid "plugins.importexport.csv.form.dryMode"
+msgstr "Dry Run"
+
+msgid "plugins.importexport.csv.form.dryMode.description"
+msgstr "Validate all CSV data without writing to the database. Review results before running a real import."
+
+msgid "plugins.importexport.csv.form.dryMode.enable"
+msgstr "Enable dry-run mode"
+
+msgid "plugins.importexport.csv.form.sendWelcomeEmail"
+msgstr "Welcome Email"
+
+msgid "plugins.importexport.csv.form.sendWelcomeEmail.enable"
+msgstr "Send welcome email to imported users"
+
+msgid "plugins.importexport.csv.importInProgress"
+msgstr "An import is already in progress. Please wait for it to complete."
+
+msgid "plugins.importexport.csv.invalidImportType"
+msgstr "Invalid import type: \"{$importType}\"."
+
+msgid "plugins.importexport.csv.uploadFailed"
+msgstr "File upload failed."
+
+msgid "plugins.importexport.csv.zipExtractionFailed"
+msgstr "Failed to extract ZIP file: {$reason}"

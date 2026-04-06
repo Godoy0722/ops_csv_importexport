@@ -244,11 +244,9 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
                 $result = $store->get($uuid);
 
                 if ($result === null) {
-                    $json = new \PKP\core\JSONMessage(true);
-                    $json->setAdditionalAttributes(['done' => false]);
+                    $json = new \PKP\core\JSONMessage(true, ['done' => false]);
                 } else {
-                    $json = new \PKP\core\JSONMessage(true);
-                    $json->setAdditionalAttributes([
+                    $json = new \PKP\core\JSONMessage(true, [
                         'done'           => true,
                         'status'         => $result['status'],
                         'importType'     => $result['importType'],
@@ -311,11 +309,9 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
                 $result = $store->get($uuid);
 
                 if ($result === null) {
-                    $json = new \PKP\core\JSONMessage(true);
-                    $json->setAdditionalAttributes(['done' => false]);
+                    $json = new \PKP\core\JSONMessage(true, ['done' => false]);
                 } else {
-                    $json = new \PKP\core\JSONMessage(true);
-                    $json->setAdditionalAttributes([
+                    $json = new \PKP\core\JSONMessage(true, [
                         'done'           => true,
                         'status'         => $result['status'],
                         'importType'     => $result['importType'],

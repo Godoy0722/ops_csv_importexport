@@ -158,10 +158,10 @@ class UserCommandDryModeTest extends BaseTestCase
         $command = new UserCommand($this->tempDir, $this->createMockUser(), false, dryMode: true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, $result['exitCode']);
 
         // D-03: CachedEntities must be empty after reset() runs post-rollback
         $this->assertEmpty(CachedEntities::$servers);
@@ -201,11 +201,11 @@ class UserCommandDryModeTest extends BaseTestCase
         $command = new UserCommand($this->tempDir, $this->createMockUser(), false, dryMode: true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
         // D-06: exit code 1 when any row fails
-        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $result['exitCode']);
 
         // D-07: reporter must have shown the failed row
         $mocks['dryModeReporterMock']->shouldHaveReceived('printFailedRow');
@@ -337,10 +337,10 @@ class UserCommandDryModeTest extends BaseTestCase
         $command = new UserCommand($this->tempDir, $this->createMockUser(), true, dryMode: true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, $result['exitCode']);
         // Mockery expectations automatically verify sendWelcomeEmail was not called on tearDown
     }
 
@@ -356,10 +356,10 @@ class UserCommandDryModeTest extends BaseTestCase
         $command = new UserCommand($this->tempDir, $this->createMockUser(), false, dryMode: true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, $result['exitCode']);
         // Grand total still called even with no files
         $mocks['dryModeReporterMock']->shouldHaveReceived('printGrandTotal')->once();
 
@@ -389,11 +389,11 @@ class UserCommandDryModeTest extends BaseTestCase
         $command = new UserCommand($this->tempDir, $this->createMockUser(), false, dryMode: true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
         // All rows failed — exit code must be 1
-        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $result['exitCode']);
     }
 
     /**

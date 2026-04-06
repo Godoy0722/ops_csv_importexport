@@ -131,11 +131,12 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
         $this->validateUser();
 
-        $exitCode = match ($this->command) {
+        $result = match ($this->command) {
             'preprints' => (new PreprintCommand($this->sourceDir, $this->user, $dryMode))->run(),
             'users' => (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail, $dryMode))->run(),
             default => throw new \InvalidArgumentException(__('plugins.importexport.csv.invalidCommand', ['command' => $this->command])),
         };
+        $exitCode = $result['exitCode'];
 
         $endTime = microtime(true);
         $executionTime = $endTime - $startTime;

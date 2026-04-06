@@ -281,10 +281,10 @@ class PreprintCommandDryModeTest extends BaseTestCase
         $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, $result['exitCode']);
         $this->assertEmpty(CachedEntities::$servers);
         $this->assertEmpty(CachedEntities::$genreIds);
         $this->assertEmpty(CachedEntities::$userGroupIds);
@@ -324,10 +324,10 @@ class PreprintCommandDryModeTest extends BaseTestCase
         $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $result['exitCode']);
         $mocks['dryModeReporterMock']->shouldHaveReceived('printFailedRow')->once();
     }
 
@@ -583,10 +583,10 @@ class PreprintCommandDryModeTest extends BaseTestCase
         $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, $result['exitCode']);
         $mocks['dryModeReporterMock']->shouldHaveReceived('printGrandTotal')->once();
     }
 
@@ -616,10 +616,10 @@ class PreprintCommandDryModeTest extends BaseTestCase
         $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $result['exitCode']);
         $mocks['dryModeReporterMock']->shouldHaveReceived('printFailedRow')->twice();
     }
 
@@ -748,10 +748,10 @@ class PreprintCommandDryModeTest extends BaseTestCase
         $command = new PreprintCommand($this->tempDir, $this->createMockUser(), true);
 
         ob_start();
-        $exitCode = $command->run();
+        $result = $command->run();
         ob_get_clean();
 
-        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $result['exitCode']);
 
         // Read the invalid_ file and verify it contains the cascaded failure message
         $invalidFiles = glob($this->tempDir . '/invalid_*');

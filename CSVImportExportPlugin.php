@@ -184,6 +184,7 @@ class CSVImportExportPlugin extends ImportExportPlugin
     public function display($args, $request)
     {
         parent::display($args, $request);
+        $this->requireSiteAdmin($request);
 
         ZipExtractor::cleanupExpired(
             sys_get_temp_dir() . '/csv_import_results'
@@ -210,6 +211,13 @@ class CSVImportExportPlugin extends ImportExportPlugin
                 break;
             default:
                 throw new NotFoundHttpException();
+        }
+    }
+
+    private function requireSiteAdmin(PKPRequest $request): void
+    {
+        if (!$request->getUser() || !\PKP\security\Validation::isSiteAdmin()) {
+            throw new NotFoundHttpException();
         }
     }
 
@@ -378,9 +386,9 @@ class CSVImportExportPlugin extends ImportExportPlugin
         }
 
         $sourceDir = $result['sourceDir'] ?? '';
-        $filePath = $sourceDir . '/' . $filename;
+        $filePath = realpath($sourceDir . '/' . $filename);
 
-        if (!file_exists($filePath)) {
+        if (!$filePath || !str_starts_with($filePath, realpath(sys_get_temp_dir()) . '/')) {
             throw new NotFoundHttpException();
         }
 

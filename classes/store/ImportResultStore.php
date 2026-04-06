@@ -47,6 +47,7 @@ class ImportResultStore
 
     private function path(string $uuid): string
     {
-        return $this->storeDir . '/' . $uuid . '.json';
+        $sanitized = preg_replace('/[^a-f0-9\-]/', '', $uuid);
+        return $this->storeDir . '/' . $sanitized . '.json';
     }
 }

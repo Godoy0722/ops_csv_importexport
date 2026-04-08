@@ -19,15 +19,16 @@ use APP\core\Application;
 use APP\facades\Repo;
 use APP\plugins\importexport\csv\classes\commands\PreprintCommand;
 use APP\plugins\importexport\csv\classes\commands\UserCommand;
-use APP\plugins\importexport\csv\classes\exceptions\ImportLockException;
-use APP\plugins\importexport\csv\classes\exceptions\ZipExtractionException;
 use APP\plugins\importexport\csv\classes\forms\CsvImportForm;
-use APP\plugins\importexport\csv\classes\handlers\ZipExtractor;
-use APP\plugins\importexport\csv\classes\store\ImportResultStore;
+use APP\plugins\importexport\csv\shared\exceptions\ImportLockException;
+use APP\plugins\importexport\csv\shared\exceptions\ZipExtractionException;
+use APP\plugins\importexport\csv\shared\handlers\ZipExtractor;
+use APP\plugins\importexport\csv\shared\store\ImportResultStore;
 use PKP\core\PKPApplication;
 use PKP\core\PKPRequest;
 use PKP\file\TemporaryFileManager;
 use PKP\plugins\Hook;
+use PKP\facades\Locale;
 use PKP\plugins\ImportExportPlugin;
 use PKP\security\Validation;
 use PKP\user\User;
@@ -77,6 +78,17 @@ class CSVImportExportPlugin extends ImportExportPlugin
         }
 
         return true;
+    }
+
+    /** @copydoc Plugin::addLocaleData() */
+    public function addLocaleData(): void
+    {
+        parent::addLocaleData();
+
+        $sharedLocalePath = $this->getPluginPath() . '/shared/locale';
+        if (is_dir($sharedLocalePath)) {
+            Locale::registerPath($sharedLocalePath);
+        }
     }
 
     /**

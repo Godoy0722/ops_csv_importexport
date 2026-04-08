@@ -16,31 +16,18 @@
 
 namespace APP\plugins\importexport\csv\classes\processors;
 
-use APP\facades\Repo;
+use APP\plugins\importexport\csv\shared\processors\SubmissionProcessor as SharedSubmissionProcessor;
 use APP\publication\Publication;
+use APP\server\Server;
 use APP\submission\Submission;
-use PKP\context\Context;
 
-class SubmissionProcessor
+class SubmissionProcessor extends SharedSubmissionProcessor
 {
-    public static function process(object $data, Publication $publication, Context $server): Submission
+    public static function process(object $data, Publication $publication, Server $server): Submission
     {
-        $submission = Repo::submission()->newDataObject();
+        $normalizedAbstract = PublicationProcessor::normalizeAbstractToHtml($data->preprintAbstract);
+        $dateSubmitted = $data->dateSubmitted ?? $data->datePosted;
 
-        $submission->setData('contextId', $server->getId());
-        $submission->setData('status', Submission::STATUS_PUBLISHED);
-        $submission->setData('locale', $data->locale);
-        $submission->setData('stageId', WORKFLOW_STAGE_ID_PRODUCTION);
-        $submission->setData('submissionProgress', '');
-        $submission->setData('abstract', PublicationProcessor::normalizeAbstractToHtml($data->preprintAbstract), $data->locale);
-        $submission->setData('dateSubmitted', $data->dateSubmitted ?? $data->datePosted);
-
-        $submissionId = Repo::submission()->add($submission, $publication, $server);
-        return Repo::submission()->get($submissionId);
-    }
-
-    public static function setCurrentPublicationId(Submission $submission, int $publicationId): void
-    {
-        Repo::submission()->edit($submission, ['currentPublicationId' => $publicationId]);
+        return parent::processCommons($data->locale, $publication, $server, $normalizedAbstract, $dateSubmitted);
     }
 }

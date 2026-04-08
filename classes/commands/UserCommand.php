@@ -17,15 +17,15 @@
 namespace APP\plugins\importexport\csv\classes\commands;
 
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
-use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
-use APP\plugins\importexport\csv\classes\handlers\CsvFileHandler;
-use APP\plugins\importexport\csv\classes\handlers\DryModeReporter;
-use APP\plugins\importexport\csv\classes\handlers\WelcomeEmailHandler;
-use APP\plugins\importexport\csv\classes\processors\UserGroupsProcessor;
-use APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor;
-use APP\plugins\importexport\csv\classes\processors\UsersProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredUserHeaders;
+use APP\plugins\importexport\csv\shared\exceptions\RowValidationException;
+use APP\plugins\importexport\csv\shared\handlers\CSVFileHandler;
+use APP\plugins\importexport\csv\shared\handlers\DryModeReporter;
+use APP\plugins\importexport\csv\shared\handlers\WelcomeEmailHandler;
+use APP\plugins\importexport\csv\shared\processors\UserGroupsProcessor;
+use APP\plugins\importexport\csv\shared\processors\UserInterestsProcessor;
+use APP\plugins\importexport\csv\shared\processors\UsersProcessor;
 use Illuminate\Support\Facades\DB;
 use PKP\security\Validation;
 use PKP\user\User;
@@ -74,7 +74,7 @@ class UserCommand
             }
 
             $filePath = $fileInfo->getPathname();
-            $file = CsvFileHandler::createReadableCSVFile($filePath);
+            $file = CSVFileHandler::createReadableCSVFile($filePath);
             if (is_null($file)) {
                 continue;
             }
@@ -107,7 +107,7 @@ class UserCommand
 
                     $server = CachedEntities::getCachedServer($data->serverPath);
 
-                    InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
+                    InvalidRowValidations::validateContextIsValid($server, $data->serverPath, 'Server');
                     InvalidRowValidations::validateUserAlreadyExistsWithThisEmail($data->email);
 
                     if ($data->username) {

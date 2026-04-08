@@ -21,23 +21,23 @@ use APP\facades\Repo;
 use APP\file\PublicFileManager;
 use APP\publication\Publication;
 use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
-use APP\plugins\importexport\csv\classes\exceptions\FileNotSavedException;
-use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
-use APP\plugins\importexport\csv\classes\handlers\CsvFileHandler;
-use APP\plugins\importexport\csv\classes\handlers\DryModeReporter;
-use APP\plugins\importexport\csv\classes\processors\AuthorsProcessor;
-use APP\plugins\importexport\csv\classes\processors\CategoriesProcessor;
-use APP\plugins\importexport\csv\classes\processors\FundersProcessor;
-use APP\plugins\importexport\csv\classes\processors\GalleyProcessor;
-use APP\plugins\importexport\csv\classes\processors\StatisticsProcessor;
-use APP\plugins\importexport\csv\classes\processors\KeywordsProcessor;
 use APP\plugins\importexport\csv\classes\processors\PublicationProcessor;
 use APP\plugins\importexport\csv\classes\processors\SectionsProcessor;
-use APP\plugins\importexport\csv\classes\processors\SubjectsProcessor;
-use APP\plugins\importexport\csv\classes\processors\SubmissionFileProcessor;
 use APP\plugins\importexport\csv\classes\processors\SubmissionProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredPreprintHeaders;
+use APP\plugins\importexport\csv\shared\exceptions\FileNotSavedException;
+use APP\plugins\importexport\csv\shared\exceptions\RowValidationException;
+use APP\plugins\importexport\csv\shared\handlers\CSVFileHandler;
+use APP\plugins\importexport\csv\shared\handlers\DryModeReporter;
+use APP\plugins\importexport\csv\shared\processors\AuthorsProcessor;
+use APP\plugins\importexport\csv\shared\processors\CategoriesProcessor;
+use APP\plugins\importexport\csv\shared\processors\FundersProcessor;
+use APP\plugins\importexport\csv\shared\processors\GalleyProcessor;
+use APP\plugins\importexport\csv\shared\processors\KeywordsProcessor;
+use APP\plugins\importexport\csv\shared\processors\StatisticsProcessor;
+use APP\plugins\importexport\csv\shared\processors\SubjectsProcessor;
+use APP\plugins\importexport\csv\shared\processors\SubmissionFileProcessor;
 use APP\server\ServerDAO;
 use APP\submission\Submission;
 use Illuminate\Support\Facades\DB;
@@ -141,7 +141,7 @@ class PreprintCommand
             }
 
             $filePath = $fileInfo->getPathname();
-            $file = CsvFileHandler::createReadableCSVFile($filePath);
+            $file = CSVFileHandler::createReadableCSVFile($filePath);
 
             if (is_null($file)) {
                 continue;
@@ -191,7 +191,7 @@ class PreprintCommand
                         $data,
                         fn($row) => RequiredPreprintHeaders::validateRowHasAllRequiredFields($row, $this->processedPreprints)
                     );
-                    InvalidRowValidations::validatePreprintVersioningFields($data);
+                    InvalidRowValidations::validateContextVersioningFields($data);
                     InvalidRowValidations::validateSectionFields($data);
 
                     if (!empty($data->versionIdentifier)) {
@@ -199,7 +199,7 @@ class PreprintCommand
                     }
 
                     if ($data->galleyFilenames) {
-                        InvalidRowValidations::validatePreprintGalleys(
+                        InvalidRowValidations::validatePublicationGalleys(
                             $data->galleyFilenames,
                             $data->galleyLabels,
                             $this->sourceDir
@@ -214,7 +214,7 @@ class PreprintCommand
                         );
                     }
 
-                    InvalidRowValidations::validatePreprintViews($data->preprintViews ?? null);
+                    InvalidRowValidations::validatePublicationViews($data->preprintViews ?? null, 'preprintViews');
                     InvalidRowValidations::validateGalleyViews($data->galleyViews ?? null, $data->galleyLabels ?? null);
 
                     if ($data->suppFilenames && $data->suppLabels && !empty($data->suppDescriptions)) {
@@ -259,8 +259,8 @@ class PreprintCommand
 
                     $server = CachedEntities::getCachedServer($data->serverPath);
 
-                    InvalidRowValidations::validateServerIsValid($server, $data->serverPath);
-                    InvalidRowValidations::validateServerLocale($server, $data->locale);
+                    InvalidRowValidations::validateContextIsValid($server, $data->serverPath, 'Server');
+                    InvalidRowValidations::validateContextLocale($server, $data->locale, 'Server');
 
                     // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
                     $genreName = 'SUBMISSION';
@@ -268,11 +268,11 @@ class PreprintCommand
                     InvalidRowValidations::validateGenreIdValid($genreId, $genreName);
 
                     $userGroupId = CachedEntities::getCachedAuthorUserGroupId($data->serverPath, $server->getId());
-                    InvalidRowValidations::validateUserGroupId($userGroupId, $data->serverPath);
+                    InvalidRowValidations::validateUserGroupId($userGroupId, $data->serverPath, 'Server');
 
                     // Validate Funding plugin is enabled if funders data is provided
                     if ($data->funders) {
-                        InvalidRowValidations::validateFundingPluginEnabled($data->funders, $server->getId());
+                        InvalidRowValidations::validateFundingPluginEnabled($data->funders, $server->getId(), 'Server');
                         InvalidRowValidations::validateFundersCrossrefRegistry($data->funders, $server->getId());
                     }
 
@@ -325,7 +325,7 @@ class PreprintCommand
                     } elseif ($existingSubmission && $basePublication) {
                         // New version import
                         $submission = $existingSubmission;
-                        $publication = PublicationProcessor::createPublicationVersion($basePublication, $data, $server);
+                        $publication = PublicationProcessor::createPublicationVersionCommons($basePublication, $data, $server);
                         $publication = PublicationProcessor::processVersionedPublication($publication, $data, $basePublication, $this->sourceDir);
                     } else {
                         // New submission import
@@ -351,7 +351,7 @@ class PreprintCommand
                     }
 
                     if (!empty($data->preprintViews) && (int)$data->preprintViews > 0) {
-                        StatisticsProcessor::insertPreprintViews(
+                        StatisticsProcessor::insertSubmissionViews(
                             $submission->getId(),
                             $server->getId(),
                             (int)$data->preprintViews
@@ -387,7 +387,6 @@ class PreprintCommand
 
                         foreach (array_map('trim', explode(';', $data->suppFilenames)) as $suppFile) {
                             try {
-                                // @TODO: change the exception type here
                                 $suppFileId = $this->saveSubmissionFile(
                                     $suppFile,
                                     $server->getId(),
@@ -514,12 +513,12 @@ class PreprintCommand
                     }
 
                     if (is_null($invalidCsvFile)) {
-                        $invalidCsvFile = CsvFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
+                        $invalidCsvFile = CSVFileHandler::createCSVFileInvalidRows($this->sourceDir, "invalid_{$basename}", RequiredPreprintHeaders::$preprintHeaders);
                         if (is_null($invalidCsvFile)) {
                             continue 2;
                         }
                     }
-                    CsvFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $e->getMessage(), $this->failedRows);
+                    CSVFileHandler::processFailedRow($invalidCsvFile, $fields, $this->expectedRowSize, $e->getMessage(), $this->failedRows);
                     if ($this->dryMode) {
                         $fileFailedRows[] = ['row' => $this->processedRows + 1, 'reason' => $e->getMessage()];
                     }

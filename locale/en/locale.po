@@ -43,29 +43,11 @@ msgstr "Unknown User: \"{$username}\". Exiting."
 msgid "plugins.importexport.csv.unknownSourceDir"
 msgstr "Invalid source dir: \"{$sourceDir}\". Please verify this param on CLI. Exiting."
 
-msgid "plugins.importexport.csv.couldNotOpenFile"
-msgstr "Could not read file: \"{$filePath}\". Error: \"{$errorMessage}\"."
-
 msgid "plugins.importexport.csv.couldNotCreateFile"
 msgstr "Could not create the file \"{$filename}\"."
 
-msgid "plugins.importexport.csv.rowDoesntContainAllFields"
-msgstr "Row doesn't contain all fields."
-
-msgid "plugins.importexport.csv.rowContainsTooManyFields"
-msgstr "Row contains more fields than expected."
-
-msgid "plugins.importexport.csv.verifyRequiredFieldsForThisRow"
-msgstr "Verify the required fields for this row."
-
 msgid "plugins.importexport.csv.baseRowFailedForIdentifier"
 msgstr "Skipped: the base row for identifier \"{$identifier}\" failed validation earlier in this file. Fix the base row first, then this row will be processed as a multi-locale/version import."
-
-msgid "plugins.importexport.csv.unknownServer"
-msgstr "Unknown server with path \"{$serverPath}\"."
-
-msgid "plugins.importexport.csv.unknownLocale"
-msgstr "Unknown locale or locale not supported by this server: \"{$locale}\". Supported locales: {$supportedLocales}"
 
 msgid "plugins.importexport.csv.invalidPreprintFile"
 msgstr "Invalid file for this preprint."
@@ -73,35 +55,11 @@ msgstr "Invalid file for this preprint."
 msgid "plugins.importexport.csv.invalidCoverImage"
 msgstr "Invalid cover image for this submission."
 
-msgid "plugins.importexport.csv.invalidGalleyFile"
-msgstr "Invalid galley file \"{$filename}\" for this submission."
-
-msgid "plugins.importexport.csv.invalidNumberOfLabelsAndGalleys"
-msgstr "Galley files don't have the same amount as the labels. Please verify it for this row."
-
-msgid "plugins.importexport.csv.invalidSupplementaryFile"
-msgstr "Invalid supplementary file \"{$filename}\" for this submission."
-
-msgid "plugins.importexport.csv.invalidNumberOfLabelsAndSupplementaryFiles"
-msgstr "Supplementary files don't have the same amount as the labels. Please verify it for this row."
-
-msgid "plugins.importexport.csv.invalidNumberOfDescriptionsAndSupplementaryFiles"
-msgstr "Supplementary files don't have the same amount as the descriptions. Please verify it for this row."
-
-msgid "plugins.importexport.csv.noAuthorGroup"
-msgstr "There is no default author group in the journal {$journal}."
-
 msgid "plugins.importexpot.csv.fileProcessFinished"
 msgstr "Process for file \"{$filename}\" finished. {$processedRows} rows processed. {$failedRows} rows with error."
 
-msgid "plugins.importexport.csv.invalidPreprintCoverImage"
-msgstr "The cover image has an invalid format for this row."
-
 msgid "plugins.importexport.csv.erroWhileSavingBookCoverImage"
 msgstr "An error occurred while saving the book cover image."
-
-msgid "plugins.importexport.csv.noGenre"
-msgstr "There is no {$genreName} genre."
 
 msgid "plugins.importexport.csv.errorWhileSavingSubmissionFile"
 msgstr "An error occurred while saving the Submission file."
@@ -114,15 +72,6 @@ msgstr "An error occurred while saving the galley {$galley}."
 
 msgid "plugins.importexport.csv.abstractRequiredBySection"
 msgstr "Abstract is required for this section but not provided."
-
-msgid "plugins.importexport.csv.userAlreadyExistsWithEmail"
-msgstr "User already exists with email \"{$email}\"."
-
-msgid "plugins.importexport.csv.userAlreadyExistsWithUsername"
-msgstr "User already exists with username \"{$username}\"."
-
-msgid "plugins.importexport.csv.roleDoesntExist"
-msgstr "Role \"{$role}\" doesn't exist."
 
 msgid "plugins.importexport.csv.invalidStartDate"
 msgstr "The subscription start date \"{$date}\" is not valid. Format required: YYYY-MM-DD."
@@ -139,47 +88,14 @@ msgstr "Missing required subscription fields (start_date and end_date) for user 
 msgid "plugins.importexport.csv.subscriptionTypeDoesntExist"
 msgstr "Invalid subscripion type with ID \"{$subscriptionTypeId}\""
 
-msgid "plugins.importexport.csv.versionRequiredWhenIdentifierProvided"
-msgstr "Version is required when versionIdentifier is provided."
-
-msgid "plugins.importexport.csv.versionMustBePositiveInteger"
-msgstr "Version must be a positive integer greater than 0."
-
 msgid "plugins.importexport.csv.duplicatePreprintVersionFound"
 msgstr "A preprint with identifier \"{$identifier}\" and version \"{$version}\" already exists in this import. Please check the article's version."
-
-msgid "plugins.importexport.csv.duplicatePreprintVersionLocaleFound"
-msgstr "A preprint with identifier \"{$identifier}\", version \"{$version}\", and locale \"{$locale}\" already exists in this import. Please check the article's version and locale combination."
-
-msgid "plugins.importexport.csv.invalidReferencesFile"
-msgstr "Invalid references file: \"{$filename}\". Please verify the file exists and is readable."
-
-msgid "plugins.importexport.csv.invalidReferencesFileExtension"
-msgstr "References file must have a .txt extension."
-
-msgid "plugins.importexport.csv.invalidOrcidFormat"
-msgstr "Invalid ORCID format: \"{$orcid}\". Accepted formats: URL (https://orcid.org/0000-0000-0000-0000), dashed (0000-0000-0000-0000), or numeric (0000000000000000)."
 
 msgid "plugins.importexport.csv.orcidNotFound"
 msgstr "ORCID not found: \"{$orcid}\". The ORCID entry does not exist."
 
-msgid "plugins.importexport.csv.invalidVorDoiFormat"
-msgstr "Invalid VOR DOI format: \"{$vorDoi}\". Accepted formats: DOI URL (https://doi.org/10.1234/example), DOI identifier (10.1234/example), or with prefix (doi:10.1234/example)."
-
 msgid "plugins.importexport.csv.usernameNotFoundUsingDefault"
 msgstr "Notice: Username \"{$username}\" not found. Submission ID {$submissionId} was added using default user \"{$defaultUsername}\"."
-
-msgid "plugins.importexport.csv.fundingPluginNotEnabled"
-msgstr "The Funding plugin is not installed or not enabled for this server. Please enable it before importing rows with funders data."
-
-msgid "plugins.importexport.csv.invalidFunderFormat"
-msgstr "Invalid funder format at position {$index}. Each funder must have at least a name."
-
-msgid "plugins.importexport.csv.funderNotInCrossrefRegistry"
-msgstr "Funder \"{$funderName}\" at position {$index} is not from the Crossref Funder Registry. The funder identification must be a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...)."
-
-msgid "plugins.importexport.csv.funderMissingCrossrefId"
-msgstr "Funder \"{$funderName}\" at position {$index} is missing a Crossref Funder Registry identification. Please provide a valid Crossref DOI (e.g., http://dx.doi.org/10.13039/...)."
 
 msgid "plugins.importexport.csv.skippingInvalidFile"
 msgstr "Skipping \"{$filename}\" (file from previous failed import). To re-import failed rows, fix errors in this file, rename it without the 'invalid_' prefix, and run the import again."
@@ -189,42 +105,6 @@ msgstr "Executed in: {$seconds} seconds.\n"
 
 msgid "plugins.importexport.csv.couldNotWriteFile"
 msgstr "Could not write to file \"{$filename}\"."
-
-msgid "plugins.importexport.csv.incompleteSectionFields"
-msgstr "Both sectionTitle and sectionAbbrev must be provided together. If one is filled, the other must also be filled."
-
-msgid "plugins.importexport.csv.invalidPreprintViews"
-msgstr "The preprintViews field must be empty or a non-negative integer."
-
-msgid "plugins.importexport.csv.galleyViewsWithoutGalleys"
-msgstr "galleyViews is provided but galleyLabels is empty. Galley labels are required when galley views are specified."
-
-msgid "plugins.importexport.csv.invalidNumberOfGalleyViews"
-msgstr "The number of galleyViews values doesn't match the number of galleyLabels. Please verify the semicolon-separated counts match."
-
-msgid "plugins.importexport.csv.invalidGalleyViewValue"
-msgstr "Invalid galley view value \"{$value}\". Each galley view must be empty or a non-negative integer."
-
-msgid "plugins.importexport.csv.invalidSourceDir"
-msgstr "The source directory is invalid or does not exist."
-
-msgid "plugins.importexport.csv.filePathEscapesSourceDir"
-msgstr "File path \"{$filename}\" escapes the source directory. Filenames must not contain path traversal sequences."
-
-msgid "plugins.importexport.csv.dryModeFileHeader"
-msgstr "=== {$filename} ==="
-
-msgid "plugins.importexport.csv.dryModeTableHeader"
-msgstr "ROW  | STATUS | ERROR"
-
-msgid "plugins.importexport.csv.dryModeFailedRow"
-msgstr "{$row}  | FAILED | {$reason}"
-
-msgid "plugins.importexport.csv.dryModeFileSummary"
-msgstr "Result: {$passed} passed, {$failed} failed ({$total} total)"
-
-msgid "plugins.importexport.csv.dryModeGrandTotal"
-msgstr "--- Dry-mode complete: {$files} files, {$passed} passed, {$failed} failed ---"
 
 msgid "plugins.importexport.csv.form.submitButton"
 msgstr "Import"
@@ -276,18 +156,6 @@ msgstr "File upload failed."
 
 msgid "plugins.importexport.csv.zipExtractionFailed"
 msgstr "Failed to extract ZIP file: {$reason}"
-
-msgid "plugins.importexport.csv.importLocked"
-msgstr "An import is currently in progress. Please wait for it to complete before starting another."
-
-msgid "plugins.importexport.csv.zipCorruptArchive"
-msgstr "Cannot open ZIP archive: \"{$path}\"."
-
-msgid "plugins.importexport.csv.zipBombDetected"
-msgstr "ZIP archive rejected: uncompressed size ({$actual}) exceeds the allowed limit ({$limit})."
-
-msgid "plugins.importexport.csv.zipPathTraversal"
-msgstr "ZIP archive rejected: entry \"{$entry}\" contains a path traversal sequence."
 
 msgid "plugins.importexport.csv.results.dryModeTitle"
 msgstr "Dry-Run Results"

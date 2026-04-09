@@ -12,11 +12,15 @@
         <testsuite name="CSV Import/Export Plugin Tests">
             <directory>tests</directory>
         </testsuite>
+        <testsuite name="Shared CSV Import/Export Library Tests">
+            <directory>shared/tests</directory>
+        </testsuite>
     </testsuites>
 
     <source>
         <include>
             <directory suffix=".php">classes</directory>
+            <directory suffix=".php">shared</directory>
         </include>
         <exclude>
             <directory>tests</directory>

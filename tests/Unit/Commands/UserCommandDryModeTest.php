@@ -25,6 +25,7 @@ use APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor;
 use APP\plugins\importexport\csv\classes\processors\UsersProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredUserHeaders;
+use APP\plugins\importexport\csv\shared\handlers\OrcidHandler;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
 use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
@@ -92,7 +93,9 @@ class UserCommandDryModeTest extends BaseTestCase
         $validationMock->shouldReceive('validateUserAlreadyExistsWithThisEmail')->byDefault();
         $validationMock->shouldReceive('validateUserAlreadyExistsWithThisUsername')->byDefault();
         $validationMock->shouldReceive('validateAllUserGroupsAreValid')->byDefault();
-        $validationMock->shouldReceive('validateOrcid')->byDefault();
+
+        $orcidMock = Mockery::mock('overload:' . OrcidHandler::class);
+        $orcidMock->shouldReceive('validate')->byDefault();
 
         // Overload UsersProcessor
         $usersProcessorMock = Mockery::mock('overload:' . UsersProcessor::class);

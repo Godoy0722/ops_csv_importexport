@@ -22,6 +22,7 @@ use APP\plugins\importexport\csv\classes\processors\UserInterestsProcessor;
 use APP\plugins\importexport\csv\classes\processors\UsersProcessor;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredUserHeaders;
+use APP\plugins\importexport\csv\shared\handlers\OrcidHandler;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\CsvTestDataBuilder;
 use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
@@ -1166,7 +1167,9 @@ class UserCommandTest extends BaseTestCase
         $validationMock->shouldReceive('validateUserAlreadyExistsWithThisEmail');
         $validationMock->shouldReceive('validateUserAlreadyExistsWithThisUsername');
         $validationMock->shouldReceive('validateAllUserGroupsAreValid');
-        $validationMock->shouldReceive('validateOrcid');
+
+        $orcidMock = Mockery::mock('overload:' . OrcidHandler::class);
+        $orcidMock->shouldReceive('validate');
 
         $mockUser = $this->createMockUser(['id' => 1]);
 

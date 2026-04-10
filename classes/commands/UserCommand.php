@@ -20,6 +20,7 @@ use APP\plugins\importexport\csv\classes\cachedAttributes\CachedEntities;
 use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\classes\validations\RequiredUserHeaders;
 use APP\plugins\importexport\csv\shared\exceptions\RowValidationException;
+use APP\plugins\importexport\csv\shared\handlers\OrcidHandler;
 use APP\plugins\importexport\csv\shared\handlers\CSVFileHandler;
 use APP\plugins\importexport\csv\shared\handlers\DryModeReporter;
 use APP\plugins\importexport\csv\shared\handlers\WelcomeEmailHandler;
@@ -119,7 +120,7 @@ class UserCommand
                     InvalidRowValidations::validateAllUserGroupsAreValid($roles, $server->getId(), $server->getPrimaryLocale());
 
                     if (!empty($data->orcid)) {
-                        InvalidRowValidations::validateOrcid($data->orcid);
+                        OrcidHandler::validate($data->orcid);
                     }
 
                     // Generate password if tempPassword column is empty

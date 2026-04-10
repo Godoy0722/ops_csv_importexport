@@ -21,14 +21,11 @@ use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use APP\plugins\importexport\csv\tests\Fixtures\MockFactory;
 use APP\server\Server;
-use GuzzleHttp\Psr7\Response;
 use Mockery;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
-use PKP\core\Registry;
-use PKP\tests\PKPTestCase;
 
 #[CoversClass(InvalidRowValidations::class)]
 class InvalidRowValidationsTest extends BaseTestCase
@@ -485,99 +482,6 @@ class InvalidRowValidationsTest extends BaseTestCase
         $this->assertNull($result);
     }
 
-    // ==================== ORCID Validation Tests ====================
-
-    #[DataProvider('validOrcidProvider')]
-    public function testValidateOrcidFormatWithValidFormats(string $orcid): void
-    {
-        // Test format validation only (normalization + digit count)
-        // The full validateOrcid() also performs an HTTP existence check
-        // which is not suitable for unit tests
-        $normalized = InvalidRowValidations::normalizeOrcid($orcid);
-        $this->assertNotNull($normalized, "ORCID '$orcid' should normalize to a valid value");
-
-        // Verify digit count matches expected ORCID format (16 digits)
-        $orcidId = preg_replace('/^https?:\/\/(sandbox\.)?orcid\.org\//', '', $normalized);
-        $digits = preg_replace('/[^0-9X]/i', '', $orcidId);
-        $this->assertEquals(16, strlen($digits), "ORCID '$orcid' should have 16 digits after normalization");
-    }
-
-    public static function validOrcidProvider(): array
-    {
-        return [
-            'Full URL' => ['https://orcid.org/0000-0002-1825-0097'],
-            'Sandbox URL' => ['https://sandbox.orcid.org/0000-0002-1825-0097'],
-            'Dashed format' => ['0000-0002-1825-0097'],
-            'Numeric format' => ['0000000218250097'],
-            'With X checksum' => ['0000-0001-5109-3700'],
-        ];
-    }
-
-    public function testValidateOrcidWithInvalidFormat(): void
-    {
-        $this->expectException(RowValidationException::class);
-        InvalidRowValidations::validateOrcid('invalid-orcid');
-    }
-
-    public function testValidateOrcidWithInvalidChecksum(): void
-    {
-        // The production code validates ORCID existence via HTTP rather than local checksum.
-        // A structurally valid ORCID passes format validation regardless of checksum.
-        $normalized = InvalidRowValidations::normalizeOrcid('0000-0002-1825-0098');
-        $this->assertNotNull($normalized, 'Structurally valid ORCID should pass normalization');
-    }
-
-    public function testValidateOrcidWithEmptyValue(): void
-    {
-        $result = InvalidRowValidations::validateOrcid('');
-
-        $this->assertNull($result);
-    }
-
-    public function testValidateOrcidWithNullValue(): void
-    {
-        $result = InvalidRowValidations::validateOrcid(null);
-
-        $this->assertNull($result);
-    }
-
-    // ==================== ORCID Normalization Tests ====================
-
-    public function testNormalizeOrcidFromDashedFormat(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('0000-0002-1825-0097');
-
-        $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $result);
-    }
-
-    public function testNormalizeOrcidFromNumericFormat(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('0000000218250097');
-
-        $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $result);
-    }
-
-    public function testNormalizeOrcidFromFullUrl(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('https://orcid.org/0000-0002-1825-0097');
-
-        $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $result);
-    }
-
-    public function testNormalizeOrcidFromSandboxUrl(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('https://sandbox.orcid.org/0000-0002-1825-0097');
-
-        $this->assertEquals('https://sandbox.orcid.org/0000-0002-1825-0097', $result);
-    }
-
-    public function testNormalizeOrcidWithInvalidFormat(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('invalid');
-
-        $this->assertNull($result);
-    }
-
     // ==================== VOR DOI Validation Tests ====================
 
     #[DataProvider('validVorDoiProvider')]
@@ -854,37 +758,6 @@ class InvalidRowValidationsTest extends BaseTestCase
         $this->assertNull($result);
     }
 
-    // ==================== ORCID Normalization Edge Cases ====================
-
-    public function testNormalizeOrcidWithEmptyString(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('');
-
-        $this->assertNull($result);
-    }
-
-    public function testNormalizeOrcidWithWhitespace(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('  0000-0002-1825-0097  ');
-
-        $this->assertEquals('https://orcid.org/0000-0002-1825-0097', $result);
-    }
-
-    public function testNormalizeOrcidWithXChecksumCharacter(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('0000-0001-5109-370X');
-
-        $this->assertNotNull($result);
-        $this->assertStringEndsWith('370X', $result);
-    }
-
-    public function testNormalizeOrcidFromNumericFormatWithX(): void
-    {
-        $result = InvalidRowValidations::normalizeOrcid('000000015109370X');
-
-        $this->assertEquals('https://orcid.org/0000-0001-5109-370X', $result);
-    }
-
     // ==================== Cover Image Allowed Types Tests ====================
 
     public function testCoverImageAllowedTypesIsComplete(): void
@@ -1147,50 +1020,6 @@ class InvalidRowValidationsTest extends BaseTestCase
         $this->assertFalse($result);
     }
 
-    // ==================== ORCID Full Validation Tests (with HTTP mock) ====================
-
-    public function testValidateOrcidSucceedsWhenOrcidExists(): void
-    {
-        $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
-        $mockClient->shouldReceive('request')
-            ->once()
-            ->andReturn(new Response(200));
-        Registry::set(PKPTestCase::MOCKED_GUZZLE_CLIENT_NAME, $mockClient);
-
-        InvalidRowValidations::validateOrcid('0000-0002-1825-0097');
-        $this->assertTrue(true);
-    }
-
-    public function testValidateOrcidThrowsWhenOrcidNotFound(): void
-    {
-        $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
-        $mockClient->shouldReceive('request')
-            ->once()
-            ->andReturn(new Response(404));
-        Registry::set(PKPTestCase::MOCKED_GUZZLE_CLIENT_NAME, $mockClient);
-
-        $this->expectException(RowValidationException::class);
-        InvalidRowValidations::validateOrcid('0000-0002-1825-0097');
-    }
-
-    public function testValidateOrcidThrowsWhenHttpClientFails(): void
-    {
-        $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
-        $mockClient->shouldReceive('request')
-            ->once()
-            ->andThrow(new \Exception('Connection timeout'));
-        Registry::set(PKPTestCase::MOCKED_GUZZLE_CLIENT_NAME, $mockClient);
-
-        $this->expectException(RowValidationException::class);
-        InvalidRowValidations::validateOrcid('0000-0002-1825-0097');
-    }
-
-    public function testValidateOrcidThrowsForInvalidDigitCount(): void
-    {
-        $this->expectException(RowValidationException::class);
-        TestableInvalidRowValidationsForOrcidDigits::validateOrcid('anything');
-    }
-
     // ==================== Funding Plugin Enabled Validation Tests ====================
 
     public function testValidateFundingPluginEnabledWithEmptyStringReturnsEarly(): void
@@ -1258,17 +1087,5 @@ class InvalidRowValidationsTest extends BaseTestCase
         }
 
         $this->assertTrue(true);
-    }
-}
-
-/**
- * Test helper subclass that overrides normalizeOrcid to test the invalid digit count path.
- * Uses late static binding: validateOrcid() calls static::normalizeOrcid().
- */
-class TestableInvalidRowValidationsForOrcidDigits extends InvalidRowValidations
-{
-    public static function normalizeOrcid(string $orcid): ?string
-    {
-        return 'https://orcid.org/short-id';
     }
 }

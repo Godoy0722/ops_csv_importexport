@@ -16,7 +16,7 @@
 
 namespace APP\plugins\importexport\csv\classes\validations;
 
-use APP\plugins\importexport\csv\classes\exceptions\RowValidationException;
+use APP\plugins\importexport\csv\shared\exceptions\RowValidationException;
 use APP\plugins\importexport\csv\shared\validations\InvalidRowValidations as SharedInvalidRowValidations;
 
 class InvalidRowValidations extends SharedInvalidRowValidations
@@ -29,5 +29,28 @@ class InvalidRowValidations extends SharedInvalidRowValidations
     public static function validateRowHasAllRequiredFields(object $data, callable $requiredFieldsValidation): void
     {
         parent::validateRowHasAllRequiredFieldsCommons($data, $requiredFieldsValidation);
+    }
+
+    /**
+     * Validates the VOR DOI field.
+     *
+     * Accepted formats:
+     * - Full URL: https://doi.org/10.1234/example
+     * - DOI identifier: 10.1234/example
+     * - With doi: prefix: doi:10.1234/example
+     *
+     * @throws RowValidationException
+     */
+    public static function validateVorDoi(?string $vorDoi): void
+    {
+        if (empty($vorDoi)) {
+            return;
+        }
+
+        $normalizedDoi = static::normalizeVorDoi($vorDoi);
+
+        if ($normalizedDoi === null) {
+            throw new RowValidationException(__('plugins.importexport.csv.invalidVorDoiFormat', ['vorDoi' => $vorDoi]));
+        }
     }
 }

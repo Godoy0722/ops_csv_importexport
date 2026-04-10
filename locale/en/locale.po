@@ -180,3 +180,6 @@ msgstr "Failed Rows"
 
 msgid "plugins.importexport.csv.results.invalidFiles"
 msgstr "Download invalid rows"
+
+msgid "plugins.importexport.csv.invalidVorDoiFormat"
+msgstr "Invalid VOR DOI format: \"{$vorDoi}\". Accepted formats: DOI URL (https://doi.org/10.1234/example), DOI identifier (10.1234/example), or with prefix (doi:10.1234/example)."

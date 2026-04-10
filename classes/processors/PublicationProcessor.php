@@ -19,6 +19,7 @@
 namespace APP\plugins\importexport\csv\classes\processors;
 
 use APP\facades\Repo;
+use APP\plugins\importexport\csv\classes\validations\InvalidRowValidations;
 use \APP\plugins\importexport\csv\shared\processors\PublicationProcessor as SharedPublicationProcessor;
 use APP\publication\Publication;
 use APP\server\Server;
@@ -106,5 +107,19 @@ class PublicationProcessor extends SharedPublicationProcessor
             static::LOCALIZED_FIELDS,
             static::NON_LOCALIZED_FIELDS
         );
+    }
+
+    /**
+     * Update the VOR DOI for a publication.
+     * When a VOR DOI is provided, it automatically sets the relationStatus to PUBLISHED (3).
+     * The DOI is normalized to URL format (https://doi.org/...) before storing.
+     */
+    public static function updateVorDoi(Publication $publication, ?string $vorDoi): void
+    {
+        $normalizedDoi = InvalidRowValidations::normalizeVorDoi($vorDoi);
+
+        $publication->setData('vorDoi', $normalizedDoi);
+        $publication->setData('relationStatus', Publication::PUBLICATION_RELATION_PUBLISHED);
+        Repo::publication()->dao->update($publication);
     }
 }

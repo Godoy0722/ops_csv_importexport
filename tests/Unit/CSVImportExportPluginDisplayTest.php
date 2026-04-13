@@ -12,13 +12,13 @@
  * @ingroup plugins_importexport_csv
  *
  * @brief Tests for CSVImportExportPlugin display() op handlers:
- * index, uploadZip, import, pollResult, downloadInvalidCsv
+ * index, import, downloadInvalidCsv, cleanup
  */
 
 namespace APP\plugins\importexport\csv\tests\Unit;
 
 use APP\plugins\importexport\csv\CSVImportExportPlugin;
-use APP\plugins\importexport\csv\classes\store\ImportResultStore;
+use APP\plugins\importexport\csv\shared\store\ImportResultStore;
 use APP\plugins\importexport\csv\tests\BaseTestCase;
 use Mockery;
 use PKP\core\PKPRequest;
@@ -104,10 +104,9 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
                 switch ($op) {
                     case 'index':
                     case '':
-                    case 'uploadZip':
                     case 'import':
-                    case 'pollResult':
                     case 'downloadInvalidCsv':
+                    case 'cleanup':
                         // Known ops — do nothing in this test subclass
                         break;
                     default:
@@ -148,39 +147,6 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
         $this->assertTrue($plugin->isResultManaged);
     }
 
-    // ==================== handleUploadZip tests ====================
-
-    public function testHandleUploadZipWithFailedUploadReturnsError(): void
-    {
-        $user = $this->createMockUser(['id' => 42]);
-
-        $request = $this->createMockRequest([
-            'checkCSRF' => true,
-            'user' => $user,
-        ]);
-
-        // Override TemporaryFileManager by using a testable plugin subclass
-        $plugin = new class extends CSVImportExportPlugin {
-            public function callUploadZip($request): void
-            {
-                http_response_code(400);
-                header('Content-Type: application/json');
-                $this->result = json_encode(['errorMessage' => 'Upload failed']);
-                echo $this->result;
-                $this->isResultManaged = true;
-            }
-        };
-
-        // Suppress header() calls and echo in CLI test context
-        @ob_start();
-        $plugin->callUploadZip($request);
-        @ob_end_clean();
-
-        $this->assertTrue($plugin->isResultManaged);
-        $decoded = json_decode($plugin->result, true);
-        $this->assertArrayHasKey('errorMessage', $decoded);
-    }
-
     // ==================== handleImport tests ====================
 
     public function testHandleImportWithInvalidImportTypeReturnsJsonError(): void
@@ -201,137 +167,6 @@ class CSVImportExportPluginDisplayTest extends BaseTestCase
         $this->assertTrue($this->plugin->isResultManaged);
         $decoded = $this->decodeResult();
         $this->assertArrayHasKey('errorMessage', $decoded);
-    }
-
-    // ==================== handlePollResult tests ====================
-
-    public function testHandlePollResultWithUnknownUuidReturnsDoneFalse(): void
-    {
-        $tempDir = $this->createTempDirectory();
-
-        // Create a testable plugin that overrides Config dependency
-        $plugin = new class($tempDir) extends CSVImportExportPlugin {
-            private string $testFilesDir;
-
-            public function __construct(string $testFilesDir)
-            {
-                $this->testFilesDir = $testFilesDir;
-            }
-
-            public function callPollResult($request): void
-            {
-                $uuid = $request->getUserVar('uuid');
-                $store = new ImportResultStore($this->testFilesDir . '/csv_import_results');
-                $result = $store->get($uuid);
-
-                if ($result === null) {
-                    $data = ['done' => false];
-                } else {
-                    $data = [
-                        'done'           => true,
-                        'status'         => $result['status'],
-                        'importType'     => $result['importType'],
-                        'rowsProcessed'  => $result['rowsProcessed'],
-                        'rowsFailed'     => $result['rowsFailed'],
-                        'capturedOutput' => $result['capturedOutput'],
-                        'invalidFiles'   => $result['perFileResults'] ?? [],
-                    ];
-                }
-
-                header('Content-Type: application/json');
-                $this->result = json_encode($data);
-                echo $this->result;
-                $this->isResultManaged = true;
-            }
-        };
-
-        $request = $this->createMockRequest([
-            'userVars' => ['uuid' => 'nonexistent-uuid'],
-        ]);
-
-        @ob_start();
-        $plugin->callPollResult($request);
-        @ob_end_clean();
-
-        $this->assertTrue($plugin->isResultManaged);
-        $decoded = json_decode($plugin->result, true);
-        $this->assertFalse($decoded['done']);
-
-        $this->cleanupTempDirectory($tempDir);
-    }
-
-    public function testHandlePollResultWithKnownUuidReturnsDoneTrueWithFields(): void
-    {
-        $tempDir = $this->createTempDirectory();
-        $resultDir = $tempDir . '/csv_import_results';
-
-        // Pre-populate the store
-        $store = new ImportResultStore($resultDir);
-        $uuid = 'test-uuid-known';
-        $store->save($uuid, [
-            'status'         => 'success',
-            'importType'     => 'preprints',
-            'rowsProcessed'  => 10,
-            'rowsFailed'     => 2,
-            'capturedOutput' => 'Processing complete.',
-            'perFileResults' => ['invalid_data.csv'],
-        ]);
-
-        $plugin = new class($tempDir) extends CSVImportExportPlugin {
-            private string $testFilesDir;
-
-            public function __construct(string $testFilesDir)
-            {
-                $this->testFilesDir = $testFilesDir;
-            }
-
-            public function callPollResult($request): void
-            {
-                $uuid = $request->getUserVar('uuid');
-                $store = new ImportResultStore($this->testFilesDir . '/csv_import_results');
-                $result = $store->get($uuid);
-
-                if ($result === null) {
-                    $data = ['done' => false];
-                } else {
-                    $data = [
-                        'done'           => true,
-                        'status'         => $result['status'],
-                        'importType'     => $result['importType'],
-                        'rowsProcessed'  => $result['rowsProcessed'],
-                        'rowsFailed'     => $result['rowsFailed'],
-                        'capturedOutput' => $result['capturedOutput'],
-                        'invalidFiles'   => $result['perFileResults'] ?? [],
-                    ];
-                }
-
-                header('Content-Type: application/json');
-                $this->result = json_encode($data);
-                echo $this->result;
-                $this->isResultManaged = true;
-            }
-        };
-
-        $request = $this->createMockRequest([
-            'userVars' => ['uuid' => $uuid],
-        ]);
-
-        @ob_start();
-        $plugin->callPollResult($request);
-        @ob_end_clean();
-
-        $this->assertTrue($plugin->isResultManaged);
-        $decoded = json_decode($plugin->result, true);
-
-        $this->assertTrue($decoded['done']);
-        $this->assertEquals('success', $decoded['status']);
-        $this->assertEquals('preprints', $decoded['importType']);
-        $this->assertEquals(10, $decoded['rowsProcessed']);
-        $this->assertEquals(2, $decoded['rowsFailed']);
-        $this->assertEquals('Processing complete.', $decoded['capturedOutput']);
-        $this->assertEquals(['invalid_data.csv'], $decoded['invalidFiles']);
-
-        $this->cleanupTempDirectory($tempDir);
     }
 
     // ==================== handleDownloadInvalidCsv tests ====================

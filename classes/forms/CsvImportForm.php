@@ -11,69 +11,20 @@
  *
  * @ingroup plugins_importexport_csv
  *
- * @brief Form for CSV import via Settings > Website tab
+ * @brief OPS-specific CSV import form with Preprints and Users import types.
  */
 
 namespace APP\plugins\importexport\csv\classes\forms;
 
-use PKP\components\forms\FieldOptions;
-use PKP\components\forms\FieldSelect;
-use PKP\components\forms\FieldUpload;
-use PKP\components\forms\FormComponent;
+use APP\plugins\importexport\csv\shared\forms\CsvImportForm as SharedCsvImportForm;
 
-define('FORM_CSV_IMPORT', 'csvImport');
-
-class CsvImportForm extends FormComponent
+class CsvImportForm extends SharedCsvImportForm
 {
-    public $id = FORM_CSV_IMPORT;
-    public $method = 'POST';
-
     public function __construct(string $action, string $uploadUrl)
     {
-        $this->action = $action;
-
-        $this
-            ->addPage(['id' => 'default', 'submitButton' => ['label' => __('plugins.importexport.csv.form.submitButton')]])
-            ->addGroup(['id' => 'default', 'pageId' => 'default'])
-            ->addField(new FieldUpload('importFile', [
-                'label' => __('plugins.importexport.csv.form.importFile'),
-                'description' => __('plugins.importexport.csv.form.importFile.description'),
-                'isRequired' => true,
-                'groupId' => 'default',
-                'options' => [
-                    'url' => $uploadUrl,
-                    'acceptedFiles' => '.zip,.csv',
-                ],
-            ]))
-            ->addField(new FieldSelect('importType', [
-                'label' => __('plugins.importexport.csv.form.importType'),
-                'isRequired' => true,
-                'groupId' => 'default',
-                'options' => [
-                    ['value' => 'preprints', 'label' => __('plugins.importexport.csv.form.importType.preprints')],
-                    ['value' => 'users', 'label' => __('plugins.importexport.csv.form.importType.users')],
-                ],
-                'value' => 'preprints',
-            ]))
-            ->addField(new FieldOptions('dryMode', [
-                'label' => __('plugins.importexport.csv.form.dryMode'),
-                'description' => __('plugins.importexport.csv.form.dryMode.description'),
-                'type' => 'checkbox',
-                'groupId' => 'default',
-                'options' => [
-                    ['value' => true, 'label' => __('plugins.importexport.csv.form.dryMode.enable')],
-                ],
-                'value' => [],
-            ]))
-            ->addField(new FieldOptions('sendWelcomeEmail', [
-                'label' => __('plugins.importexport.csv.form.sendWelcomeEmail'),
-                'type' => 'checkbox',
-                'groupId' => 'default',
-                'options' => [
-                    ['value' => true, 'label' => __('plugins.importexport.csv.form.sendWelcomeEmail.enable')],
-                ],
-                'value' => [],
-                'showWhen' => ['importType', 'users'],
-            ]));
+        parent::__construct($action, $uploadUrl, [
+            ['value' => 'preprints', 'label' => __('plugins.importexport.csv.form.importType.preprints')],
+            ['value' => 'users', 'label' => __('plugins.importexport.csv.form.importType.users')],
+        ], 'preprints');
     }
 }

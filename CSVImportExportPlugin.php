@@ -27,16 +27,14 @@ use APP\plugins\importexport\csv\shared\store\ImportResultStore;
 use PKP\core\PKPApplication;
 use PKP\core\PKPRequest;
 use PKP\file\TemporaryFileManager;
-use PKP\plugins\Hook;
 use PKP\facades\Locale;
 use PKP\plugins\ImportExportPlugin;
-use PKP\security\Validation;
 use PKP\user\User;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class CSVImportExportPlugin extends ImportExportPlugin
 {
-    /** @var string Command being used from CLI (supports "issues" or "users") */
+    /** @var string Command being used from CLI (supports "preprints" or "users") */
     private string $command = '';
 
     /** @var string Username for authentication */
@@ -66,15 +64,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
         if (!Application::isUnderMaintenance() && $this->getEnabled()) {
             $this->addLocaleData();
-            Hook::add('Template::Settings::admin', [$this, 'callbackShowAdminSettingsTab']);
-
-            $request = Application::get()->getRequest();
-            $templateMgr = \APP\template\TemplateManager::getManager($request);
-            $scriptUrl = $request->getBaseUrl() . '/' . $this->getPluginPath() . '/scripts/csvImportResults.js';
-            $templateMgr->addJavaScript('csvImportResults', $scriptUrl, [
-                'contexts' => ['backend'],
-                'priority' => $templateMgr::STYLE_SEQUENCE_LAST,
-            ]);
         }
 
         return true;
@@ -131,34 +120,49 @@ class CSVImportExportPlugin extends ImportExportPlugin
     }
 
     /**
-     * Hook callback for Template::Settings::admin — injects the CSV import tab.
+     * @copydoc ImportExportPlugin::display()
      */
-    public function callbackShowAdminSettingsTab(string $hookName, array $args): bool
+    public function display($args, $request)
     {
-        $templateMgr = $args[1];
-        $output = &$args[2];
-        $request = Application::get()->getRequest();
+        parent::display($args, $request);
 
-        $serverPath = $this->getFirstServerPath();
-        if (!$serverPath) {
-            return false;
+        $op = array_shift($args) ?? '';
+
+        switch ($op) {
+            case 'index':
+            case '':
+                $this->displayImportForm($request);
+                break;
+            case 'import':
+                $this->handleImport($request);
+                break;
+            case 'downloadInvalidCsv':
+                $this->handleDownloadInvalidCsv($request);
+                break;
+            case 'cleanup':
+                $this->handleCleanup($request);
+                break;
+            default:
+                throw new NotFoundHttpException();
         }
+    }
 
+    private function displayImportForm(PKPRequest $request): void
+    {
+        $templateMgr = \APP\template\TemplateManager::getManager($request);
+
+        $context = $request->getContext();
         $form = new CsvImportForm(
-            $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $serverPath, 'management', 'importexport', ['plugin', $this->getName(), 'import']),
-            $request->getDispatcher()->url($request, PKPApplication::ROUTE_API, $serverPath, 'temporaryFiles')
+            $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'management', 'importexport', ['plugin', $this->getName(), 'import']),
+            $request->getBaseUrl() . '/index.php/' . $context->getPath() . '/api/v1/temporaryFiles'
         );
 
-        $state = $templateMgr->getTemplateVars('state');
-        $state['components'][FORM_CSV_IMPORT] = $form->getConfig();
-        $templateMgr->assign('state', $state);
-
-        $output .= $templateMgr->fetch($this->getTemplateResource('settingsForm.tpl'));
+        $templateMgr->setState(['components' => [FORM_CSV_IMPORT => $form->getConfig()]]);
 
         $downloadBaseUrl = $request->getDispatcher()->url(
             $request,
             PKPApplication::ROUTE_PAGE,
-            $serverPath,
+            null,
             'management',
             'importexport',
             ['plugin', $this->getName(), 'downloadInvalidCsv']
@@ -166,12 +170,19 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $cleanupUrl = $request->getDispatcher()->url(
             $request,
             PKPApplication::ROUTE_PAGE,
-            $serverPath,
+            null,
             'management',
             'importexport',
             ['plugin', $this->getName(), 'cleanup']
         );
-        $configJson = json_encode([
+
+        $scriptUrl = $request->getBaseUrl() . '/' . $this->getPluginPath() . '/shared/scripts/csvImportResults.js';
+        $templateMgr->addJavaScript('csvImportResults', $scriptUrl, [
+            'contexts' => ['backend'],
+            'priority' => $templateMgr::STYLE_SEQUENCE_LAST,
+        ]);
+
+        $templateMgr->assign('csvImportPluginConfig', json_encode([
             'formId' => FORM_CSV_IMPORT,
             'downloadBaseUrl' => $downloadBaseUrl,
             'cleanupUrl' => $cleanupUrl,
@@ -187,61 +198,9 @@ class CSVImportExportPlugin extends ImportExportPlugin
                 'importing' => __('plugins.importexport.csv.form.importing'),
                 'imported' => __('plugins.importexport.csv.form.imported'),
             ],
-        ]);
-        $output .= '<script>window.csvImportPluginConfig = ' . $configJson . ';</script>';
+        ]));
 
-        return false;
-    }
-
-    private function getFirstServerPath(): ?string
-    {
-        $contextDao = Application::getContextDAO();
-        $contexts = $contextDao->getAll();
-        /** @var Context $context */
-        $context = $contexts->next();
-        return $context ? $context->getPath() : null;
-    }
-
-    /**
-     * @copydoc ImportExportPlugin::display()
-     */
-    public function display($args, $request)
-    {
-        parent::display($args, $request);
-        $this->requireSiteAdmin($request);
-
-        $op = array_shift($args) ?? '';
-
-        switch ($op) {
-            case 'index':
-            case '':
-                $this->isResultManaged = true;
-                break;
-            case 'uploadZip':
-                $this->handleUploadZip($request);
-                break;
-            case 'import':
-                $this->handleImport($request);
-                break;
-            case 'pollResult':
-                $this->handlePollResult($request);
-                break;
-            case 'downloadInvalidCsv':
-                $this->handleDownloadInvalidCsv($request);
-                break;
-            case 'cleanup':
-                $this->handleCleanup($request);
-                break;
-            default:
-                throw new NotFoundHttpException();
-        }
-    }
-
-    private function requireSiteAdmin(PKPRequest $request): void
-    {
-        if (!$request->getUser() || !Validation::isSiteAdmin()) {
-            throw new NotFoundHttpException();
-        }
+        $templateMgr->display($this->getTemplateResource('settingsForm.tpl'));
     }
 
     private function sendJsonResponse(array $data, int $statusCode = 200): void
@@ -253,24 +212,8 @@ class CSVImportExportPlugin extends ImportExportPlugin
         $this->isResultManaged = true;
     }
 
-    private function handleUploadZip(PKPRequest $request): void
-    {
-
-        $user = $request->getUser();
-        $temporaryFileManager = new TemporaryFileManager();
-        $temporaryFile = $temporaryFileManager->handleUpload('uploadedFile', $user->getId());
-
-        if (!$temporaryFile) {
-            $this->sendJsonResponse(['errorMessage' => __('plugins.importexport.csv.uploadFailed')], 400);
-            return;
-        }
-
-        $this->sendJsonResponse(['temporaryFileId' => $temporaryFile->getId()]);
-    }
-
     private function handleImport(PKPRequest $request): void
     {
-
         $user = $request->getUser();
         $importType = $request->getUserVar('importType');
         $dryMode = (bool) $request->getUserVar('dryMode');
@@ -354,28 +297,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
         }
     }
 
-    private function handlePollResult(PKPRequest $request): void
-    {
-        $uuid = $request->getUserVar('uuid');
-        $storeDir = sys_get_temp_dir() . '/csv_import_results';
-        $store = new ImportResultStore($storeDir);
-        $result = $store->get($uuid);
-
-        if ($result === null) {
-            $this->sendJsonResponse(['done' => false]);
-        } else {
-            $this->sendJsonResponse([
-                'done' => true,
-                'status' => $result['status'],
-                'importType' => $result['importType'],
-                'rowsProcessed' => $result['rowsProcessed'],
-                'rowsFailed' => $result['rowsFailed'],
-                'capturedOutput' => $result['capturedOutput'],
-                'invalidFiles' => $result['perFileResults'] ?? [],
-            ]);
-        }
-    }
-
     private function handleDownloadInvalidCsv(PKPRequest $request): void
     {
         $uuid = $request->getUserVar('uuid');
@@ -413,7 +334,6 @@ class CSVImportExportPlugin extends ImportExportPlugin
 
     private function handleCleanup(PKPRequest $request): void
     {
-
         $uuid = $request->getUserVar('uuid');
         if (empty($uuid)) {
             $this->sendJsonResponse(['cleaned' => false], 400);

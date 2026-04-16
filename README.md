@@ -1,10 +1,11 @@
-# OPS CSV Import Plugin (CLI)
+# OPS CSV Import Plugin
 
-This plugin allows administrators to import users and preprints with their associated metadata in CSV format into OPS 3.5.X. This plugin operates exclusively via command-line interface (CLI).
+This plugin allows administrators to import users and preprints with their associated metadata in CSV format into OPS 3.5.X. The plugin can be used through both the web interface and the command-line interface (CLI).
 
 ## Table of Contents
-- [OPS CSV Import Plugin (CLI)](#ops-csv-import-plugin-cli)
+- [OPS CSV Import Plugin](#ops-csv-import-plugin)
 	- [Table of Contents](#table-of-contents)
+	- [Web Interface Usage](#web-interface-usage)
 	- [CLI Usage](#cli-usage)
 		- [Importing Users](#importing-users)
 		- [Importing Preprints](#importing-preprints)
@@ -58,6 +59,32 @@ This plugin allows administrators to import users and preprints with their assoc
 			- [Preprint Import Issues](#preprint-import-issues)
 			- [General Troubleshooting Tips](#general-troubleshooting-tips)
 
+
+## Web Interface Usage
+
+The plugin supports importing through the OPS web interface:
+
+1. Navigate to **Tools → Import/Export → CSV Import Export Plugin**
+2. Upload your CSV file or a ZIP archive containing CSV files and associated assets
+3. Select the import type (**Preprints** or **Users**)
+4. Optionally enable **Dry Mode** to validate without persisting changes
+5. Optionally enable **Send Welcome Email** (visible only when importing Users)
+6. Click **Import**
+
+After the import completes, a results modal is displayed showing:
+
+- **Summary badges** — files processed, total rows, successful rows, and failed rows
+- **Per-file breakdown** — a table listing each failed row with its row number and error reason
+- **Download links** — for each file that produced errors, a link to download the `invalid_*.csv` file containing the failed rows with error details
+
+The modal border is green when all rows succeed and pink when any rows fail. Closing the modal automatically cleans up temporary files on the server.
+
+> **ZIP uploads:** When using a ZIP file, place your CSV files along with any referenced assets (cover images, PDF files, supplementary files) either at the root of the archive or inside a single folder. If the ZIP contains exactly one folder and no CSV files at the root, that folder will be used automatically.
+
+> **Notes:**
+> - The web interface uses the currently logged-in user as the importing user
+> - All the same validation rules, multi-locale support, multi-version support, and error handling described in this documentation apply to web imports
+> - For very large imports (thousands of rows), the CLI may be more appropriate as it avoids browser timeout concerns
 
 ## CLI Usage
 

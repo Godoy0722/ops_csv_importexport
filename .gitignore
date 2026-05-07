@@ -3,3 +3,4 @@
 imports/
 tests/coverage/
 CLAUDE.md
+examples/*.zip

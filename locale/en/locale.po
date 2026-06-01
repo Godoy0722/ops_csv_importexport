@@ -193,5 +193,23 @@ msgstr "Failed Rows"
 msgid "plugins.importexport.csv.results.invalidFiles"
 msgstr "Download invalid rows"
 
+msgid "plugins.importexport.csv.results.intro.preprints"
+msgstr "This is the result of importing <b>preprints</b>. Every row of your CSV files was processed: rows that succeeded were saved to the server, and any that failed are listed further down together with the reason they could not be imported."
+
+msgid "plugins.importexport.csv.results.intro.preprints.dryMode"
+msgstr "This is a <b>dry run</b> for <b>preprints</b> — nothing was saved to the server. The summary below is a preview of what a real import would do: it shows which rows would be created and which would fail, along with the reason for each failure. When you are happy with the result, disable <b>Dry Run</b> and import again to apply the changes."
+
+msgid "plugins.importexport.csv.results.intro.users"
+msgstr "This is the result of importing <b>users</b>. Every row of your CSV files was processed: rows that succeeded were created as user accounts, and any that failed are listed further down together with the reason they could not be imported."
+
+msgid "plugins.importexport.csv.results.intro.users.dryMode"
+msgstr "This is a <b>dry run</b> for <b>users</b> — no accounts were created. The summary below is a preview of what a real import would do: it shows which rows would be created and which would fail, along with the reason for each failure. When you are happy with the result, disable <b>Dry Run</b> and import again to apply the changes."
+
+msgid "plugins.importexport.csv.results.legend"
+msgstr "The counters below show the totals for this run, followed by a per-file breakdown. Each failed row is listed with its row number and the reason it failed, so you can fix it in the CSV and import again."
+
+msgid "plugins.importexport.csv.results.invalidFilesHint"
+msgstr "For every CSV that had failed rows, a downloadable copy named <b>invalid_&lt;your-file&gt;.csv</b> is generated containing only those failed rows. Click the file name shown below each error table to download it, fix the rows, and import again."
+
 msgid "plugins.importexport.csv.invalidVorDoiFormat"
 msgstr "Invalid VOR DOI format: \"{$vorDoi}\". Accepted formats: DOI URL (https://doi.org/10.1234/example), DOI identifier (10.1234/example), or with prefix (doi:10.1234/example)."

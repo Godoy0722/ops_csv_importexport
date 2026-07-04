@@ -143,13 +143,13 @@ msgid "plugins.importexport.csv.form.importType.users"
 msgstr "Users"
 
 msgid "plugins.importexport.csv.form.dryMode"
-msgstr "Dry Run"
+msgstr "Data Validation"
 
 msgid "plugins.importexport.csv.form.dryMode.description"
 msgstr "Validate all CSV data without writing to the database. Review results before running a real import."
 
 msgid "plugins.importexport.csv.form.dryMode.enable"
-msgstr "Enable dry-run mode"
+msgstr "Enable data validation mode"
 
 msgid "plugins.importexport.csv.form.sendWelcomeEmail"
 msgstr "Welcome Email"
@@ -170,7 +170,7 @@ msgid "plugins.importexport.csv.zipExtractionFailed"
 msgstr "Failed to extract ZIP file: {$reason}"
 
 msgid "plugins.importexport.csv.results.dryModeTitle"
-msgstr "Dry-Run Results"
+msgstr "Data Validation Results"
 
 msgid "plugins.importexport.csv.results.importCompleteTitle"
 msgstr "Import Complete"
@@ -197,13 +197,13 @@ msgid "plugins.importexport.csv.results.intro.preprints"
 msgstr "This is the result of importing <b>preprints</b>. Every row of your CSV files was processed: rows that succeeded were saved to the server, and any that failed are listed further down together with the reason they could not be imported."
 
 msgid "plugins.importexport.csv.results.intro.preprints.dryMode"
-msgstr "This is a <b>dry run</b> for <b>preprints</b> — nothing was saved to the server. The summary below is a preview of what a real import would do: it shows which rows would be created and which would fail, along with the reason for each failure. When you are happy with the result, disable <b>Dry Run</b> and import again to apply the changes."
+msgstr "This is a <b>Data Validation</b> for <b>preprints</b> — nothing was saved to the server. The summary below is a preview of what a real import would do: it shows which rows would be created and which would fail, along with the reason for each failure. When you are happy with the result, disable <b>Data Validation</b> and import again to apply the changes."
 
 msgid "plugins.importexport.csv.results.intro.users"
 msgstr "This is the result of importing <b>users</b>. Every row of your CSV files was processed: rows that succeeded were created as user accounts, and any that failed are listed further down together with the reason they could not be imported."
 
 msgid "plugins.importexport.csv.results.intro.users.dryMode"
-msgstr "This is a <b>dry run</b> for <b>users</b> — no accounts were created. The summary below is a preview of what a real import would do: it shows which rows would be created and which would fail, along with the reason for each failure. When you are happy with the result, disable <b>Dry Run</b> and import again to apply the changes."
+msgstr "This is a <b>Data Validation</b> for <b>users</b> — no accounts were created. The summary below is a preview of what a real import would do: it shows which rows would be created and which would fail, along with the reason for each failure. When you are happy with the result, disable <b>Data Validation</b> and import again to apply the changes."
 
 msgid "plugins.importexport.csv.results.legend"
 msgstr "The counters below show the totals for this run, followed by a per-file breakdown. Each failed row is listed with its row number and the reason it failed, so you can fix it in the CSV and import again."

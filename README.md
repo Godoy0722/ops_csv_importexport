@@ -6,20 +6,20 @@ This plugin allows administrators to import users and preprints with their assoc
 
 ### Web Interface
 
-Navigate to **Tools → Import/Export → CSV Import Export Plugin**, select the import type (Preprints or Users), upload your CSV file or a ZIP archive, optionally enable Dry Mode, and click **Import**. See [Web Interface Usage](docs/web-interface.md) for details.
+Navigate to **Tools → Import/Export → CSV Import Plugin**, select the import type (Preprints or Users), upload your CSV file or a ZIP archive, optionally enable Dry Mode, and click **Import**. See [Web Interface Usage](docs/web-interface.md) for details.
 
 ### CLI
 
 Import users:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin users [username] [pathToFolderWithCsvFiles] [--sendWelcomeEmail]
+php tools/importExport.php CSVImportPlugin users [username] [pathToFolderWithCsvFiles] [--sendWelcomeEmail]
 ```
 
 Import preprints:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin preprints [username] [pathToFolderWithCsvFiles]
+php tools/importExport.php CSVImportPlugin preprints [username] [pathToFolderWithCsvFiles]
 ```
 
 See [CLI Usage](docs/cli-usage.md) for parameter details and examples.

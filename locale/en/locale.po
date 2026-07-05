@@ -12,19 +12,19 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 msgid "plugins.importexport.csv.displayName"
-msgstr "CSV Import Export Plugin"
+msgstr "CSV Import Plugin"
 
 msgid "plugins.importexport.csv.description"
-msgstr "Import and export issues or users through a CSV file."
+msgstr "Import preprints or users through a CSV file."
 
 msgid "plugins.importexport.csv.cliUsage"
-msgstr "Command-line tool for importing issues or users through a CSV file.\n"
+msgstr "Command-line tool for importing preprints or users through a CSV file.\n"
 "Usage:\n"
-"{$scriptName} [users|issues] username [pathToCsvFile] [--sendWelcomeEmail] [--subscription-type <typeId>]\n"
+"{$scriptName} [users|preprints] username [pathToCsvFile] [--sendWelcomeEmail] [--subscription-type <typeId>]\n"
 "Choose one of the following options:\n"
 " - users - import users from CSV file\n"
-" - issues - import issues from CSV file\n\n"
-"username - the username of the user to whom imported issues should be assigned.\n"
+" - preprints - import preprints from CSV file\n\n"
+"username - the username of the user to whom imported preprints should be assigned.\n"
 "pathToCsvFile - the path to the CSV file to be imported.\n"
 "--sendWelcomeEmail - optional parameter, if set, a welcome email will be sent to the imported users.\n"
 "--subscription-type <typeId> - optional parameter for user import, adds subscriptions with the specified type ID."
@@ -32,9 +32,9 @@ msgstr "Command-line tool for importing issues or users through a CSV file.\n"
 msgid "plugins.importexport.csv.cliUsage.examples"
 msgstr "Examples:\n"
 "{$scriptName} users admin /home/user/import_files/users.csv\n"
-"{$scriptName} issues admin /home/user/import_files/issues.csv\n"
+"{$scriptName} preprints admin /home/user/import_files/preprints.csv\n"
 "{$scriptName} users admin /home/user/import_files/users.csv --sendWelcomeEmail\n"
-"{$scriptName} issues admin /home/user/import_files/issues.csv --sendWelcomeEmail\n"
+"{$scriptName} preprints admin /home/user/import_files/preprints.csv --sendWelcomeEmail\n"
 "{$scriptName} users admin /home/user/import_files/users.csv --sendWelcomeEmail --subscription-type 1\n"
 
 msgid "plugins.importexport.csv.unknownUser"
@@ -142,15 +142,6 @@ msgstr "Preprints"
 msgid "plugins.importexport.csv.form.importType.users"
 msgstr "Users"
 
-msgid "plugins.importexport.csv.form.dryMode"
-msgstr "Data Validation"
-
-msgid "plugins.importexport.csv.form.dryMode.description"
-msgstr "Validate all CSV data without writing to the database. Review results before running a real import."
-
-msgid "plugins.importexport.csv.form.dryMode.enable"
-msgstr "Enable data validation mode"
-
 msgid "plugins.importexport.csv.form.sendWelcomeEmail"
 msgstr "Welcome Email"
 
@@ -168,9 +159,6 @@ msgstr "File upload failed."
 
 msgid "plugins.importexport.csv.zipExtractionFailed"
 msgstr "Failed to extract ZIP file: {$reason}"
-
-msgid "plugins.importexport.csv.results.dryModeTitle"
-msgstr "Data Validation Results"
 
 msgid "plugins.importexport.csv.results.importCompleteTitle"
 msgstr "Import Complete"
@@ -201,9 +189,6 @@ msgstr "This is a <b>Data Validation</b> for <b>preprints</b> — nothing was sa
 
 msgid "plugins.importexport.csv.results.intro.users"
 msgstr "This is the result of importing <b>users</b>. Every row of your CSV files was processed: rows that succeeded were created as user accounts, and any that failed are listed further down together with the reason they could not be imported."
-
-msgid "plugins.importexport.csv.results.intro.users.dryMode"
-msgstr "This is a <b>Data Validation</b> for <b>users</b> — no accounts were created. The summary below is a preview of what a real import would do: it shows which rows would be created and which would fail, along with the reason for each failure. When you are happy with the result, disable <b>Data Validation</b> and import again to apply the changes."
 
 msgid "plugins.importexport.csv.results.legend"
 msgstr "The counters below show the totals for this run, followed by a per-file breakdown. Each failed row is listed with its row number and the reason it failed, so you can fix it in the CSV and import again."

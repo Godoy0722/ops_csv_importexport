@@ -7,7 +7,7 @@
 To import users from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin users [username] [pathToFolderWithCsvFiles] [--sendWelcomeEmail] [--dry-mode]
+php tools/importExport.php CSVImportPlugin users [username] [pathToFolderWithCsvFiles] [--sendWelcomeEmail] [--dry-mode]
 ```
 
 Parameters:
@@ -18,7 +18,7 @@ Parameters:
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_with_csv_user_files --sendWelcomeEmail
+php tools/importExport.php CSVImportPlugin users admin /path/to/folder_with_csv_user_files --sendWelcomeEmail
 ```
 
 ## Importing Preprints
@@ -26,7 +26,7 @@ php tools/importExport.php CSVImportExportPlugin users admin /path/to/folder_wit
 To import preprints from a CSV file, use the following command:
 
 ```bash
-php tools/importExport.php CSVImportExportPlugin preprints [username] [pathToFolderWithCsvFiles] [--dry-mode]
+php tools/importExport.php CSVImportPlugin preprints [username] [pathToFolderWithCsvFiles] [--dry-mode]
 ```
 
 Parameters:
@@ -36,7 +36,7 @@ Parameters:
 
 Example:
 ```bash
-php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/folder_with_csv_preprint_files
+php tools/importExport.php CSVImportPlugin preprints admin /path/to/folder_with_csv_preprint_files
 ```
 
 > **Important Notes**

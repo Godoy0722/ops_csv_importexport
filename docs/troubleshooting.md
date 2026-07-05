@@ -19,7 +19,7 @@ When an import encounters errors, the plugin automatically creates `invalid_*.cs
 
 ```bash
 # Initial import
-php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/import_folder/
+php tools/importExport.php CSVImportPlugin preprints admin /path/to/import_folder/
 
 # Output shows:
 # Process for file "preprints.csv" finished. 50 rows processed. 3 rows with error.
@@ -42,7 +42,7 @@ cp /path/to/import_folder/invalid_preprints.csv /path/to/import_retry/preprints_
 #    - Copy all the assets present on the rows that you will run again to the new folder
 
 # 4. Run the import on the new folder
-php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/import_retry/
+php tools/importExport.php CSVImportPlugin preprints admin /path/to/import_retry/
 ```
 
 **Option 2: Fix In Place**
@@ -57,7 +57,7 @@ mv /path/to/import_folder/preprints.csv /path/to/import_folder/preprints_complet
 # 3. Fix errors in preprints_fixed.csv (remove the 'error' column)
 
 # 4. Re-run the import (will only process preprints_fixed.csv)
-php tools/importExport.php CSVImportExportPlugin preprints admin /path/to/import_folder/
+php tools/importExport.php CSVImportPlugin preprints admin /path/to/import_folder/
 ```
 
 ### Avoiding Duplicates

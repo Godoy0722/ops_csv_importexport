@@ -9,10 +9,10 @@
          failOnWarning="false"
          failOnDeprecation="false">
     <testsuites>
-        <testsuite name="CSV Import/Export Plugin Tests">
+        <testsuite name="CSV Import Plugin Tests">
             <directory>tests</directory>
         </testsuite>
-        <testsuite name="Shared CSV Import/Export Library Tests">
+        <testsuite name="Shared CSV Import Library Tests">
             <directory>shared/tests</directory>
         </testsuite>
     </testsuites>

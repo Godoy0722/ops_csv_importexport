@@ -1,6 +1,8 @@
-.claude/
-.phpunit.cache/
-imports/
-tests/coverage/
-CLAUDE.md
-examples/*.zip
+examples/**/*
+!examples/**/*.csv
+imports
+examples/**/invalid_*.csv
+examples/**/*.zip
+docs/superpowers/
+tests/coverage
+.claude

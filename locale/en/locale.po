@@ -55,8 +55,8 @@ msgstr "Invalid file for this preprint."
 msgid "plugins.importexport.csv.invalidCoverImage"
 msgstr "Invalid cover image for this submission."
 
-msgid "plugins.importexpot.csv.fileProcessFinished"
-msgstr "Process for file \"{$filename}\" finished. {$processedRows} rows processed. {$failedRows} rows with error."
+msgid "plugins.importexport.csv.fileProcessFinished"
+msgstr "Process for file \"{$filename}\" finished. {$createdRows} created, {$updatedRows} updated, {$failedRows} failed."
 
 msgid "plugins.importexport.csv.erroWhileSavingBookCoverImage"
 msgstr "An error occurred while saving the book cover image."

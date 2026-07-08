@@ -58,6 +58,8 @@ class UserCommand
             'filesProcessed' => 0,
             'totalRows' => 0,
             'successfulRows' => 0,
+            'createdRows' => 0,
+            'updatedRows' => 0,
             'failedRows' => 0,
             'perFile' => [],
         ];
@@ -84,6 +86,8 @@ class UserCommand
 
             $this->processedRows = 0;
             $this->failedRows = 0;
+            $fileUpdatedRows = 0;
+            $fileUpdatedUsers = [];
             $fileFailedRows = [];
 
             if ($this->dryMode) {
@@ -109,10 +113,19 @@ class UserCommand
                     $server = CachedEntities::getCachedServer($data->serverPath);
 
                     InvalidRowValidations::validateContextIsValid($server, $data->serverPath, 'Server');
-                    InvalidRowValidations::validateUserAlreadyExistsWithThisEmail($data->email);
+                    $existingUser = CachedEntities::getCachedUserByEmail($data->email);
+                    $isNewUser = is_null($existingUser);
 
-                    if ($data->username) {
-                        InvalidRowValidations::validateUserAlreadyExistsWithThisUsername($data->username);
+                    if ($isNewUser) {
+                        InvalidRowValidations::validateUserAlreadyExistsWithThisEmail($data->email);
+
+                        if ($data->username) {
+                            InvalidRowValidations::validateUserAlreadyExistsWithThisUsername($data->username);
+                        }
+
+                        if (empty($data->username)) {
+                            $data->username = UsersProcessor::getValidUsername($data->firstname, $data->lastname);
+                        }
                     }
 
                     $roles = array_map('trim', explode(';', $data->roles ?? ''));
@@ -123,9 +136,7 @@ class UserCommand
                         OrcidHandler::validate($data->orcid);
                     }
 
-                    // Generate password if tempPassword column is empty
-                    // User will need to use password reset function to receive a reset link
-                    if (is_null($data->tempPassword)) {
+                    if ($isNewUser && is_null($data->tempPassword)) {
                         $data->tempPassword = Validation::generatePassword();
                     }
 
@@ -133,10 +144,15 @@ class UserCommand
                     $userId = $user->getId();
                     $userInterests = array_map('trim', explode(';', $data->reviewInterests ?? ''));
                     UserInterestsProcessor::process($userInterests, $userId);
-                    UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
 
-                    if ($this->sendWelcomeEmail && !$this->dryMode) {
-                        // @review There were some discussions about strategies for mail delivery
+                    if ($isNewUser) {
+                        UserGroupsProcessor::process($roles, $userId, $server->getId(), $server->getPrimaryLocale());
+                    } else {
+                        $fileUpdatedRows++;
+                        $fileUpdatedUsers[] = $data->email;
+                    }
+
+                    if ($this->sendWelcomeEmail && !$this->dryMode && $isNewUser) {
                         WelcomeEmailHandler::sendWelcomeEmail($server, $user, $this->senderEmailUser, $data->tempPassword);
                     }
                 } catch (RowValidationException $e) {
@@ -173,9 +189,12 @@ class UserCommand
                 CachedEntities::reset();
             }
 
-            echo __('plugins.importexpot.csv.fileProcessFinished', [
+            $createdRows = $this->processedRows - $this->failedRows - $fileUpdatedRows;
+            echo __('plugins.importexport.csv.fileProcessFinished', [
                 'filename' => $fileInfo->getFilename(),
                 'processedRows' => $this->processedRows,
+                'createdRows' => $createdRows,
+                'updatedRows' => $fileUpdatedRows,
                 'failedRows' => $this->failedRows,
             ]) . "\n";
 
@@ -183,6 +202,9 @@ class UserCommand
                 'filename' => $basename,
                 'rows' => $this->processedRows,
                 'successful' => $this->processedRows - $this->failedRows,
+                'created' => $this->processedRows - $this->failedRows - $fileUpdatedRows,
+                'updated' => $fileUpdatedRows,
+                'updatedUsers' => $fileUpdatedUsers,
                 'failed' => $this->failedRows,
                 'errors' => $fileFailedRows,
                 'invalidFile' => $this->failedRows > 0 ? "invalid_{$basename}" : null,
@@ -191,6 +213,8 @@ class UserCommand
             $results['filesProcessed']++;
             $results['totalRows'] += $this->processedRows;
             $results['successfulRows'] += $this->processedRows - $this->failedRows;
+            $results['createdRows'] = ($results['createdRows'] ?? 0) + $this->processedRows - $this->failedRows - $fileUpdatedRows;
+            $results['updatedRows'] = ($results['updatedRows'] ?? 0) + $fileUpdatedRows;
             $results['failedRows'] += $this->failedRows;
         }
 
@@ -200,7 +224,7 @@ class UserCommand
             return $results;
         }
 
-        $results['exitCode'] = 0;
+        $results['exitCode'] = $results['failedRows'] > 0 ? 1 : 0;
         return $results;
     }
 }

@@ -30,6 +30,10 @@ class SectionsProcessor extends SharedSectionsProcessor
 
 	public static function process(object $data, Server $server, Publication $publication): void
     {
+        if (empty($data->sectionTitle) && empty($data->sectionAbbrev)) {
+            return;
+        }
+
         if (!$data->sectionTitle) {
             /** @var Section */
             $section = CachedEntities::getCachedSection(

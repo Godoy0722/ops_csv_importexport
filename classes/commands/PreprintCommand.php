@@ -101,10 +101,14 @@ class PreprintCommand
     private array $processedPreprints;
     private array $failedIdentifiers = [];
 
-    public function __construct(private string $sourceDir, private User $user, private bool $dryMode = false)
+    /** @var string|null Current server path from GUI context. When set, rows with a different serverPath are rejected. */
+    private ?string $currentServerPath;
+
+    public function __construct(private string $sourceDir, private User $user, private bool $dryMode = false, ?string $currentServerPath = null)
     {
         $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
         $this->processedPreprints = [];
+        $this->currentServerPath = $currentServerPath;
 
         // Initialize static variables.
         $this->dirNames ??= Application::getFileDirectories();
@@ -263,6 +267,17 @@ class PreprintCommand
                     $server = CachedEntities::getCachedServer($data->serverPath);
 
                     InvalidRowValidations::validateContextIsValid($server, $data->serverPath, 'Server');
+
+                    if ($this->currentServerPath !== null && $data->serverPath !== $this->currentServerPath) {
+                        throw new RowValidationException(
+                            __('plugins.importexport.csv.contextPathMismatch', [
+                                'contextType' => 'Server',
+                                'csvContextPath' => $data->serverPath,
+                                'currentContextPath' => $this->currentServerPath,
+                            ])
+                        );
+                    }
+
                     InvalidRowValidations::validateContextLocale($server, $data->locale, 'Server');
 
                     // we need a Genre for the files.  Assume a key of SUBMISSION as a default.

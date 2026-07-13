@@ -225,6 +225,8 @@ class CSVImportPlugin extends ImportExportPlugin
     private function handleImport(PKPRequest $request): void
     {
         $user = $request->getUser();
+        $context = $request->getContext();
+        $currentServerPath = $context?->getPath();
         $importType = $request->getUserVar('importType');
         $dryMode = (bool) $request->getUserVar('dryMode');
         $sendWelcomeEmail = (bool) $request->getUserVar('sendWelcomeEmail');
@@ -262,8 +264,8 @@ class CSVImportPlugin extends ImportExportPlugin
 
             ob_start();
             $result = match ($importType) {
-                'preprints' => (new PreprintCommand($sourceDir, $user, $dryMode))->run(),
-                'users' => (new UserCommand($sourceDir, $user, $sendWelcomeEmail, $dryMode))->run(),
+                'preprints' => (new PreprintCommand($sourceDir, $user, $dryMode, $currentServerPath))->run(),
+                'users' => (new UserCommand($sourceDir, $user, $sendWelcomeEmail, $dryMode, $currentServerPath))->run(),
             };
             $capturedOutput = ob_get_clean();
 
@@ -408,8 +410,8 @@ class CSVImportPlugin extends ImportExportPlugin
         $this->validateUser();
 
         $result = match ($this->command) {
-            'preprints' => (new PreprintCommand($this->sourceDir, $this->user, $dryMode))->run(),
-            'users' => (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail, $dryMode))->run(),
+            'preprints' => (new PreprintCommand($this->sourceDir, $this->user, $dryMode, null))->run(),
+            'users' => (new UserCommand($this->sourceDir, $this->user, $this->sendWelcomeEmail, $dryMode, null))->run(),
             default => throw new \InvalidArgumentException(__('plugins.importexport.csv.invalidCommand', ['command' => $this->command])),
         };
         $exitCode = $result['exitCode'];

@@ -40,13 +40,18 @@ class UserCommand
 
     private int $failedRows;
 
+    /** @var string|null Current server path from GUI context. When set, rows with a different serverPath are rejected. */
+    private ?string $currentServerPath;
+
     public function __construct(
         private string $sourceDir,
         private User $senderEmailUser,
         private bool $sendWelcomeEmail,
-        private bool $dryMode = false
+        private bool $dryMode = false,
+        ?string $currentServerPath = null
     ) {
         $this->expectedRowSize = count(RequiredUserHeaders::$userHeaders);
+        $this->currentServerPath = $currentServerPath;
     }
 
     public function run(): array
@@ -116,6 +121,17 @@ class UserCommand
                     $server = CachedEntities::getCachedServer($data->serverPath);
 
                     InvalidRowValidations::validateContextIsValid($server, $data->serverPath, 'Server');
+
+                    if ($this->currentServerPath !== null && $data->serverPath !== $this->currentServerPath) {
+                        throw new RowValidationException(
+                            __('plugins.importexport.csv.contextPathMismatch', [
+                                'contextType' => 'Server',
+                                'csvContextPath' => $data->serverPath,
+                                'currentContextPath' => $this->currentServerPath,
+                            ])
+                        );
+                    }
+
                     $existingUser = CachedEntities::getCachedUserByEmail($data->email);
                     $isNewUser = is_null($existingUser);
 

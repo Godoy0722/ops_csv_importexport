@@ -45,6 +45,8 @@
 
 You can take a look at the example we provide on the [User CSV file](../examples/users/users_example.csv).
 
+Make sure to follow this CSV structure with all headers present, including the non-required ones. It is ok for non-required fields to have no values as long as the header is present.
+
 ## Preprints CSV Format
 
 | Column | Required | Description | Example | Notes |
@@ -229,6 +231,8 @@ Notes:
 ### Preprints CSV Example
 
 You can take a look at the example we provide on the [Preprint CSV file](../examples/preprints/comprehensive_multilocale_preprints.csv).
+
+Make sure to follow this CSV structure with all headers present, including the non-required ones. It is ok for non-required fields to have no values as long as the header is present.
 
 ### Import File Structure
 

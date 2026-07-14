@@ -295,17 +295,23 @@ class PreprintCommand
                     }
 
                     $coverImageUploadName = null;
-                    if (!$this->dryMode && $data->coverImageFilename) {
-                        try {
-                            $coverImageUploadName = PublicationProcessor::uploadCoverImage(
-                                $data,
-                                $server->getId(),
-                                $this->sourceDir,
-                                $this->publicFileManager,
-                                $this->fileManager
-                            );
-                        } catch (\Exception $e) {
-                            throw new RowValidationException($e->getMessage());
+                    if ($data->coverImageFilename) {
+                        $reason = InvalidRowValidations::validateCoverImageIsValid($data->coverImageFilename, $this->sourceDir);
+                        if (!is_null($reason)) {
+                            throw new RowValidationException($reason);
+                        }
+                        if (!$this->dryMode) {
+                            try {
+                                $coverImageUploadName = PublicationProcessor::uploadCoverImage(
+                                    $data,
+                                    $server->getId(),
+                                    $this->sourceDir,
+                                    $this->publicFileManager,
+                                    $this->fileManager
+                                );
+                            } catch (\Exception $e) {
+                                throw new RowValidationException($e->getMessage());
+                            }
                         }
                     }
 

@@ -584,7 +584,7 @@ class PreprintCommandTest extends BaseTestCase
         // invalid_ file should trigger skip message
         $this->assertStringContainsString('plugins.importexport.csv.skippingInvalidFile', $output);
         // No file processing finished message (no valid CSV processed)
-        $this->assertStringNotContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringNotContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -612,7 +612,7 @@ class PreprintCommandTest extends BaseTestCase
         $output = ob_get_clean();
 
         // continue on line 134 skips the file processing summary echo
-        $this->assertStringNotContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringNotContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -649,7 +649,7 @@ class PreprintCommandTest extends BaseTestCase
         $output = ob_get_clean();
 
         // continue 2 on line 424 skips the file processing summary echo
-        $this->assertStringNotContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringNotContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -675,7 +675,7 @@ class PreprintCommandTest extends BaseTestCase
         $command->run();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -736,7 +736,7 @@ class PreprintCommandTest extends BaseTestCase
         $command->run();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
         // Username was found, so no default user message
         $this->assertStringNotContainsString('plugins.importexport.csv.usernameNotFoundUsingDefault', $output);
     }
@@ -813,7 +813,7 @@ class PreprintCommandTest extends BaseTestCase
         $command->run();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -884,7 +884,7 @@ class PreprintCommandTest extends BaseTestCase
         $command->run();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -921,7 +921,7 @@ class PreprintCommandTest extends BaseTestCase
         $output = ob_get_clean();
 
         $this->assertStringContainsString('plugins.importexport.csv.usernameNotFoundUsingDefault', $output);
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -953,7 +953,7 @@ class PreprintCommandTest extends BaseTestCase
         // The invalid CSV file should be created
         $invalidFiles = glob($this->tempDir . '/invalid_*.csv');
         $this->assertNotEmpty($invalidFiles);
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -994,7 +994,7 @@ class PreprintCommandTest extends BaseTestCase
         // FileNotSavedException caught, invalid CSV created, processing continues
         $invalidFiles = glob($this->tempDir . '/invalid_*.csv');
         $this->assertNotEmpty($invalidFiles);
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -1046,7 +1046,7 @@ class PreprintCommandTest extends BaseTestCase
         // FileNotSavedException caught, invalid CSV created
         $invalidFiles = glob($this->tempDir . '/invalid_*.csv');
         $this->assertNotEmpty($invalidFiles);
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -1085,7 +1085,7 @@ class PreprintCommandTest extends BaseTestCase
         $command->run();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -1133,7 +1133,7 @@ class PreprintCommandTest extends BaseTestCase
         // FileNotSavedException caught, galley cleanup ran, invalid CSV created
         $invalidFiles = glob($this->tempDir . '/invalid_*.csv');
         $this->assertNotEmpty($invalidFiles);
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -1256,7 +1256,7 @@ class PreprintCommandTest extends BaseTestCase
         $command->run();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -1296,7 +1296,7 @@ class PreprintCommandTest extends BaseTestCase
         // RowValidationException caught, invalid CSV created
         $invalidFiles = glob($this->tempDir . '/invalid_*.csv');
         $this->assertNotEmpty($invalidFiles);
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**
@@ -1379,7 +1379,7 @@ class PreprintCommandTest extends BaseTestCase
         $output = ob_get_clean();
 
         // Line 385-389: PublicationProcessor::setCoverImage was called for v2 with base cover image
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.submissionFileProcessFinished', $output);
     }
 
     /**

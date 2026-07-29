@@ -613,7 +613,7 @@ class PreprintCommand
                 $this->failedIdentifiers = [];
             }
 
-            echo __('plugins.importexpot.csv.fileProcessFinished', [
+            echo __('plugins.importexport.csv.submissionFileProcessFinished', [
                 'filename' => $fileInfo->getFilename(),
                 'processedRows' => $this->processedRows,
                 'failedRows' => $this->failedRows,

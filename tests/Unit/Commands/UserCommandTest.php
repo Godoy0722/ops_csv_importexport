@@ -1146,7 +1146,7 @@ class UserCommandTest extends BaseTestCase
         $output = ob_get_clean();
 
         // continue on line 65 skips the file processing summary echo on line 133
-        $this->assertStringNotContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringNotContainsString('plugins.importexport.csv.fileProcessFinished', $output);
     }
 
     /**
@@ -1205,7 +1205,7 @@ class UserCommandTest extends BaseTestCase
 
         // Line 108 was executed (tempPassword was null, Validation::generatePassword() was called).
         // Processing continued successfully to line 133 (file processing summary echo).
-        $this->assertStringContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringContainsString('plugins.importexport.csv.fileProcessFinished', $output);
     }
 
     /**
@@ -1244,6 +1244,6 @@ class UserCommandTest extends BaseTestCase
         $output = ob_get_clean();
 
         // continue 2 on line 125 skips the file processing summary echo on line 133
-        $this->assertStringNotContainsString('plugins.importexpot.csv.fileProcessFinished', $output);
+        $this->assertStringNotContainsString('plugins.importexport.csv.fileProcessFinished', $output);
     }
 }

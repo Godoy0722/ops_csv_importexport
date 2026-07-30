@@ -31,6 +31,9 @@ class CachedEntities extends SharedCachedEntities
     /** @var array<int,int|null> */
     static array $supplementaryGenreIds = [];
 
+    /** @var array<int,array<string,bool>> Server-scoped cache of existing DOIs from the database */
+    static array $existingDoisByServer = [];
+
     /** Resets all cached entities. Used after dry-mode rollback to clear stale IDs. */
     public static function reset(): void
     {
@@ -38,6 +41,7 @@ class CachedEntities extends SharedCachedEntities
 
         static::$servers = [];
         static::$supplementaryGenreIds = [];
+        static::$existingDoisByServer = [];
     }
 
     /** Retrieves a cached Server by its path. Returns null if an error occurs. */
@@ -59,5 +63,26 @@ class CachedEntities extends SharedCachedEntities
         $supplementaryGenres = $genreDao->getBySupplementaryAndContextId(true, $serverId)->toArray();
 
         return static::$supplementaryGenreIds[$serverId] = !empty($supplementaryGenres) ? $supplementaryGenres[0]->getId() : null;
+    }
+
+    /** Retrieves all existing DOIs for a server, cached statically. Returns assoc array [doi => true]. */
+    static function getExistingDois(int $serverId): array
+    {
+        if (isset(static::$existingDoisByServer[$serverId])) {
+            return static::$existingDoisByServer[$serverId];
+        }
+
+        $dois = \Illuminate\Support\Facades\DB::table('dois')
+            ->where('context_id', $serverId)
+            ->whereNotNull('doi')
+            ->distinct()
+            ->pluck('doi');
+
+        $map = [];
+        foreach ($dois as $doi) {
+            $map[$doi] = true;
+        }
+
+        return static::$existingDoisByServer[$serverId] = $map;
     }
 }

@@ -101,6 +101,9 @@ class PreprintCommand
     private array $processedPreprints;
     private array $failedIdentifiers = [];
 
+    /** @var array<string,bool> DOIs imported during this run for deduplication */
+    private array $importedDois;
+
     /** @var string|null Current server path from GUI context. When set, rows with a different serverPath are rejected. */
     private ?string $currentServerPath;
 
@@ -109,6 +112,7 @@ class PreprintCommand
         $this->expectedRowSize = count(RequiredPreprintHeaders::$preprintHeaders);
         $this->processedPreprints = [];
         $this->currentServerPath = $currentServerPath;
+        $this->importedDois = [];
 
         // Initialize static variables.
         $this->dirNames ??= Application::getFileDirectories();
@@ -240,6 +244,12 @@ class PreprintCommand
                         InvalidRowValidations::validateVorDoi($data->vorDoi);
                     }
 
+                    InvalidRowValidations::validateDoiNotDuplicate(
+                        $data->doi ?? null,
+                        $existingDois,
+                        $this->importedDois
+                    );
+
                     if ($data->funders) {
                         InvalidRowValidations::validateFunders($data->funders);
                     }
@@ -279,6 +289,8 @@ class PreprintCommand
                     }
 
                     InvalidRowValidations::validateContextLocale($server, $data->locale, 'Server');
+
+                    $existingDois = CachedEntities::getExistingDois($server->getId());
 
                     // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
                     $genreName = 'SUBMISSION';
@@ -533,6 +545,13 @@ class PreprintCommand
                         DB::commit();
                     }
 
+                    if (!empty(trim($data->doi ?? ''))) {
+                        $normalizedDoi = InvalidRowValidations::normalizeVorDoi($data->doi);
+                        if ($normalizedDoi !== null) {
+                            $this->importedDois[$normalizedDoi] = true;
+                        }
+                    }
+
                 } catch (RowValidationException | FileNotSavedException $e) {
                     if (!$this->dryMode) {
                         DB::rollBack();
@@ -611,6 +630,7 @@ class PreprintCommand
                 CachedEntities::reset();
                 $this->processedPreprints = [];
                 $this->failedIdentifiers = [];
+                $this->importedDois = [];
             }
 
             echo __('plugins.importexport.csv.submissionFileProcessFinished', [

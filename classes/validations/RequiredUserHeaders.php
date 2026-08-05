@@ -35,7 +35,6 @@ class RequiredUserHeaders
     static $userRequiredHeaders = [
         'serverPath',
         'firstname',
-        'lastname',
         'email',
         'roles',
     ];

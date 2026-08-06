@@ -70,6 +70,7 @@ Make sure to follow this CSV structure with all headers present, including the n
 | galleyFilenames | No | Semicolon-separated galley files | paper.pdf;slides.pptx | Optional |
 | galleyLabels | No | Labels for galleys | PDF;SLIDES | Must match galleyFilenames count |
 | galleyViews | No | Semicolon-separated view counts per galley | 150;42 | Must match galleyFilenames count. See [Usage Statistics](#usage-statistics) |
+| htmlGalley | No | Semicolon-separated HTML galley with dependent files | article.html;style.css;chart.svg | First file must be .html/.htm. See [HTML Galleys](#html-galleys) |
 | suppFilenames | No | Semicolon-separated supplementary files | supplement.pdf;data.csv | Optional |
 | suppLabels | No | Labels for supplementary files | Supplement;Dataset | Must match suppFilenames count |
 | suppDescriptions | No | Semicolon-separated descriptions for supplementary files | Supplementary analysis;Raw dataset (CSV) | Optional; if provided must match suppFilenames and suppLabels count |
@@ -249,6 +250,44 @@ import_directory/
 ├── supplementary_data.csv
 ├── cover.jpg
 ```
+
+### HTML Galleys
+
+The `htmlGalley` column allows importing an HTML file as a galley, optionally with dependent files (CSS, SVG, JS, images, etc.).
+
+**Format:**
+
+```
+htmlFile.html;dependentFile1.css;dependentFile2.svg
+```
+
+- Values are **semicolon-separated** (`;`)
+- The **first file** must be the HTML galley (`.html` or `.htm` extension)
+- All remaining files are treated as **dependent files**
+- All files must be placed in the same directory as the CSV file, or in a subfolder — use a relative path from the CSV directory (e.g., `galleys/article.html;galleys/styles.css`)
+
+**Example — HTML galley with stylesheet and chart:**
+
+```
+htmlGalley: article.html;styles.css;chart.svg
+```
+
+**Combining with regular galleys:**
+
+You can import both regular galleys and an HTML galley in the same row:
+
+```
+galleyFilenames: paper.pdf
+galleyLabels:    PDF
+galleyViews:     150;75
+htmlGalley:      article.html;styles.css
+```
+
+> The HTML galley always receives the label `HTML`. If you provide `galleyViews`, include a view count for the HTML galley as well — dependent files don't count.
+
+**Important:** When the HTML galley is downloaded, the browser receives the raw HTML file. Relative paths to dependent files inside the HTML (e.g., `<link href="styles.css">`) are not automatically resolved — the platform currently has no built-in URL routing to serve them alongside the HTML in the reader view.
+
+> **Dependent file types:** Any file type can be uploaded as a dependent file — CSS, SVG, PNG, JPEG, JS, fonts, etc. There are no extension restrictions on dependent files, only the first file in the list must be `.html` or `.htm`.
 
 ## Funders Support
 

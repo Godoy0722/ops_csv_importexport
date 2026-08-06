@@ -34,6 +34,7 @@ use APP\plugins\importexport\csv\shared\processors\AuthorsProcessor;
 use APP\plugins\importexport\csv\shared\processors\CategoriesProcessor;
 use APP\plugins\importexport\csv\shared\processors\FundersProcessor;
 use APP\plugins\importexport\csv\shared\processors\GalleyProcessor;
+use APP\plugins\importexport\csv\shared\processors\HtmlGalleyProcessor;
 use APP\plugins\importexport\csv\shared\processors\KeywordsProcessor;
 use APP\plugins\importexport\csv\shared\processors\StatisticsProcessor;
 use APP\plugins\importexport\csv\shared\processors\SubjectsProcessor;
@@ -217,6 +218,13 @@ class PreprintCommand
                         );
                     }
 
+                    if ($data->htmlGalley) {
+                        InvalidRowValidations::validateHtmlGalleys(
+                            $data->htmlGalley,
+                            $this->sourceDir
+                        );
+                    }
+
                     if ($data->suppFilenames) {
                         InvalidRowValidations::validateSupplementaryFiles(
                             $data->suppFilenames,
@@ -243,12 +251,6 @@ class PreprintCommand
                     if ($data->vorDoi) {
                         InvalidRowValidations::validateVorDoi($data->vorDoi);
                     }
-
-                    InvalidRowValidations::validateDoiNotDuplicate(
-                        $data->doi ?? null,
-                        $existingDois,
-                        $this->importedDois
-                    );
 
                     if ($data->funders) {
                         InvalidRowValidations::validateFunders($data->funders);
@@ -291,6 +293,12 @@ class PreprintCommand
                     InvalidRowValidations::validateContextLocale($server, $data->locale, 'Server');
 
                     $existingDois = CachedEntities::getExistingDois($server->getId());
+
+                    InvalidRowValidations::validateDoiNotDuplicate(
+                        $data->doi ?? null,
+                        $existingDois,
+                        $this->importedDois
+                    );
 
                     // we need a Genre for the files.  Assume a key of SUBMISSION as a default.
                     $genreName = 'SUBMISSION';
@@ -384,6 +392,65 @@ class PreprintCommand
                         $galleyMetadata = $this->processGalleys($data, $server->getId(), $submission, $genreId, $publication->getId(), $fileUploadUser);
                     } else {
                         $galleyMetadata = [];
+                    }
+
+                    if (!$this->dryMode && $data->htmlGalley) {
+                        $htmlGalleyFiles = array_values(array_filter(
+                            array_map('trim', explode(';', $data->htmlGalley)),
+                            fn(string $f) => $f !== ''
+                        ));
+
+                        $htmlFile = $htmlGalleyFiles[0];
+                        $dependentFiles = array_slice($htmlGalleyFiles, 1);
+
+                        $htmlSourcePath = "{$this->sourceDir}/{$htmlFile}";
+
+                        $sanitizedHtml = HtmlGalleyProcessor::sanitizeHtmlFile($htmlSourcePath);
+                        $tempFile = tempnam(sys_get_temp_dir(), 'csv_html_galley_');
+                        file_put_contents($tempFile, $sanitizedHtml);
+
+                        try {
+                            $htmlFileId = $this->saveSubmissionFile(
+                                $htmlFile,
+                                $server->getId(),
+                                $submission,
+                                __('plugins.importexport.csv.errorWhileSavingHtmlGalley', ['filename' => $htmlFile]),
+                                $tempFile
+                            );
+
+                            $htmlGalleyLabel = 'HTML';
+                            $htmlGalleyMeta = $this->handleGalley(
+                                ['file' => $htmlFile, 'id' => $htmlFileId],
+                                $data,
+                                $submission->getId(),
+                                $genreId,
+                                $htmlGalleyLabel,
+                                $publication->getId(),
+                                $fileUploadUser
+                            );
+
+                            $galleyMetadata[] = $htmlGalleyMeta;
+
+                            $submissionDir = sprintf($this->format, $server->getId(), $submission->getId());
+
+                            if (!empty($dependentFiles)) {
+                                HtmlGalleyProcessor::createDependentFiles(
+                                    $dependentFiles,
+                                    $htmlGalleyMeta['submissionFileId'],
+                                    $this->sourceDir,
+                                    $submissionDir,
+                                    $data,
+                                    $submission->getId(),
+                                    $genreId,
+                                    $fileUploadUser,
+                                    $this->fileService
+                                );
+                            }
+                        } finally {
+                            if (file_exists($tempFile)) {
+                                unlink($tempFile);
+                            }
+                        }
                     }
 
                     if (!empty($data->preprintViews) && (int)$data->preprintViews > 0) {
@@ -731,13 +798,14 @@ class PreprintCommand
         string $filePath,
         int $serverId,
         Submission $submission,
-        string $errorMessage
+        string $errorMessage,
+        ?string $sourcePathOverride = null,
     ): int
     {
         try {
             $extension = $this->fileManager->parseFileExtension($filePath);
             $submissionDir = sprintf($this->format, $serverId, $submission->getId());
-            $completePath = "{$this->sourceDir}/{$filePath}";
+            $completePath = $sourcePathOverride ?? "{$this->sourceDir}/{$filePath}";
 
             return $this->fileService->add($completePath, $submissionDir . '/' . uniqid() . '.' . $extension);
         } catch (\Exception $e) {

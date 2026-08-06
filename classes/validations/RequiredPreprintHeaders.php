@@ -38,6 +38,7 @@ class RequiredPreprintHeaders
         'galleyFilenames',
         'galleyLabels',
         'galleyViews',
+        'htmlGalley',
         'suppFilenames',
         'suppLabels',
         'suppDescriptions',
